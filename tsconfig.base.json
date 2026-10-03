@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "paths": {
+      "@pagepace/schema": ["./packages/schema/src/index.ts"],
+      "@pagepace/extractor": ["./packages/extractor/src/index.ts"],
+      "@pagepace/segmenter": ["./packages/segmenter/src/index.ts"],
+      "@pagepace/eval": ["./packages/eval/src/index.ts"]
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# Manifest do corpus PÚBLICO. Preenchido na tarefa E0-T01 / E1-T05.
+# Regras: só material de domínio público ou licença aberta verificada. Nunca PDFs com copyright.
+# O script `pnpm corpus:fetch` baixa cada item para corpus/public/ e valida o sha256.
+#
+# Esquema de cada entrada:
+#   - id: n1-en-0001            # único, estável
+#     level: N1                 # N1..N5
+#     lang: en                  # pt | en
+#     title: "..."
+#     source_url: "https://..."
+#     license: "public-domain | CC-BY-4.0 | ..."
+#     sha256: "<64 hex>"
+#     features: [footnotes, two-column, hyphenation, equations, tagged, scanned]
+#     golden: none              # ou caminho relativo em corpus/golden/
+#     visibility: public
+
+version: 1
+documents: []
+
+# Necessidades de cobertura (ver docs/extractor/CORPUS.md):
+#   N1: 2 pt, 2 en   N2: 2 en, 1 pt   N3: 3 pt, 3 en   N4: 1 pt, 2 en   N5: 2 mistos

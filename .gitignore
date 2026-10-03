@@ -1,0 +1,22 @@
+# dependencies / build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.pagepace-cache/
+
+# env / editor / OS
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# PDFs NEVER go to git (public ones are fetched by script, private ones live outside the repo)
+*.pdf
+corpus/public/*
+!corpus/public/.gitkeep
+
+# eval outputs (generated)
+packages/eval/out/

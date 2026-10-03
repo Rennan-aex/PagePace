@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:no-pdf
+      # Corpus evaluation gate (the "golden rule": no metric may regress).
+      # Enabled automatically once the eval package ships its baseline (task E1-T08).
+      - name: Corpus evaluation
+        if: hashFiles('packages/eval/baseline.json') != ''
+        run: |
+          pnpm corpus:fetch
+          pnpm eval --ci
