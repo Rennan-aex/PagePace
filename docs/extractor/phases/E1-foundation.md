@@ -28,7 +28,8 @@
 - **Aceite:** `pnpm pagepace dump-raw <pdf> [--pages 1-5]` escreve JSON; `--help` funciona; erro claro para arquivo inexistente.
 
 ### E1-T05 · Corpus: manifest + `corpus:fetch`
-- **Aceite:** `pnpm corpus:fetch` baixa os públicos do manifest para `corpus/public/`, valida SHA-256 e falha em divergência; reexecutar não rebaixa o que já está certo; mescla o manifest privado se `CORPUS_PRIVATE_DIR` existir.
+- **Passos:** o script resolve `CORPUS_PRIVATE_DIR` lendo primeiro a variável de ambiente e, se ela não existir, o arquivo `.env` na raiz do repositório (sem dependência nova: parser de `KEY=VALUE` mínimo, `.env` já está no `.gitignore`). Sem as duas fontes, seguir só com o corpus público e avisar uma vez, sem falhar.
+- **Aceite:** `pnpm corpus:fetch` baixa os públicos do manifest para `corpus/public/`, valida SHA-256 e falha em divergência; reexecutar não rebaixa o que já está certo; mescla o manifest privado se `CORPUS_PRIVATE_DIR` existir; `pnpm eval` acha `CORPUS_PRIVATE_DIR` pelo `.env` quando a variável não está no ambiente.
 
 ### E1-T06 · Runner de avaliação + métrica `text_cer`
 - **Objetivo:** `@pagepace/eval` roda o pipeline (por ora só ingestão + texto bruto concatenado) em cada documento do corpus com gabarito e calcula `text_cer`.
