@@ -21,12 +21,13 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 **Decisão:** correções não alteram o `Book`; são `Overlay` reaplicável por âncoras.
 **Consequências:** reprocessar com extrator melhor não perde trabalho manual; `unapplied` é mostrado ao usuário.
 
-### ADR-005 · PDF.js como base da ingestão · provisional (confirmar no E0)
+### ADR-005 · PDF.js como base da ingestão · accepted · 2026-10-04
 **Decisão:** usar PDF.js (Apache-2.0) para ler itens de texto. Critério de revisão: o spike E0 mostra que não entrega fonte/posição suficientes ou é inviável em desempenho no Android.
 **Evidência (S1, 2026-10-04):** a favor — itens/geométrica/fontes/render OK em 5 PDFs, 5–10 ms/página, ver `spikes/S1-pdfjs.md`. Continua `provisional` até o S4 (Android/WebView).
 **Evidência (S4, 2026-10-04):** a favor — leitura bruta da página toda em **8,90 ms/página** (Node, 2.521 páginas) e **11,0 ms/página a 6× de throttling em Chromium com worker** (livro de 494 páginas); 1ª página com render em 107–813 ms; livro de 494 páginas com **178 MB** de RSS pico (limite 300 MB). Ressalvas registradas em `spikes/S4-performance.md`: scans com imagem chegam a **132–139 ms/página** só de leitura, há páginas isoladas de **2.427 ms** e **2 PDFs passam de 300 MB**.
 **Evidência (S4 aparelho real, 2026-10-04):** a favor — **Redmi Note 13 (Android 15, Chrome)** mediu **24,77 ms/página com worker** (24,35 sem worker) e **1ª página em 1.198 ms** (fria, inclui download de 1,9 MB por Wi-Fi) no livro de 494 páginas → **orçamento do caso normal (150 ms/pág e 2 s) confirmado em aparelho de entrada**, com 6× de folga; prints e método em `spikes/S4-performance.md` §4.1 e §8. O proxy do Chromium era piso otimista: o aparelho real ficou **2,2× mais lento** que o throttling de 6×.
-**Status:** mantida **`provisional`**: a E0 ainda não terminou (falta o S5 de licenças, que também trata desta ADR) e **não foram medidos no aparelho** o scan (132–139 ms/pág no proxy), a página atípica de 2.427 ms, o render e a memória real (`performance.memory` do Android é grosseiro). Rever no fim da E0 (E0-T06).
+**Evidência (S5, licenças, 2026-10-04):** **Apache-2.0** confirmada no pacote instalado (`pdfjs-dist@6.4.299`, 33,3 MB) e no registro npm; **0 dependências, nenhum binário nativo e entrada de navegador declarada** (`browser={"fs":false,…}`) — único candidato que atende a REQ-EXT-17 (navegador + Node + WebView). `mupdf` (AGPL-3.0) é bloqueado pela ADR-006; `pdf-parse` (Apache-2.0, mas `bin`/só Node) quebraria o núcleo portável. **Ressalva medida:** o pacote distribui também **4 fontes `LiberationSans*.ttf` sob GPLv2 + exceção de fonte** (o worker as usa nos 4 Helvetica base-14 não embutidos) — em `spikes/S5-licenses.md` §3 a extração foi **idêntica sem elas** (24 páginas de 2 PDFs do corpus + 1 PDF sintético) e só o render mudou (**1,8% dos pixels** no sintético, fonte de fallback no lugar do Liberation Sans). Detalhes e a tabela completa: `spikes/S5-licenses.md`.
+**Status (E0-T06, 2026-10-04):** **`accepted`** — os três critérios de revisão estão respondidos: dados suficientes (S1/S2/S3), desempenho viável no Android (S4, aparelho real: 24,77 ms/página com 6× de folga) e licença compatível (S5). Riscos residuais registrados **com dono**: scans/página de 2.427 ms/memória não medidos no aparelho (BACKLOG: descarte de `font.data` na E8-T03, `operator list` sem materializar imagens; leitura de scan está fora do caminho pela ADR-018) e as fontes Liberation a decidir na **E1-T02** ao copiar os assets do app (excluir os `.ttf`, aceitar GPL só neles, ou trocar por Liberation 2.x/OFL). Se algum estourar em E1/E8, reabrir esta ADR.
 
 ### ADR-006 · Licenças: sem AGPL/GPL como dependência · accepted
 **Decisão:** MuPDF/PyMuPDF (AGPL) e Poppler (GPL) servem só como referência de estudo. Dependências devem ser MIT/BSD/Apache/ISC. Licença do projeto fica para depois (repo privado).
@@ -39,6 +40,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 
 ### ADR-009 · Ferramental provisório: pnpm + Vitest + TypeScript estrito · provisional
 **Decisão:** pnpm workspaces, Vitest, `tsc --noEmit`. Lint/format (ESLint/Prettier ou Biome) a decidir na tarefa E1-T00.
+**Evidência de licença (S5, 2026-10-04):** pnpm MIT · Vitest MIT · TypeScript Apache-2.0; os 50 pacotes instalados somam **0 licenças copyleft** (`spikes/S5-licenses.md` §2). Segue `provisional` só enquanto não existir lint/formato (E1-T00, ver ADR-017).
 
 ### ADR-010 · Fluxo para uma IA por vez (OpenCode) · accepted
 **Decisão:** tarefas atômicas, `STATE.md` como handoff com checkpoints, commits WIP frequentes, AGENTS.md curto e explícito, skills em `.opencode/skills/`. Sem worktrees paralelos.
@@ -51,6 +53,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 
 ### ADR-013 · Gabaritos sintéticos programáticos · provisional
 **Decisão:** além de PDFs tagged, pares PDF+EPUB e páginas anotadas à mão, gerar PDFs sintéticos a partir de uma especificação (ex.: com pdfkit/pdf-lib, MIT) cuja especificação é o próprio gabarito. A escolha da ferramenta é feita na E1-T07 após checar licença e capacidade (negrito/itálico, colunas, notas).
+**Evidência de licença (S5, 2026-10-04):** os três candidatos passam — `pdf-lib@1.17.1` (MIT, 18,6 MB, build de navegador publicado em `unpkg`), `pdfkit@0.20.2` (MIT, 10,0 MB, 6 dependências, só declara `exports` de Node) e `jspdf@4.2.1` (MIT, 28,8 MB, campo `browser`); nenhum tem binário nativo. **A licença não decide mais esta ADR** — a escolha da E1-T07 é de capacidade (negrito/itálico, colunas, notas, quebra de linha) e o gerador roda só em teste/CLI, então o tamanho não vai ao app.
 
 ### ADR-014 · Campo `file` no manifest privado do corpus · accepted
 **Contexto:** o manifest público localiza cada PDF por `source_url` (o fetch baixa por ela). O manifest privado, que fica em `$CORPUS_PRIVATE_DIR`, não tem URL: o arquivo já está no disco e nunca é baixado. O runner de métricas mescla os dois manifests (CORPUS.md), então os dois precisam ter o mesmo formato.
@@ -74,6 +77,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 **Contexto:** a ADR-009 deixou lint/format em aberto para a E1-T00 (ESLint+Prettier ou Biome).
 **Alternativas:** (a) Biome (ferramenta única, Rust, rápido, um binário) · (b) ESLint + Prettier (ecossistema maduro, duas ferramentas + plugins).
 **Decisão:** o PO escolheu **Biome** (2026-10-04), com status `provisional`: a E1-T00 confirma licença compatível (MIT, a confirmar) e funcionamento real no projeto antes de virar `accepted`.
+**Evidência de licença (S5, 2026-10-04):** confirmada — `@biomejs/biome@2.5.15` = **`MIT OR Apache-2.0`**, e o pacote do binário da plataforma (`@biomejs/cli-win32-x64`) tem a mesma licença; binário roda só no build e não vai ao app. Segue `provisional` até a E1-T00 instalar, configurar e ligar ao `pnpm verify`.
 **Consequências:** a E1-T00 instala e configura o Biome, liga `pnpm lint` e `pnpm format:check` ao `pnpm verify` e ao CI; se a licença ou a capacidade não convencerem, volta para ESLint+Prettier e esta ADR é reescrita.
 
 ### ADR-018 · PDF escaneado: detectar e marcar "aguardando OCR" · accepted · 2026-10-04
