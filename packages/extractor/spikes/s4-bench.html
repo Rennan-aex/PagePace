@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PagePace · spike S4 — leitura bruta com PDF.js</title>
+  <style>
+    body { font: 14px/1.5 ui-monospace, Consolas, monospace; margin: 16px; color: #111; }
+    h1 { font-size: 16px; }
+    #status { white-space: pre-wrap; background: #f5f5f5; padding: 8px; border-radius: 4px; }
+    .ok { color: #0a6b2d; }
+    .err { color: #a40000; }
+  </style>
+</head>
+<body>
+  <h1>PagePace · spike S4 — leitura bruta com PDF.js (bench para WebView/Android)</h1>
+  <p>
+    Abra esta página num servidor local (ver <code>docs/extractor/spikes/S4-performance.md</code>,
+    § método) e acrescente <code>?pdf=&lt;id&gt;</code>. Parâmetros:
+    <code>pdf</code> (id do corpus privado), <code>pages</code> (limite de páginas),
+    <code>mode=worker|main</code>.
+  </p>
+  <pre id="status">carregando…</pre>
+
+  <script type="module">
+    import * as pdfjsLib from "/vendor/pdfjs/build/pdf.mjs";
+
+    const statusEl = document.getElementById("status");
+    const params = new URLSearchParams(location.search);
+    const MODE = params.get("mode") === "main" ? "main" : "worker";
+    const PDF_ID = params.get("pdf") ?? "n1-pt-sofia";
+    const MAX_PAGES = Number(params.get("pages") ?? 0) || Infinity;
+    const COUNT_OPS = params.get("countops") === "1";
+    const IMAGE_OPS = new Set([
+      pdfjsLib.OPS.paintImageXObject,
+      pdfjsLib.OPS.paintImageMaskXObject,
+      pdfjsLib.OPS.paintInlineImageXObject,
+      pdfjsLib.OPS.paintImageXObjectRepeat,
+      pdfjsLib.OPS.paintJpegXObject,
+      pdfjsLib.OPS.paintImageMaskXObjectRepeat,
+    ]);
+
+    const log = (text, cls = "") => {
+      statusEl.textContent = `${text}\n${statusEl.textContent}`;
+      if (cls) statusEl.className = cls;
+    };
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
+
+    // mode=main força o "fake worker" do PDF.js (tudo na thread principal),
+    // exatamente o que aconteceria numa WebView SEM Web Worker.
+    if (MODE === "main") {
+      globalThis.pdfjsWorker = await import("/vendor/pdfjs/build/pdf.worker.mjs");
+    }
+
+    const percentile = (sorted, p) => {
+      if (sorted.length === 0) return 0;
+      const i = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+      return sorted[i];
+    };
+    const round = (value, digits = 1) => Number(value.toFixed(digits));
+    const heapNow = () => (performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null);
+
+    function startHeartbeat(intervalMs = 20) {
+      let expected = performance.now() + intervalMs;
+      let maxLag = 0;
+      const timer = setInterval(() => {
+        const now = performance.now();
+        const lag = now - expected;
+        if (lag > maxLag) maxLag = lag;
+        expected = now + intervalMs;
+      }, intervalMs);
+      return {
+        stop() {
+          clearInterval(timer);
+          return round(maxLag, 1);
+        },
+      };
+    }
+
+    window.__benchInfo = {
+      mode: MODE,
+      pdfId: PDF_ID,
+      userAgent: navigator.userAgent,
+      hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+      deviceMemory: navigator.deviceMemory ?? null,
+    };
+
+    window.__runBench = async function runBench() {
+      const pdfUrl = `/corpus/${encodeURIComponent(PDF_ID)}.pdf`;
+      const t0 = performance.now();
+      let maxHeap = heapNow() ?? 0;
+      const sampleHeap = () => {
+        const h = heapNow();
+        if (h !== null && h > maxHeap) maxHeap = h;
+      };
+
+      let heartbeat = startHeartbeat();
+      const task = pdfjsLib.getDocument({
+        url: pdfUrl,
+        isEvalSupported: false,
+        standardFontDataUrl: "/vendor/pdfjs/standard_fonts/",
+        cMapUrl: "/vendor/pdfjs/cmaps/",
+        cMapPacked: true,
+        wasmUrl: "/vendor/pdfjs/wasm/",
+      });
+      const pdf = await task.promise;
+      const openMs = performance.now() - t0;
+
+      const totalPages = Math.min(pdf.numPages, MAX_PAGES);
+      let getPageMs = 0;
+      let textMs = 0;
+      let opsMs = 0;
+      let opsCount = 0;
+      let imageOps = 0;
+      let items = 0;
+      let chars = 0;
+      let pagesWithText = 0;
+      const pageTimes = [];
+      let firstPageMs = null;
+      let lagAfterFirstPageMs = null;
+
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const tPage = performance.now();
+
+        const tGet = performance.now();
+        const page = await pdf.getPage(pageNum);
+        getPageMs += performance.now() - tGet;
+
+        const tText = performance.now();
+        const textContent = await page.getTextContent();
+        textMs += performance.now() - tText;
+        const pageItems = textContent.items.filter((i) => typeof i.str === "string");
+        items += pageItems.length;
+        for (const item of pageItems) chars += item.str.length;
+        if (pageItems.length > 0) pagesWithText += 1;
+
+        const tOps = performance.now();
+        const opList = await page.getOperatorList();
+        opsMs += performance.now() - tOps;
+        opsCount += opList.fnArray?.length ?? 0;
+        if (COUNT_OPS) {
+          for (const fn of opList.fnArray ?? []) if (IMAGE_OPS.has(fn)) imageOps += 1;
+        }
+
+        page.cleanup();
+        pageTimes.push(performance.now() - tPage);
+        sampleHeap();
+
+        if (pageNum === 1) {
+          firstPageMs = performance.now() - t0;
+          lagAfterFirstPageMs = heartbeat.stop();
+          heartbeat = startHeartbeat();
+        }
+      }
+
+      const totalMs = performance.now() - t0;
+      const maxLagMs = Math.max(lagAfterFirstPageMs ?? 0, heartbeat.stop());
+      await task.destroy().catch(() => {});
+
+      const sorted = [...pageTimes].sort((a, b) => a - b);
+      const readMs = getPageMs + textMs + opsMs;
+      const result = {
+        mode: MODE,
+        pdfId: PDF_ID,
+        pdfUrl,
+        pagesRun: totalPages,
+        numPagesTotal: pdf.numPages,
+        openMs: round(openMs),
+        firstPageMs: round(firstPageMs ?? 0),
+        getPageMs: round(getPageMs),
+        textMs: round(textMs),
+        opsMs: round(opsMs),
+        readMs: round(readMs),
+        totalMs: round(totalMs),
+        msPerPage: {
+          open: round(openMs / totalPages, 2),
+          text: round(textMs / totalPages, 2),
+          ops: round(opsMs / totalPages, 2),
+          read: round(readMs / totalPages, 2),
+          total: round(totalMs / totalPages, 2),
+        },
+        perPage: {
+          p50: round(percentile(sorted, 50)),
+          p95: round(percentile(sorted, 95)),
+          max: round(sorted[sorted.length - 1] ?? 0),
+        },
+        eventLoop: { maxLagMs, lagAfterFirstPageMs },
+        memory: {
+          peakHeapMb: round(maxHeap ?? 0),
+          heapLimitMb: performance.memory ? round(performance.memory.jsHeapSizeLimit / 1048576) : null,
+        },
+        content: { items, chars, pagesWithText, opsCount, imageOps },
+        ...window.__benchInfo,
+      };
+      log(JSON.stringify(result, null, 2), "ok");
+      return result;
+    };
+
+    window.__renderCheck = async function renderCheck(pageNum = 1) {
+      const pdfUrl = `/corpus/${encodeURIComponent(PDF_ID)}.pdf`;
+      const task = pdfjsLib.getDocument({
+        url: pdfUrl,
+        isEvalSupported: false,
+        standardFontDataUrl: "/vendor/pdfjs/standard_fonts/",
+        cMapUrl: "/vendor/pdfjs/cmaps/",
+        cMapPacked: true,
+        wasmUrl: "/vendor/pdfjs/wasm/",
+      });
+      const pdf = await task.promise;
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const t0 = performance.now();
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const renderMs = performance.now() - t0;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let checksum = 0;
+      let darkSamples = 0;
+      for (let i = 0; i < data.length; i += 4 * 97) {
+        checksum = (checksum * 31 + data[i]) >>> 0;
+        if (data[i] < 250) darkSamples += 1;
+      }
+      const png = canvas.toDataURL("image/png");
+      await task.destroy().catch(() => {});
+      const result = {
+        kind: "renderCheck",
+        mode: MODE,
+        pdfId: PDF_ID,
+        pageNum,
+        renderMs: round(renderMs),
+        width: canvas.width,
+        height: canvas.height,
+        checksum,
+        darkSamples,
+        pngBytes: Math.round(png.length * 0.75),
+        ...window.__benchInfo,
+      };
+      return result;
+    };
+
+    window.__ready = true;
+    log(`pronto: mode=${MODE} pdf=${PDF_ID} pdfjs=${pdfjsLib.version}`, "ok");
+  </script>
+</body>
+</html>

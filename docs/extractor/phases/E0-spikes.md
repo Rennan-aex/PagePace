@@ -39,9 +39,10 @@
 - **Aceite:** `spikes/S3-tagged.md` com contagem, exemplos bons/ruins, recomendação de como usar o sinal.
 - **Resultado:** 5/15 têm `StructTreeRoot`, 4/15 têm `Marked=true`, só **3/15 têm árvore utilizável e 100% de cobertura** (n1-en-sofia, n1-en-curinga, n4-en-fisica); **1 `H1` em todo o corpus, 0 `H2`–`H6`** → não serve para títulos (E4); n1-en-lostworld = árvore vazia com `Marked=true` (falso positivo), n3-pt-filosofia = 9 nós em 2 páginas; n1-en-curinga com `Sect` dentro de `P` + 19.461 `Span` com `alt` repetido. Recomendação: usar só como **confirmação de parágrafos (E2)** e de **figuras com `bbox` (E10)**, após validação (não vazio ≥90% das páginas, sem hierarquia invertida). Feature `tagged` marcada no manifest privado nos 3 confiáveis.
 
-### E0-T05 · Spike S4: desempenho
+### E0-T05 · Spike S4: desempenho · `done`
 - **Objetivo:** medir ms/página e pico de memória em Node para um livro de ~300–500 páginas; medir em WebView/Android de entrada (emulador com limites ou dispositivo real do PO) apenas a leitura bruta com PDF.js.
 - **Aceite:** `spikes/S4-performance.md` com números, método e conclusão sobre o orçamento (ARCHITECTURE, decisão 8); necessidade de worker.
+- **Resultado:** 15 PDFs (2.765 páginas) em Node: **8,90 ms/página** no caso normal (15,63 ms/pág no corpus inteiro), abertura 57–68 ms, 1ª página com render 107–813 ms, render mediana 23,9 ms/pág; pior página **2.427 ms** (n2-en-astrofisica) e bloqueio de event loop de **916 ms** sem worker. Memória: livro de 494 páginas = **178 MB RSS** (baseline 76,5 MB), mas 2 PDFs de 14/163 páginas passam de 300 MB (406/314 MB); `fontExtraProperties` custa até +35 MB. WebView (proxy: **Chromium headless com throttling 4×/6×**, dois modos): com worker **11,0 ms/pág a 6×** no livro comum e **132–139 ms/pág** no scan; sem worker **49,7 ms/pág** e 4,4× mais heap → **worker é obrigatório (E8-T03)**. Orçamento: caso normal folgado, casos-limite no limite; **falta medir em Android real** (roteiro `--serve` pronto, ação do PO) — ADR-005 segue `provisional`.
 
 ### E0-T06 · Spike S5: auditoria de licenças e alternativas
 - **Objetivo:** listar dependências candidatas (PDF.js, pdfkit/pdf-lib, zod/ajv, bibliotecas de segmentação) com licença, tamanho, suporte a navegador.

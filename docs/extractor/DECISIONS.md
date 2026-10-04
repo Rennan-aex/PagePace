@@ -24,6 +24,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 ### ADR-005 · PDF.js como base da ingestão · provisional (confirmar no E0)
 **Decisão:** usar PDF.js (Apache-2.0) para ler itens de texto. Critério de revisão: o spike E0 mostra que não entrega fonte/posição suficientes ou é inviável em desempenho no Android.
 **Evidência (S1, 2026-10-04):** a favor — itens/geométrica/fontes/render OK em 5 PDFs, 5–10 ms/página, ver `spikes/S1-pdfjs.md`. Continua `provisional` até o S4 (Android/WebView).
+**Evidência (S4, 2026-10-04):** a favor — leitura bruta da página toda em **8,90 ms/página** (Node, 2.521 páginas) e **11,0 ms/página a 6× de throttling em Chromium com worker** (livro de 494 páginas); 1ª página com render em 107–813 ms; livro de 494 páginas com **178 MB** de RSS pico (limite 300 MB). Ressalvas registradas em `spikes/S4-performance.md`: scans com imagem chegam a **132–139 ms/página** só de leitura, há páginas isoladas de **2.427 ms** e **2 PDFs passam de 300 MB**; **a medição em Android real não foi feita** (proxy = Chromium desktop com throttling; roteiro do PO pronto) → **mantida `provisional`**.
 
 ### ADR-006 · Licenças: sem AGPL/GPL como dependência · accepted
 **Decisão:** MuPDF/PyMuPDF (AGPL) e Poppler (GPL) servem só como referência de estudo. Dependências devem ser MIT/BSD/Apache/ISC. Licença do projeto fica para depois (repo privado).
