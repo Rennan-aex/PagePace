@@ -46,3 +46,9 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 
 ### ADR-013 · Gabaritos sintéticos programáticos · provisional
 **Decisão:** além de PDFs tagged, pares PDF+EPUB e páginas anotadas à mão, gerar PDFs sintéticos a partir de uma especificação (ex.: com pdfkit/pdf-lib, MIT) cuja especificação é o próprio gabarito. A escolha da ferramenta é feita na E1-T07 após checar licença e capacidade (negrito/itálico, colunas, notas).
+
+### ADR-014 · Campo `file` no manifest privado do corpus · accepted
+**Contexto:** o manifest público localiza cada PDF por `source_url` (o fetch baixa por ela). O manifest privado, que fica em `$CORPUS_PRIVATE_DIR`, não tem URL: o arquivo já está no disco e nunca é baixado. O runner de métricas mescla os dois manifests (CORPUS.md), então os dois precisam ter o mesmo formato.
+**Alternativas:** (a) campo novo `file` com o nome relativo a `CORPUS_PRIVATE_DIR` · (b) `path` ou `local_path` · (c) reutilizar `source_url` com caminho relativo, sem campo novo.
+**Decisão:** campo `file`, com o nome do arquivo relativo a `CORPUS_PRIVATE_DIR` (resposta do PO, 2026-10-03). `source_url` e `license` continuam no esquema e valem `null` / `proprietary-personal` no manifest privado; `sha256` é preenchido para permitir detectar arquivo trocado.
+**Consequências:** `corpus:fetch` e o runner de métricas (E1-T05, E1-T06) resolvem arquivos privados por `$CORPUS_PRIVATE_DIR/<file>` e os públicos por `source_url`. Nenhuma mudança no esquema `@pagepace/schema`. Revisitar se um dia o corpus privado passar a ter subpastas por nível ou idioma.

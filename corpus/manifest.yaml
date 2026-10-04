@@ -1,4 +1,4 @@
-# Manifest do corpus PÚBLICO. Preenchido na tarefa E0-T01 / E1-T05.
+# Manifest do corpus PÚBLICO. Preenchido na tarefa E0-T01b / E1-T05.
 # Regras: só material de domínio público ou licença aberta verificada. Nunca PDFs com copyright.
 # O script `pnpm corpus:fetch` baixa cada item para corpus/public/ e valida o sha256.
 #
@@ -13,6 +13,8 @@
 #     features: [footnotes, two-column, hyphenation, equations, tagged, scanned]
 #     golden: none              # ou caminho relativo em corpus/golden/
 #     visibility: public
+#
+# Não usa `file` (ADR-014): aqui o arquivo vem de `source_url` e é baixado pelo script.
 
 version: 1
 documents: []

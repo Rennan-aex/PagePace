@@ -17,10 +17,18 @@ Método: **GSD (Get Shit Done) + ágil**, adaptado a uma IA por vez (OpenCode), 
 6. **Ship:** PR, CI verde, squash merge.
 
 ## Git
-- `main` protegida: só entra via PR com CI verde.
+- `main` protegida: só entra via PR com CI verde. **Proteção já configurada pelo PO (2026-10-03).**
 - Branch por tarefa: `e2-t03-detect-paragraphs`. Commits `wip:` livres na branch; o squash gera um commit limpo (Conventional Commits).
 - Tags: `schema-vX.Y.Z` a cada versão do esquema; `e1-done`, `e2-done`... ao fechar marcos.
-- Configuração recomendada do GitHub (uma vez): proteger `main`, exigir o check `verify`, permitir apenas squash merge, apagar branch após merge.
+- Configuração recomendada do GitHub (uma vez): proteger `main`, exigir o check `verify`, permitir apenas squash merge, apagar branch após merge. **Feita.**
+
+### Fluxo de publicação nesta máquina (sem `gh`)
+A CLI do GitHub (`gh`) **não está instalada** e não deve ser instalada sem o PO pedir. Portanto:
+1. A IA termina a tarefa e faz `git push` da branch.
+2. O PO abre o PR no navegador: `https://github.com/Rennan-aex/PagePace/compare/main...<branch>?expand=1` → **Create pull request** → **Squash and merge** → **Confirm merge**.
+3. A IA volta para a `main` e atualiza: `git checkout main` e `git pull`.
+
+Por que a branch continua "ativa" depois do merge: o GitHub usa *squash* (junta tudo num commit novo), então a branch não some sozinha e o `git pull` da `main` **não** traz o trabalho dela. Se a `main` parece desatualizada, quase sempre é PR aberto e não mergeado — conference em `git log origin/main -3` e no site.
 
 ## Handoff entre IAs (o ponto mais importante)
 A IA seguinte pode ser outro modelo, sem nenhum contexto. Por isso:

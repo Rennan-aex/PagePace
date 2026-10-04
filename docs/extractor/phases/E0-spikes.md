@@ -4,15 +4,24 @@
 **Requisitos:** REQ-EXT-17, 21 (e informa 01, 05, 15).
 **Depende de:** corpus mínimo disponível (ação do PO).
 **Critério de saída:** relatórios S1–S5 escritos; ADR-005 (PDF.js) confirmada ou substituída; metas de desempenho confirmadas ou ajustadas.
+**Corpus:** E0-T01 foi dividida em **E0-T01a** (corpus privado, `done`) e **E0-T01b** (corpus público, `todo`). O corpus privado já existe (13 PDFs); o público é necessário a partir do E1.
 
 ## Tarefas
 
-### E0-T01 · Corpus inicial e primeira lista de candidatos
-- **Status:** `todo` (parte humana: PO coloca PDFs; parte IA: preparar o manifest)
-- **Objetivo:** ter ao menos 10 PDFs (2+ por nível N1–N4, mistura pt/en) acessíveis aos agentes.
-- **Passos:** PO define `CORPUS_PRIVATE_DIR` e coloca PDFs pessoais; IA propõe candidatos públicos (arXiv, domínio público) por nível/idioma em `OPEN-QUESTIONS.md` sem baixar nada com licença duvidosa; criar `corpus/manifest.yaml` com as entradas públicas confirmadas (sha256 calculado).
-- **Aceite:** `ls $CORPUS_PRIVATE_DIR` lista os PDFs; manifest válido (YAML) com ≥ 4 públicos; `pnpm check:no-pdf` verde.
-- **Fora de escopo:** gabaritos, qualquer código de extração.
+### E0-T01a · Corpus privado (manifest particular) · `done`
+- **Objetivo:** o PO coloca PDFs pessoais fora do repo e a IA registra cada um no manifest privado com nível, idioma, features e SHA-256, sem texto do livro no git.
+- **Passos:** PO define `CORPUS_PRIVATE_DIR` (ambiente e/ou `.env` na raiz) e joga os PDFs na pasta; IA lista a pasta e escreve `$CORPUS_PRIVATE_DIR/manifest.yaml` (mesmo esquema do público + campo `file`, ADR-014). `level`/`lang`/`features` saem do nome do arquivo e são provisórios.
+- **Aceite:** `CORPUS_PRIVATE_DIR` lista ≥ 8 PDFs em pelo menos 4 níveis e 2 idiomas; manifest privado válido com uma entrada por PDF (`level`, `lang`, `features`, `sha256`, `visibility: private`); `pnpm check:no-pdf` verde.
+- **Fora de escopo:** corpus público, gabaritos, qualquer código de extração.
+- **Testes:** nenhum automatizado (arquivo fora do repo, não versionado). Revisão visual da lista no `pnpm verify` e conferência manual dos níveis com `dump-raw` na E1-T04.
+
+### E0-T01b · Corpus público (manifest versionado + `corpus:fetch`) · `todo`
+- **Objetivo:** ≥ 4 PDFs de licença aberta confirmada no `corpus/manifest.yaml`, para que o CI e qualquer máquina reproduzam o corpus sem o material do PO.
+- **Entradas / dependências:** E0-T01a (formato do manifest já definido).
+- **Passos sugeridos:** levantar candidatos por nível/idioma (arXiv e periódicos CC-BY para N2/N4; SciELO Livros, eduCAPES, OpenStax, Wikisource/Domínio Público, Internet Archive para N1/N3/N5) **sem baixar nada de licença duvidosa**; confirmar a licença de cada item e registrar a URL; baixar para `corpus/public/` (ignorado) e calcular o SHA-256; escrever as entradas; implementar `pnpm corpus:fetch` (E1-T05) validando o SHA-256; repetir a cobertura de CORPUS.md.
+- **Aceite:** `corpus/manifest.yaml` com ≥ 4 entradas, cada uma com `source_url`, `license` e `sha256` conferidos; `pnpm corpus:fetch` em diretório limpo baixa tudo e valida os hashes; `pnpm check:no-pdf` verde.
+- **Fora de escopo:** corpus privado, gabaritos, spikes.
+- **Testes:** automatizado: teste do `corpus:fetch` com diretório temporário e falha proposital por hash divergente. Manual: `tests/manual/` do E0.
 
 ### E0-T02 · Spike S1: o que o PDF.js entrega
 - **Objetivo:** documentar exatamente quais dados o PDF.js dá (itens de texto, `fontName`, transform, largura, `hasEOL`, estilos de fonte, `getOutline`, `getStructTree`, metadados), em Node e no navegador.
