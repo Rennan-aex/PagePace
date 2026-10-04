@@ -4,6 +4,7 @@ Regra: ideia nova nunca entra direto no código. Anote aqui com data e contexto;
 
 | Data | Item | Origem (tarefa) | Prioridade sugerida |
 |---|---|---|---|
-| 2026-10-04 | Recompor acento destacado (LaTeX: `´` em item separado sobrepondo a letra; 9.013 ocorrências em n4) com heurística geométrica antes da tokenização | E0-T02 (S1) | P1 |
-| 2026-10-04 | Descartar `font.data` após ler `name`/métricas quando `fontExtraProperties: true` (memória: 308 MB em n4) | E0-T02 (S1) | P2 |
+| 2026-10-04 | Descartar `font.data` após ler `name`/métricas quando `fontExtraProperties: true` (memória: 308 MB em n4) — **ligado à tarefa E8-T03, sem implementar agora** | E0-T02 (S1) | P2 |
 | (exemplo) | Detectar texto em grego e marcar `lang: "grc"` | E5 | P2 |
+
+Nota (2026-10-04): o item "recompor acento destacado (LaTeX)" saiu daqui e virou a tarefa **E3-T01b** (fase E3, prioridade P1), decisão do PO.

@@ -8,6 +8,6 @@
 ### E8-T02 · Cache
 - Chave `(sha256, extractorVersion, schemaVersion)`; armazenamento atrás de uma interface (arquivo no CLI, IndexedDB/SQLite no app). **Aceite:** segunda abertura não reprocessa; mudança de versão invalida.
 ### E8-T03 · Worker e memória
-- Rodar em Web Worker; liberar páginas do PDF.js após uso; limite de memória. **Aceite:** pico ≤ meta em livro de 500 páginas.
+- Rodar em Web Worker; liberar páginas do PDF.js após uso; limite de memória. Inclui descartar `font.data` (bytes da fonte) depois de ler nome/métricas quando `fontExtraProperties: true` — no spike S1 isso segurou 308 MB em n4; **só planejar aqui, sem implementar agora** (item do BACKLOG ligado a esta tarefa). **Aceite:** pico ≤ meta em livro de 500 páginas.
 ### E8-T04 · Benchmarks reproduzíveis
 - `pnpm bench` por documento (ms/página, MB); inclui roteiro manual para medir no Android. **Aceite:** números no baseline (informativos) e regressão grave (> 25%) avisa no CI.

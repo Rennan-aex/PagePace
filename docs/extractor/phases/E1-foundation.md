@@ -21,8 +21,9 @@
 - **Aceite:** em 3 PDFs do corpus, saída valida no esquema; número de páginas confere; `source.sha256` correto; mesma entrada gera JSON idêntico (teste de determinismo).
 - **Detalhe:** leitura de arquivo só no CLI; o adaptador recebe `Uint8Array`.
 
-### E1-T03 · Detecção de PDF escaneado/sem texto
-- **Aceite:** em fixture sem camada de texto, `ingest` marca `warnings: ["no-text-layer"]` e o CLI informa claramente; nenhum crash. (REQ-EXT-22)
+### E1-T03 · Detecção de PDF escaneado/sem texto (ADR-018)
+- Comportamento (decisão do PO, ADR-018): detectar PDF sem camada de texto, **não tentar extrair** (não montar `RawDocument` vazio) e emitir a mensagem exata `PDF escaneado: leitura exige OCR, ainda não disponível`; nenhum crash. O app guarda o livro na biblioteca como "aguardando OCR" (parte do app, fora desta tarefa).
+- **Aceite:** fixture sem camada de texto (ex.: `n5-pt-astrofisica`) → CLI mostra a mensagem e não gera JSON de livro; PDF com texto normal não muda; teste do detector no CI. (REQ-EXT-22)
 
 ### E1-T04 · CLI mínima
 - **Aceite:** `pnpm pagepace dump-raw <pdf> [--pages 1-5]` escreve JSON; `--help` funciona; erro claro para arquivo inexistente.

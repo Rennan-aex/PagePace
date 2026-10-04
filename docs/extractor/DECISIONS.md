@@ -15,6 +15,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 ### ADR-003 · Reflow em todas as telas, PDF nunca exibido · accepted
 **Decisão:** o app só usa o modelo extraído (celular e PC). Única exceção: botão "ver original" na tela de correção.
 **Consequências:** a qualidade da extração é crítica; a tela de correção é parte do núcleo do produto.
+**Exceção de figura:** recorte de imagem de figuras/tabelas/equações no modo normal, autorizada na ADR-016 (2026-10-04).
 
 ### ADR-004 · Correções do usuário em overlay separado · accepted
 **Decisão:** correções não alteram o `Book`; são `Overlay` reaplicável por âncoras.
@@ -59,3 +60,21 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 **Alternativas:** (a) `pdfjs-dist` + `@napi-rs/canvas` via npm · (b) ler PDF com biblioteca própria/zero dependência · (c) usar pdftotext/Poppler (GPL, proibido) como binário externo.
 **Decisão:** (a). `pdfjs-dist@6.4.299` — Apache-2.0, é o próprio ADR-005, roda em navegador e Node, sem binário nativo. `@napi-rs/canvas@1.0.10` — MIT, é *optional dependency* já declarada pelo próprio pdfjs-dist, só para render em Node (não vai para o navegador). Ambas como `devDependencies` na raiz enquanto só os spikes as usam.
 **Consequências:** quando o E1-T02 criar a ingestão de verdade, `pdfjs-dist` migra para dependência de `packages/extractor` (revisitar aí versão/estado de `standardFontDataUrl` em produção). `@napi-rs/canvas` nunca deve entrar no bundle do app (só CLI/testes). Revisar no S5 (auditoria de licenças) junto com ADR-005.
+
+### ADR-016 · Recorte de figuras/tabelas/equações no modo normal (exceção à ADR-003) · accepted · 2026-10-04
+**Contexto:** a ADR-003 proíbe exibir o PDF no app. Mas figura, tabela e equação complexa perdem sentido no reflow (texto corrido) e sem elas o leitor não entende o trecho.
+**Alternativas:** (a) recorte de imagem dessas partes, só no modo de leitura normal, pulado na leitura dinâmica · (b) nunca mostrar nada (figura vira placeholder de texto) · (c) permitir a página inteira.
+**Decisão:** opção (a), escolha do PO (2026-10-04). Recorte (render da região do PDF) **apenas** de figuras, tabelas e equações complexas; **apenas** no modo de leitura normal; na leitura dinâmica são pulados. A página inteira continua proibida.
+**Consequências:** exceção formal à ADR-003 (linha de exceção acrescentada lá). O recorte é gerado pelo extrator/app a partir de coordenadas do PDF — o PDF em si continua nunca sendo o modo padrão de leitura. Tarefa de captura dos recortes entra no E10 (não-texto); revisar se o recorte não bastar para tabelas grandes.
+
+### ADR-017 · Lint/format: Biome · provisional · 2026-10-04
+**Contexto:** a ADR-009 deixou lint/format em aberto para a E1-T00 (ESLint+Prettier ou Biome).
+**Alternativas:** (a) Biome (ferramenta única, Rust, rápido, um binário) · (b) ESLint + Prettier (ecossistema maduro, duas ferramentas + plugins).
+**Decisão:** o PO escolheu **Biome** (2026-10-04), com status `provisional`: a E1-T00 confirma licença compatível (MIT, a confirmar) e funcionamento real no projeto antes de virar `accepted`.
+**Consequências:** a E1-T00 instala e configura o Biome, liga `pnpm lint` e `pnpm format:check` ao `pnpm verify` e ao CI; se a licença ou a capacidade não convencerem, volta para ESLint+Prettier e esta ADR é reescrita.
+
+### ADR-018 · PDF escaneado: detectar e marcar "aguardando OCR" · accepted · 2026-10-04
+**Contexto:** o spike S1 achou `n5-pt-astrofisica.pdf` com 319 páginas e zero texto (só imagem). Não existe camada de texto para ler; extrair daria lixo vazio. Pergunta 5 do `OPEN-QUESTIONS.md`.
+**Alternativas:** (a) recusar o arquivo com aviso · (b) aceitar sem extrair, com aviso claro e o livro marcado como "aguardando OCR" até o OCR existir (E9).
+**Decisão:** opção (b), escolha do PO (2026-10-04). O extrator **detecta** PDF sem camada de texto, **não tenta extrair**, e emite a mensagem exata `PDF escaneado: leitura exige OCR, ainda não disponível`. O app guarda o livro na biblioteca marcado como **aguardando OCR**.
+**Consequências:** a E1-T03 foi ajustada para esse comportamento (detector + mensagem, sem montar `RawDocument`); nenhum crash e nenhum livro vazio disfarçado; o livro aparece na biblioteca mas não abre para leitura até a fase E9 entregar o OCR; a E9-T04 (fluxo do OCR) parte desse estado "aguardando".
