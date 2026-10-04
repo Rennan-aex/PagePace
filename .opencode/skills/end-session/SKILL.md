@@ -18,3 +18,4 @@ description: Use ao terminar uma tarefa ou quando a sessão estiver perto do fim
 3. `git push` da branch.
 
 Nunca deixe trabalho só no disco, e nunca termine com STATE.md desatualizado.
+Ao terminar, escreva a mensagem final usando a skill report-to-po.
