@@ -29,6 +29,11 @@ const defaultIds = [
 ];
 const ids = process.argv.slice(2).length > 0 ? process.argv.slice(2) : defaultIds;
 
+// PDFs escaneados com camada de OCR embutida (todo o texto em `Tr 3`, invisível;
+// feature `scanned-ocr-layer` no manifest — ADR-019). O relatório S2 agrega os
+// grupos separados: texto digital nativo × texto de OCR embutido.
+const OCR_LAYER_IDS = new Set(["n1-en-lostworld", "n3-en-filosofia"]);
+
 const PDFJS_PARAMS = {
   standardFontDataUrl: toDataPath(path.join(pdfjsRoot, "standard_fonts")),
   cMapUrl: toDataPath(path.join(pdfjsRoot, "cmaps")),
@@ -143,9 +148,9 @@ function conventionOf(name) {
   return null;
 }
 
-function classifyName(rawName) {
+function classifyName(rawName, useConvention = true) {
   const name = stripSubset(rawName);
-  const conv = conventionOf(name);
+  const conv = useConvention ? conventionOf(name) : null;
   if (conv) return { name, ...conv, weight: null };
 
   const tokens = splitTokens(name).map((token) => token.toLowerCase());
@@ -393,6 +398,7 @@ function newFont(ref) {
     ref,
     rawName: null,
     nameStyle: null,
+    naiveStyle: null,
     pdfjsFlags: { bold: undefined, italic: undefined },
     type3: false,
     bytes: null,
@@ -441,6 +447,7 @@ async function resolveFontObject(page, font) {
   font.type3 = obj.isType3Font === true;
   if (!font.type3 && obj.data instanceof Uint8Array) font.bytes = styleFromBytes(obj.data);
   if (!font.nameStyle) font.nameStyle = classifyName(font.rawName);
+  if (!font.naiveStyle) font.naiveStyle = classifyName(font.rawName, false);
 }
 
 async function inspectPdf(id) {
@@ -686,6 +693,176 @@ function digestLine(result) {
   ].join(" ");
 }
 
+// Papéis de estilo que o token/default não tem como adivinhar: se a convenção
+// diz typewriter/sans/small-caps e o naive diz "texto comum", o erro é de PAPEL.
+const PAPER_ROLES = new Set(["typewriter", "sans", "small-caps"]);
+
+// Erros do naive (sem a tabela de convenções) medidos em letras de texto.
+// Categorias disjuntas por construção: papel só conta quando não é erro de
+// negrito/itálico; uma fonte com erro conta 1x no total.
+function naiveErrorsOf(results) {
+  const out = {
+    bold: { letters: 0, fonts: 0 },
+    italic: { letters: 0, fonts: 0 },
+    paper: { letters: 0, fonts: 0 },
+    total: { letters: 0, fonts: 0 },
+  };
+  for (const result of results) {
+    for (const font of result.fonts) {
+      if (!font.usage.letters) continue;
+      const truth = font.nameStyle;
+      if (!truth || truth.kind !== "text") continue;
+      const naive = font.naiveStyle ?? classifyName(font.rawName, false);
+      const boldErr = truth.bold === true && naive.bold !== true;
+      const italicErr = truth.italic === true && naive.italic !== true;
+      const paperErr =
+        PAPER_ROLES.has(truth.role) &&
+        !PAPER_ROLES.has(naive.role ?? "regular") &&
+        !boldErr &&
+        !italicErr;
+      if (boldErr) {
+        out.bold.letters += font.usage.letters;
+        out.bold.fonts += 1;
+      }
+      if (italicErr) {
+        out.italic.letters += font.usage.letters;
+        out.italic.fonts += 1;
+      }
+      if (paperErr) {
+        out.paper.letters += font.usage.letters;
+        out.paper.fonts += 1;
+      }
+      if (boldErr || italicErr || paperErr) {
+        out.total.letters += font.usage.letters;
+        out.total.fonts += 1;
+      }
+    }
+  }
+  return out;
+}
+
+// Composição real (verdade, com a tabela de convenções) em letras de texto.
+// `bold` e `italic` são contagens independentes (uma fonte bold-italic entra
+// nas duas) — mesma definição da §2/§5 do relatório S2.
+function compositionOf(results) {
+  const out = {
+    bold: { letters: 0, fonts: 0 },
+    italic: { letters: 0, fonts: 0 },
+    regular: { letters: 0, fonts: 0 },
+    mathLetters: 0,
+    symbolLetters: 0,
+  };
+  for (const result of results) {
+    for (const font of result.fonts) {
+      if (!font.usage.letters || !font.nameStyle) continue;
+      if (font.nameStyle.kind === "math") {
+        out.mathLetters += font.usage.letters;
+        continue;
+      }
+      if (font.nameStyle.kind === "symbol") {
+        out.symbolLetters += font.usage.letters;
+        continue;
+      }
+      if (font.nameStyle.bold === true) {
+        out.bold.letters += font.usage.letters;
+        out.bold.fonts += 1;
+      }
+      if (font.nameStyle.italic === true) {
+        out.italic.letters += font.usage.letters;
+        out.italic.fonts += 1;
+      }
+      if (font.nameStyle.bold !== true && font.nameStyle.italic !== true) {
+        out.regular.letters += font.usage.letters;
+        out.regular.fonts += 1;
+      }
+    }
+  }
+  return out;
+}
+
+function aggregate(results) {
+  const totals = results.reduce(
+    (acc, result) => {
+      acc.fonts += result.counts.fonts;
+      acc.textFonts += result.counts.textFonts;
+      acc.decided += result.counts.decided;
+      acc.naiveDecided += result.counts.naiveDecided;
+      acc.unknown += result.counts.unknown;
+      acc.conflicts += result.counts.conflicts;
+      acc.faux += result.counts.faux;
+      acc.withBytes += result.counts.withBytes;
+      acc.unresolvedBytes += result.counts.unresolvedBytes;
+      return acc;
+    },
+    { fonts: 0, textFonts: 0, decided: 0, naiveDecided: 0, unknown: 0, conflicts: 0, faux: 0, withBytes: 0, unresolvedBytes: 0 },
+  );
+  const letterTotals = results.reduce(
+    (acc, result) => {
+      for (const font of result.fonts) {
+        if (font.nameStyle?.kind === "symbol" || !font.usage.letters) continue;
+        if (font.nameStyle?.kind === "math") {
+          acc.mathLetters += font.usage.letters;
+          continue;
+        }
+        acc.textLetters += font.usage.letters;
+        if (font.nameStyle.bold !== null && font.nameStyle.italic !== null) acc.decidedLetters += font.usage.letters;
+        else acc.unknownLetters += font.usage.letters;
+        if (font.nameStyle.basis !== "unknown" && font.nameStyle.basis !== "convention") acc.naiveLetters += font.usage.letters;
+      }
+      return acc;
+    },
+    { textLetters: 0, decidedLetters: 0, unknownLetters: 0, naiveLetters: 0, mathLetters: 0 },
+  );
+  const draw = results.reduce(
+    (acc, result) => {
+      acc.invisibleChars += result.fonts.reduce((sum, font) => sum + (font.draw.tr["3"] ?? 0), 0);
+      acc.visibleChars += result.fonts.reduce(
+        (sum, font) => sum + Object.entries(font.draw.tr).reduce((inner, [mode, count]) => (mode === "3" ? inner : inner + count), 0),
+        0,
+      );
+      acc.shearedGlyphs += result.totals.shearedGlyphs;
+      acc.rotatedGlyphs += result.totals.rotatedGlyphs;
+      for (const [mode, count] of Object.entries(result.totals.trModes)) acc.trModes[mode] = (acc.trModes[mode] ?? 0) + count;
+      return acc;
+    },
+    { invisibleChars: 0, visibleChars: 0, shearedGlyphs: 0, rotatedGlyphs: 0, trModes: {} },
+  );
+  return {
+    pdfs: results.length,
+    ids: results.map((result) => result.id),
+    totals,
+    letterTotals,
+    naiveErrors: naiveErrorsOf(results),
+    composition: compositionOf(results),
+    draw,
+    basisHistogramText: histogram(
+      results.flatMap((result) =>
+        result.fonts
+          .filter((font) => font.nameStyle && font.usage.letters > 0 && font.nameStyle.kind === "text")
+          .map((font) => font.nameStyle.basis),
+      ),
+    ),
+    perPdf: results.map((result) => ({
+      id: result.id,
+      counts: result.counts,
+      formats: result.formats,
+      trModes: result.totals.trModes,
+      shearedGlyphs: result.totals.shearedGlyphs,
+      rotatedGlyphs: result.totals.rotatedGlyphs,
+      visibleChars: result.fonts.reduce(
+        (sum, font) => sum + Object.entries(font.draw.tr).reduce((inner, [mode, count]) => (mode === "3" ? inner : inner + count), 0),
+        0,
+      ),
+      invisibleChars: result.fonts.reduce((sum, font) => sum + (font.draw.tr["3"] ?? 0), 0),
+      textLetters: result.fonts.reduce(
+        (sum, font) => (font.nameStyle && font.nameStyle.kind === "text" ? sum + font.usage.letters : sum),
+        0,
+      ),
+      naiveErrors: naiveErrorsOf([result]),
+    })),
+  };
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const results = [];
@@ -704,70 +881,34 @@ async function main() {
   }
 
   const ok = results.filter((result) => !result.error);
-  const totals = ok.reduce(
-    (acc, result) => {
-      acc.fonts += result.counts.fonts;
-      acc.textFonts += result.counts.textFonts;
-      acc.decided += result.counts.decided;
-      acc.naiveDecided += result.counts.naiveDecided;
-      acc.unknown += result.counts.unknown;
-      acc.conflicts += result.counts.conflicts;
-      acc.faux += result.counts.faux;
-      acc.withBytes += result.counts.withBytes;
-      acc.unresolvedBytes += result.counts.unresolvedBytes;
-      return acc;
-    },
-    { fonts: 0, textFonts: 0, decided: 0, naiveDecided: 0, unknown: 0, conflicts: 0, faux: 0, withBytes: 0, unresolvedBytes: 0 },
-  );
-  const letterTotals = ok.reduce(
-    (acc, result) => {
-      for (const font of result.fonts) {
-        if (font.nameStyle?.kind === "symbol" || !font.usage.letters) continue;
-        if (font.nameStyle?.kind === "math") {
-          acc.mathLetters += font.usage.letters;
-          continue;
-        }
-        acc.textLetters += font.usage.letters;
-        if (font.nameStyle.bold !== null && font.nameStyle.italic !== null) acc.decidedLetters += font.usage.letters;
-        else acc.unknownLetters += font.usage.letters;
-        if (font.nameStyle.basis !== "unknown" && font.nameStyle.basis !== "convention") acc.naiveLetters += font.usage.letters;
-      }
-      return acc;
-    },
-    { textLetters: 0, decidedLetters: 0, unknownLetters: 0, naiveLetters: 0, mathLetters: 0 },
-  );
   const summary = {
-    pdfs: ok.length,
+    ...aggregate(ok),
     failed: results.length - ok.length,
-    totals,
-    letterTotals,
     basisHistogram: histogram(ok.flatMap((result) => result.fonts.filter((font) => font.nameStyle).map((font) => font.nameStyle.basis))),
     roleHistogram: histogram(
       ok.flatMap((result) => result.fonts.filter((font) => font.nameStyle?.basis === "convention").map((font) => font.nameStyle.role)),
     ),
-    perPdf: ok.map((result) => ({
-      id: result.id,
-      counts: result.counts,
-      formats: result.formats,
-      trModes: result.totals.trModes,
-      shearedGlyphs: result.totals.shearedGlyphs,
-      rotatedGlyphs: result.totals.rotatedGlyphs,
-      visibleChars: result.fonts.reduce(
-        (sum, font) => sum + Object.entries(font.draw.tr).reduce((inner, [mode, count]) => (mode === "3" ? inner : inner + count), 0),
-        0,
-      ),
-      invisibleChars: result.fonts.reduce((sum, font) => sum + (font.draw.tr["3"] ?? 0), 0),
-    })),
     conflicts: ok.flatMap((result) => result.conflicts.map((conflict) => ({ id: result.id, ...conflict }))),
     unknown: ok.flatMap((result) => result.unknown.map((entry) => ({ id: result.id, ...entry }))),
     faux: ok.flatMap((result) => result.faux.map((entry) => ({ id: result.id, ...entry }))),
     unresolvedBytes: ok.flatMap((result) => result.unresolvedBytes.map((entry) => ({ id: result.id, ...entry }))),
     widthPairs: ok.flatMap((result) => result.widthPairs.map((pair) => ({ id: result.id, ...pair }))),
+    groups: {
+      native: aggregate(ok.filter((result) => !OCR_LAYER_IDS.has(result.id))),
+      ocrLayer: aggregate(ok.filter((result) => OCR_LAYER_IDS.has(result.id))),
+    },
   };
   await writeFile(path.join(outDir, "summary.json"), JSON.stringify(summary, null, 2));
-  console.log(`TOTALS ${JSON.stringify(totals)}`);
-  console.log(`LETTERS ${JSON.stringify(letterTotals)}`);
+  console.log(`TOTALS ${JSON.stringify(summary.totals)}`);
+  console.log(`LETTERS ${JSON.stringify(summary.letterTotals)}`);
+  console.log(`NAIVE-ERRORS ${JSON.stringify(summary.naiveErrors)}`);
+  for (const [name, group] of Object.entries(summary.groups)) {
+    console.log(`GROUP ${name} pdfs=${group.pdfs} ${JSON.stringify(group.letterTotals)} naive=${JSON.stringify(group.naiveErrors)}`);
+  }
   console.log(`written to ${outDir}`);
 }
 
-await main();
+const isMain = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) await main();
+
+export { classifyName, conventionOf, stripSubset, splitTokens, styleCode, OCR_LAYER_IDS };

@@ -18,6 +18,7 @@
 | A-013 | TTS padrão do dispositivo; TTS local neural a investigar |
 | A-014 | Anotações/marcações salvas imediatamente |
 | A-015 | Modo dinâmico pula não textual e notas; acessíveis no modo normal |
+| A-016 | Dois estados na biblioteca (ADR-018/019 do extrator, 2026-10-04): **"sem texto: aguardando OCR"** (não abre) × **"texto de OCR embutido: leitura com aviso"** (abre, com aviso de que o texto pode ter erros) |
 
 ## A decidir
 Ver `OPEN-QUESTIONS.md`.

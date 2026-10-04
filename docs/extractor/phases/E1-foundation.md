@@ -21,9 +21,12 @@
 - **Aceite:** em 3 PDFs do corpus, saída valida no esquema; número de páginas confere; `source.sha256` correto; mesma entrada gera JSON idêntico (teste de determinismo).
 - **Detalhe:** leitura de arquivo só no CLI; o adaptador recebe `Uint8Array`.
 
-### E1-T03 · Detecção de PDF escaneado/sem texto (ADR-018)
-- Comportamento (decisão do PO, ADR-018): detectar PDF sem camada de texto, **não tentar extrair** (não montar `RawDocument` vazio) e emitir a mensagem exata `PDF escaneado: leitura exige OCR, ainda não disponível`; nenhum crash. O app guarda o livro na biblioteca como "aguardando OCR" (parte do app, fora desta tarefa).
-- **Aceite:** fixture sem camada de texto (ex.: `n5-pt-astrofisica`) → CLI mostra a mensagem e não gera JSON de livro; PDF com texto normal não muda; teste do detector no CI. (REQ-EXT-22)
+### E1-T03 · Detecção de PDF escaneado/sem texto **e** de camada OCR invisível (ADR-018 + ADR-019)
+Dois detectores, dois estados distintos (decisão do PO, 2026-10-04):
+- **Detector A — "0 itens de texto" (ADR-018):** detectar PDF sem camada de texto, **não tentar extrair** (não montar `RawDocument` vazio) e emitir a mensagem exata `PDF escaneado: leitura exige OCR, ainda não disponível`; nenhum crash. Estado no app: **"sem texto: aguardando OCR"** (o livro fica na biblioteca e não abre; parte do app, fora desta tarefa).
+- **Detector B — texto invisível `Tr 3` (ADR-019):** medir, por página/documento, a fração de caracteres com render mode invisível (`Tr 3`). Se a **maior parte dos caracteres** das páginas for invisível, o documento recebe o aviso **`ocr-text-layer`** e a extração **continua normalmente** sobre o texto existente, com três restrições: **confiança mais baixa** (`extraction.avgConfidence` reduzido e `flags`/`warnings` registrando o motivo), **negrito/itálico ignorados** (a camada de OCR não traz estilo confiável — runs saem sem `bold`/`italic`) e o **app avisa o usuário de que o texto pode ter erros**. Estado no app: **"texto de OCR embutido: leitura com aviso"** (o livro abre e é legível).
+- A E9 (OCR próprio) **não** muda de prioridade ou escopo por causa desta tarefa (decisão do PO, 2026-10-04).
+- **Aceite:** fixture sem camada de texto (ex.: `n5-pt-astrofisica`) → CLI mostra a mensagem da ADR-018 e não gera JSON de livro; fixture com camada OCR invisível (ex.: `n1-en-lostworld`, `n3-en-filosofia`) → CLI gera livro **com** o aviso `ocr-text-layer`, sem `bold`/`italic` e com confiança reduzida; PDF digital normal → nenhuma mudança; **um teste de CI para cada detector**. (REQ-EXT-22)
 
 ### E1-T04 · CLI mínima
 - **Aceite:** `pnpm pagepace dump-raw <pdf> [--pages 1-5]` escreve JSON; `--help` funciona; erro claro para arquivo inexistente.

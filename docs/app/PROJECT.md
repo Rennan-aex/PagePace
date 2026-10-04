@@ -27,6 +27,12 @@ App de leitura para **leitura profunda** (filosofia, artigos, técnicos), que re
 - Notas de rodapé: fora do fluxo da leitura dinâmica, acessíveis.
 - Reflow no PC também (duas páginas reconstruídas); páginas reconstruídas podem ser reutilizadas entre modos, caso a caso.
 
+## Estados de um livro na biblioteca (decisão do PO, 2026-10-04 · ADR-018 + ADR-019)
+São **dois estados diferentes**, e a interface precisa distinguir os dois:
+- **"sem texto: aguardando OCR"** — PDF escaneado **sem** camada de texto. O livro entra na biblioteca com esse selo, mostra `PDF escaneado: leitura exige OCR, ainda não disponível` e **não abre** para leitura até a fase E9 entregar o OCR.
+- **"texto de OCR embutido: leitura com aviso"** — PDF escaneado **com** camada de texto de OCR já embutida (todo o texto invisível no PDF, `Tr 3`; nos manifests, feature `scanned-ocr-layer`). O livro **abre e é legível**, exibindo o aviso de que **o texto pode ter erros**; o extrator entrega `Book` com `warnings` contendo `ocr-text-layer`, confiança reduzida e **sem** negrito/itálico.
+- Texto digital normal: sem nenhum selo, leitura comum.
+
 ## Fora do escopo inicial
 Sincronização entre dispositivos, contas, OCR (E9 do extrator), EPUB como entrada, versão iOS.
 

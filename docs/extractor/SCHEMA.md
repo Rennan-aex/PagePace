@@ -77,6 +77,17 @@ interface Run {
   lang?: string;                         // ex.: "grc", "la" para trechos gregos/latinos
 }
 ```
+**Códigos de `extraction.warnings` (rascunho, ADR-019):**
+- `"ocr-text-layer"` — o texto veio de uma **camada de OCR embutida em scan** (`Tr 3`, invisível). O `Book` é gerado normalmente, mas com **confiança reduzida**, runs **sem `bold`/`italic`** e o app exibindo "texto de OCR embutido: leitura com aviso" (o texto pode ter erros).
+
+**Dois estados de um PDF escaneado (ADR-018 + ADR-019):**
+
+| Situação | No modelo | No app |
+|---|---|---|
+| Sem camada de texto (scan puro) | **nenhum `Book`** — a ingestão interrompe com a mensagem da E1-T03 | "sem texto: aguardando OCR" (fica na biblioteca, não abre) |
+| Texto de OCR embutido (`Tr 3`) | `Book` com `warnings` contendo `"ocr-text-layer"`, confiança baixa, sem estilo | "texto de OCR embutido: leitura com aviso" (abre e avisa) |
+| Texto digital normal | `Book` sem esse warning | leitura normal |
+
 **Texto de um bloco** = concatenação de `runs[].text`. Offsets de âncora sempre referem a esse texto.
 **Hifenização:** o texto do bloco já vem com palavras unidas; hifens genuínos de palavras compostas são preservados.
 **Palavras:** não estão no modelo; ver `@pagepace/segmenter`.
@@ -112,3 +123,4 @@ type CorrectionOp = { id: string; createdAt: string; target: Anchor } & (
 ## Changelog
 - `0.0.0`: placeholder do pacote.
 - `0.1.0-draft`: este rascunho (E1-T01 o transforma em `1.0.0`).
+- `0.1.0-draft` (doc, 2026-10-04): códigos de `extraction.warnings` documentados (`"ocr-text-layer"`) e a tabela dos dois estados de PDF escaneado — só documentação, **nenhum tipo mudou** (ADR-019).

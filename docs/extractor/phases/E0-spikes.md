@@ -34,9 +34,10 @@
 - **Aceite:** `spikes/S2-styles.md` com a taxa de PDFs do corpus em que o nome da fonte basta, exemplos de falha e proposta para o E4.
 - **Resultado:** 257/257 fontes de texto decididas pelo nome (100%); só com tokens genéricos cai para 72% e erra 10.286 letras; flags do pdf.js `undefined` em 409/409; OS/2 perde 7% das fontes (subsets TeX); 1 caso de itálico simulado (107 letras); nenhum negrito por contorno.
 
-### E0-T04 · Spike S3: cobertura de PDFs tagged
+### E0-T04 · Spike S3: cobertura de PDFs tagged · `done`
 - **Objetivo:** quantos PDFs do corpus têm struct tree e se ela é confiável (comparar com o visual).
 - **Aceite:** `spikes/S3-tagged.md` com contagem, exemplos bons/ruins, recomendação de como usar o sinal.
+- **Resultado:** 5/15 têm `StructTreeRoot`, 4/15 têm `Marked=true`, só **3/15 têm árvore utilizável e 100% de cobertura** (n1-en-sofia, n1-en-curinga, n4-en-fisica); **1 `H1` em todo o corpus, 0 `H2`–`H6`** → não serve para títulos (E4); n1-en-lostworld = árvore vazia com `Marked=true` (falso positivo), n3-pt-filosofia = 9 nós em 2 páginas; n1-en-curinga com `Sect` dentro de `P` + 19.461 `Span` com `alt` repetido. Recomendação: usar só como **confirmação de parágrafos (E2)** e de **figuras com `bbox` (E10)**, após validação (não vazio ≥90% das páginas, sem hierarquia invertida). Feature `tagged` marcada no manifest privado nos 3 confiáveis.
 
 ### E0-T05 · Spike S4: desempenho
 - **Objetivo:** medir ms/página e pico de memória em Node para um livro de ~300–500 páginas; medir em WebView/Android de entrada (emulador com limites ou dispositivo real do PO) apenas a leitura bruta com PDF.js.
