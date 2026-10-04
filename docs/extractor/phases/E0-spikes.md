@@ -29,9 +29,10 @@
 - **Aceite:** `spikes/S1-pdfjs.md` com tabela "dado / disponível? / como obter / qualidade", exemplos reais (sem texto com copyright além de trechos mínimos) e recomendação.
 - **Fora de escopo:** pipeline, heurísticas.
 
-### E0-T03 · Spike S2: detecção de negrito/itálico
+### E0-T03 · Spike S2: detecção de negrito/itálico · `done`
 - **Objetivo:** medir quanto dá para saber de estilo só pelo nome da fonte e flags; achar os casos que exigem outra técnica (negrito simulado por contorno, fontes com nomes opacos como `F23`).
 - **Aceite:** `spikes/S2-styles.md` com a taxa de PDFs do corpus em que o nome da fonte basta, exemplos de falha e proposta para o E4.
+- **Resultado:** 257/257 fontes de texto decididas pelo nome (100%); só com tokens genéricos cai para 72% e erra 10.286 letras; flags do pdf.js `undefined` em 409/409; OS/2 perde 7% das fontes (subsets TeX); 1 caso de itálico simulado (107 letras); nenhum negrito por contorno.
 
 ### E0-T04 · Spike S3: cobertura de PDFs tagged
 - **Objetivo:** quantos PDFs do corpus têm struct tree e se ela é confiável (comparar com o visual).
