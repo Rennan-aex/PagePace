@@ -71,10 +71,18 @@ function resolveRequest(urlPath) {
   return null;
 }
 
-async function startServer() {
+async function startServer({ logRequests = false } = {}) {
   const server = createServer(async (req, res) => {
     const filePath = resolveRequest(req.url ?? "/");
+    const startedAt = Date.now();
+    const done = (status, size) => {
+      if (logRequests) {
+        const range = req.headers.range ? ` range=${req.headers.range}` : "";
+        console.log(`  ${status} ${req.url} ${size} B ${Date.now() - startedAt} ms${range}`);
+      }
+    };
     if (!filePath) {
+      done(404, 0);
       res.writeHead(404).end("not found");
       return;
     }
@@ -82,7 +90,9 @@ async function startServer() {
       const body = await readFile(filePath);
       const type = MIME[path.extname(filePath).toLowerCase()] ?? "application/octet-stream";
       res.writeHead(200, { "content-type": type, "cache-control": "no-store" }).end(body);
+      done(200, body.length);
     } catch {
+      done(404, 0);
       res.writeHead(404).end("not found");
     }
   });
@@ -239,9 +249,9 @@ async function runBench({ chromePort, httpPort, mode, rate, pages, renderCheck }
     const benchUrl =
       `http://127.0.0.1:${httpPort}/spikes/s4-bench.html` +
       `?pdf=${encodeURIComponent(pdfId)}&mode=${encodeURIComponent(mode)}` +
-      (pages ? `&pages=${pages}` : "") +
-      (argv.includes("--countops") ? "&countops=1" : "") +
-      `&run=${Date.now()}`;
+        (pages ? `&pages=${pages}` : "") +
+        (argv.includes("--countops") ? "&countops=1" : "") +
+        `&auto=0&run=${Date.now()}`;
     await session.send("Page.navigate", { url: benchUrl });
     await Promise.race([
       loaded,
@@ -283,7 +293,7 @@ async function main() {
   if (argv.includes("--serve")) {
     // Modo "celular": só o servidor local. O PO abre a URL no navegador do
     // aparelho (mesma rede Wi-Fi) e copia o JSON que aparece na tela.
-    const { server, port } = await startServer();
+    const { server, port } = await startServer({ logRequests: true });
     const ips = Object.values(os.networkInterfaces())
       .flat()
       .filter((iface) => iface && iface.family === "IPv4" && !iface.internal)

@@ -1,6 +1,6 @@
 # S4 · Desempenho: ms/página, memória e worker (spike da E0-T05)
 
-**Data:** 2026-10-04 · **Status:** concluído (com **1 pendência: medição em aparelho Android real**, ver §8)
+**Data:** 2026-10-04 · **Status:** concluído — inclui **medição em aparelho Android real** (Redmi Note 13, Android 15; ver §4.1 e §8)
 **Scripts:** `packages/extractor/spikes/s4-performance.mjs` (Node) e `packages/extractor/spikes/s4-browser.mjs` + `s4-bench.html` (Chromium) — descartáveis, commitados para reprodução.
 **Saídas brutas:** `.pagepace-cache/spikes/S4/` (`summary.json`, `browser.json`, `<id>.json`, `idle.json`; gitignored, contém estatísticas do corpus — nunca commitar).
 
@@ -101,13 +101,31 @@ Scan com camada de OCR **n1-en-lostworld** (228 páginas, 118.045 itens, 456 ops
 - **Render de página do scan (mesmo resultado nos 2 modos, checksum idêntico):** p1 = **419 ms (worker) / 404 ms (sem worker)**; p100 = 337 / 302 ms.
 - Leitura das 494 páginas no total: 2,9 s (worker 1×) e 24,5 s (sem worker 6×).
 
+### 4.1 Aparelho real — Redmi Note 13 (Android 15, Chrome, Wi-Fi)
+
+Medição feita pelo PO em 2026-10-04 com o modo `--serve` (prints: `<CORPUS_PRIVATE_DIR>\S4-prints\celular-worker.jpg` e `celular-main.jpg`), mesmo livro `n1-pt-sofia` (494 páginas, PDF de 1,9 MB servido pelo PC pela rede local):
+
+| modo | leitura ms/pág | texto | ops | abertura | 1ª pág | pior pág | p50 | p95 | trava da tela | memória JS | total (494 pág) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **worker** | **24,77** | 11,81 | 12,23 | 926 ms | 1.198 ms | 272 ms | 22,5 | 36,8 | 26,3 ms | 9,5 MB | 13,3 s |
+| sem worker (`main`) | 24,35 | 11,85 | 12,19 | 121 ms | 298 ms | 176 ms | 23,9 | 30,9 | 0,8 ms | 9,5 MB | 12,2 s |
+
+- **24,8 ms/página de leitura bruta = 6× de folga sob o orçamento de 150 ms/página: o caso normal está confirmado em aparelho real.**
+- O aparelho é **~4× mais lento que o PC a 1×** (24,8 vs 5,8 ms/pág) e **~2,2× mais lento que o PC a 6× de throttling** (24,8 vs 11,0): o proxy do §4 era mesmo **piso otimista** (§7.2).
+- **1ª página: 1.198 ms com worker** — a abertura de 926 ms é fria e inclui o download de 1,9 MB pela Wi-Fi; a rodada seguinte (já morna) abriu em 121 ms. **Dentro do limite de 2 s.**
+- **Nos dois modos a leitura saiu praticamente igual**, diferente do PC (4,5× mais lento sem worker a 6×). Duas razões: no aparelho o worker também roda no mesmo processador lento (o throttling do CDP só desacelerava a thread principal), e o modo `main` **adiou a materialização das imagens para o render**, que não foi medido aqui (§1.2). A comparação justa entre modos continua sendo a de §6.
+- **`performance.memory` no Android devolve 9,5 MB nos dois modos** — número grosseiro, não serve para comparar (no PC os mesmos modos deram 27,5 e 120,5 MB). **A confirmação dos 300 MB de memória é a do §3 (RSS em Node).**
+- **Worker segue obrigatório** com base em §6: no pior PDF do corpus, sem worker a tela ficaria **~0,9 s congelada** e o heap da thread principal é 4,4× maior.
+
+Limites desta medição: 1 execução por modo, 1 aparelho de entrada, 1 livro comum (**scan** e a **página atípica de 2,4 s não foram medidos no aparelho**) e leitura bruta **sem render**.
+
 ## 5. Orçamento × medição (ARCHITECTURE, decisão 8)
 
 | Meta (provisória, "confirmada no E0") | Medido | Veredito |
 |---|---|---|
-| **≤ 150 ms/página em celular de entrada** | Node/desktop: 8,90 ms/pág no caso normal, 83–126 ms nos extremos. Chromium throttled 6× **com worker**: 11,0 ms/pág (livro comum) e **132–139 ms/pág** (scan com imagens). Sem worker 6×: 49,7 ms/pág. | **Caso normal: folgado.** Casos-limite (scan com imagem pesada, página atípica de 2,4 s) chegam **perto ou além** de 150 ms **só na leitura**, sem o extrator. **Não confirmada sem aparelho real** → meta mantida, medição real pendente (§8). |
-| **Pico de memória ≤ 300 MB num livro de 500 páginas** | Livro de 494 pág: **178 MB RSS** (Node) e **≤ 50 MB de heap** (Chromium com worker). Porém 2 PDFs (14 e 163 páginas) ficaram em **406 MB** e **314 MB**. | **Atendida para livro longo comum; não é garantida por PDF.** O gatilho é conteúdo pesado, não "500 páginas". Confirma a E8-T03 (limite de memória, descartar `font.data`, liberar páginas). |
-| **Primeira página legível em ≤ 2 s** | Node: 107–813 ms (ler + render). Chromium: leitura 25–189 ms; render do scan ~400–460 ms. | **Atendida no desktop** (folga ≥ 2× no pior caso). Resta confirmar no aparelho. |
+| **≤ 150 ms/página em celular de entrada** | **Aparelho real (Redmi Note 13): 24,8 ms/pág** de leitura bruta (§4.1). Node/desktop: 8,90 ms/pág no caso normal, 83–126 ms nos extremos. Chromium throttled 6× **com worker**: 11,0 ms/pág (livro comum) e **132–139 ms/pág** (scan com imagens). Sem worker 6×: 49,7 ms/pág. | **Caso normal: confirmado no aparelho real, com 6× de folga.** Casos-limite (scan com imagem pesada, página atípica de 2,4 s) **não foram medidos no aparelho** e chegam perto/além de 150 ms **só na leitura**, sem o extrator. |
+| **Pico de memória ≤ 300 MB num livro de 500 páginas** | Livro de 494 pág: **178 MB RSS** (Node) e **≤ 50 MB de heap** (Chromium com worker). Porém 2 PDFs (14 e 163 páginas) ficaram em **406 MB** e **314 MB**. No aparelho o `performance.memory` não é confiável (§4.1). | **Atendida para livro longo comum; não é garantida por PDF.** O gatilho é conteúdo pesado, não "500 páginas". Confirma a E8-T03 (limite de memória, descartar `font.data`, liberar páginas). |
+| **Primeira página legível em ≤ 2 s** | **Aparelho real: 1.198 ms (worker, fria, com download de 1,9 MB) e 298 ms (sem worker)** — §4.1. Node: 107–813 ms (ler + render). Chromium: leitura 25–189 ms; render do scan ~400–460 ms. | **Atendida no aparelho real** (folga ~2× no pior caso medido). |
 
 ## 6. Precisa de worker? — **Sim**
 
@@ -123,29 +141,38 @@ Sem worker o PDF.js disputa a thread principal com a interface: fica mais lento 
 ## 7. Anomalias e limitações (para quem vier depois)
 
 1. **Fake worker "esconde" o custo de imagem** (§1.2): sem worker a leitura sai 27× mais barata no scan, com a mesma saída — a transferência de imagem só aparece no render. **Nunca usar o modo sem worker como referência de leitura.**
-2. **Throttling do CDP não é um celular:** afeta sobretudo a thread principal; parte do trabalho do worker provavelmente é mais barato aqui do que num aparelho lento. Números com worker são **piso otimista**.
+2. **Throttling do CDP não é um celular:** afeta sobretudo a thread principal; parte do trabalho do worker provavelmente é mais barato aqui do que num aparelho lento. Números com worker são **piso otimista** — confirmado em §4.1: o aparelho real ficou **2,2× mais lento que o proxy a 6×** (24,8 vs 11,0 ms/pág).
 3. **RSS de processo do Node ≠ memória de app Android** (inclui ~76,5 MB de V8 + PDF.js). Comparar sempre com o baseline, e preferir o **heap** no navegador.
 4. **`fontExtraProperties`** só pesa em PDFs com muitas fontes (+35 MB no pior); manter a flag e descartar `font.data` depois (E8-T03).
 5. **Páginas atípicas existem:** p95/pior página manda mais que a média no orçamento de responsividade (2.427 ms em n2-en-astrofisica; 593 ms no scan).
 6. **Servidor `--serve` expõe o corpus na LAN** enquanto estiver de pé: é para medir no celular e deve ser encerrado com Ctrl+C logo depois (§8).
 
-## 8. Pendência: medir em aparelho real (ação do PO, opcional mas desejável)
+## 8. Medição em aparelho real — **fechada em 2026-10-04**
 
-O proxy do §4 responde o spike, mas **a meta do orçamento só vira "confirmada" com um Android de entrada** (dispositivo real do PO ou emulador). Roteiro pronto, sem instalar nada:
+**Dispositivo:** Redmi Note 13 (Android 15, Chrome) do PO, na mesma rede Wi-Fi do PC que servia o PDF. **Resultado em §4.1:** 24,77 ms/pág com worker e 24,35 ms/pág sem worker (494 páginas), 1ª página em 1.198 ms (fria) → **orçamento de 150 ms/pág e de 2 s na 1ª página confirmados em aparelho de entrada**.
+
+Roteiro reproduzível (sem instalar nada), o mesmo usado nesta medição:
 
 ```powershell
 # 1) na raiz do projeto (PowerShell), sobe o servidor do bench na rede local
 node packages\extractor\spikes\s4-browser.mjs n1-pt-sofia --serve --lan
 
-# 2) no CELULAR (mesma rede Wi-Fi), abra uma das URLs que o comando mostrar, ex.:
+# 2) no CELULAR (mesma rede Wi-Fi), abra a URL que começa com http://10. (ex.):
 #    http://10.0.0.154:57554/spikes/s4-bench.html?pdf=n1-pt-sofia&mode=worker
-# 3) espere terminar: a página mostra um JSON com "msPerPage", "firstPageMs", "eventLoop" e "memory"
-# 4) tire um print (captura de tela) da tela inteira e salve em algum lugar que eu consiga ler
-# 5) repita com mode=main   (mesma URL trocando mode=worker por mode=main)
-# 6) Ctrl+C no PC para desligar o servidor (ele só existe enquanto estiver rodando)
+#    (192.168.56.1 é adaptador de máquina virtual e 172.30.32.1 é WSL/Hyper-V: não usar)
+# 3) a página roda SOZINHA: espere o bloco "===== RESULTADO =====" no topo (leitura em ms/página);
+#    se aparecer "ERRO:" em vermelho, tire print do erro e pare
+# 4) tire 1 print do bloco de resultado (uma tela serve)
+# 5) repita com mode=main   (mesma URL trocando mode=worker por mode=main) e tire o 2º print
+# 6) Ctrl+C no PC para desligar o servidor (ele só existe enquanto estiver rodando; ele loga
+#    cada requisição — "200 /corpus/n1-pt-sofia.pdf …" mostra que o PDF chegou ao celular)
+# 7) mova as prints para <CORPUS_PRIVATE_DIR>\S4-prints (nomeie celular-worker.jpg e celular-main.jpg)
+#    cabo USB no PC → Este Computador → [celular] → Pictures → Screenshots → copiar/colar
 ```
 
-Prazo sugerido: antes da E8-T04 (`pnpm bench`). Enquanto isso, **ADR-005 continua `provisional`** (evidência do S4 a favor, mas sem aparelho real).
+Nota da 1ª tentativa (2026-10-04): a página ficava presa em "carregando…" porque só o driver CDP chamava `__runBench()`; corrigido para auto-execução (`auto=0` continua obrigatório para o driver) e testado de ponta a ponta abrindo a URL de `10.0.0.154` num Chrome sem CDP (worker 5,83 ms/pág e main 6,08 ms/pág, 494 pág).
+
+**O que ainda NÃO foi medido no aparelho:** o scan `n1-en-lostworld` (132–139 ms/pág no proxy), a página atípica de 2.427 ms, o render e a memória real (`performance.memory` no Android é grosseiro, §4.1). Por isso a **ADR-005 segue `provisional`**: o desempenho do caso normal está confirmado, e a saída de `provisional` depende do fim da E0 (S5 de licenças e estes casos extremos).
 
 ## 9. Reprodução
 

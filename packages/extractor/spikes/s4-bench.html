@@ -194,6 +194,17 @@
         ...window.__benchInfo,
       };
       log(JSON.stringify(result, null, 2), "ok");
+      log(
+        [
+          "===== RESULTADO (tire print deste bloco) =====",
+          `modo: ${MODE} · pdf: ${PDF_ID} · páginas: ${totalPages}`,
+          `leitura: ${result.msPerPage.read} ms/página (texto ${result.msPerPage.text} · ops ${result.msPerPage.ops})`,
+          `1ª página: ${result.firstPageMs} ms · pior página: ${result.perPage.max} ms`,
+          `trava da tela: ${result.eventLoop.maxLagMs} ms · memória JS: ${result.memory.peakHeapMb} MB`,
+          "==============================================",
+        ].join("\n"),
+        "ok",
+      );
       return result;
     };
 
@@ -246,6 +257,15 @@
 
     window.__ready = true;
     log(`pronto: mode=${MODE} pdf=${PDF_ID} pdfjs=${pdfjsLib.version}`, "ok");
+
+    // Quando a página é aberta num navegador de verdade (celular), ninguém
+    // chama __runBench: roda sozinha. O driver CDP passa `auto=0` e chama na mão.
+    if (params.get("auto") !== "0") {
+      log("iniciando o bench… (pode levar alguns segundos)");
+      window.__runBench().catch((err) => {
+        log(`ERRO: ${err?.message ?? String(err)}`, "err");
+      });
+    }
   </script>
 </body>
 </html>
