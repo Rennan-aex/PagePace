@@ -23,7 +23,7 @@
 - **Fora de escopo:** corpus privado, gabaritos, spikes.
 - **Testes:** automatizado: teste do `corpus:fetch` com diretório temporário e falha proposital por hash divergente. Manual: `tests/manual/` do E0.
 
-### E0-T02 · Spike S1: o que o PDF.js entrega
+### E0-T02 · Spike S1: o que o PDF.js entrega · `done`
 - **Objetivo:** documentar exatamente quais dados o PDF.js dá (itens de texto, `fontName`, transform, largura, `hasEOL`, estilos de fonte, `getOutline`, `getStructTree`, metadados), em Node e no navegador.
 - **Passos:** script que despeja os itens de 3 PDFs (N1, N2, N3) em JSON; comparar com a página renderizada; listar o que falta (ex.: espaços, negrito).
 - **Aceite:** `spikes/S1-pdfjs.md` com tabela "dado / disponível? / como obter / qualidade", exemplos reais (sem texto com copyright além de trechos mínimos) e recomendação.

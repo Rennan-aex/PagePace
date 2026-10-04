@@ -22,6 +22,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 
 ### ADR-005 · PDF.js como base da ingestão · provisional (confirmar no E0)
 **Decisão:** usar PDF.js (Apache-2.0) para ler itens de texto. Critério de revisão: o spike E0 mostra que não entrega fonte/posição suficientes ou é inviável em desempenho no Android.
+**Evidência (S1, 2026-10-04):** a favor — itens/geométrica/fontes/render OK em 5 PDFs, 5–10 ms/página, ver `spikes/S1-pdfjs.md`. Continua `provisional` até o S4 (Android/WebView).
 
 ### ADR-006 · Licenças: sem AGPL/GPL como dependência · accepted
 **Decisão:** MuPDF/PyMuPDF (AGPL) e Poppler (GPL) servem só como referência de estudo. Dependências devem ser MIT/BSD/Apache/ISC. Licença do projeto fica para depois (repo privado).
@@ -52,3 +53,9 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 **Alternativas:** (a) campo novo `file` com o nome relativo a `CORPUS_PRIVATE_DIR` · (b) `path` ou `local_path` · (c) reutilizar `source_url` com caminho relativo, sem campo novo.
 **Decisão:** campo `file`, com o nome do arquivo relativo a `CORPUS_PRIVATE_DIR` (resposta do PO, 2026-10-03). `source_url` e `license` continuam no esquema e valem `null` / `proprietary-personal` no manifest privado; `sha256` é preenchido para permitir detectar arquivo trocado.
 **Consequências:** `corpus:fetch` e o runner de métricas (E1-T05, E1-T06) resolvem arquivos privados por `$CORPUS_PRIVATE_DIR/<file>` e os públicos por `source_url`. Nenhuma mudança no esquema `@pagepace/schema`. Revisitar se um dia o corpus privado passar a ter subpastas por nível ou idioma.
+
+### ADR-015 · Dependências do spike S1: pdfjs-dist e @napi-rs/canvas · accepted · 2026-10-04
+**Contexto:** a E0-T02 (spike S1) precisa ler PDF e renderizar página em Node para comparar texto × visual. Regra 5 do AGENTS: toda dependência passa por licença/tamanho/navegador antes de entrar.
+**Alternativas:** (a) `pdfjs-dist` + `@napi-rs/canvas` via npm · (b) ler PDF com biblioteca própria/zero dependência · (c) usar pdftotext/Poppler (GPL, proibido) como binário externo.
+**Decisão:** (a). `pdfjs-dist@6.4.299` — Apache-2.0, é o próprio ADR-005, roda em navegador e Node, sem binário nativo. `@napi-rs/canvas@1.0.10` — MIT, é *optional dependency* já declarada pelo próprio pdfjs-dist, só para render em Node (não vai para o navegador). Ambas como `devDependencies` na raiz enquanto só os spikes as usam.
+**Consequências:** quando o E1-T02 criar a ingestão de verdade, `pdfjs-dist` migra para dependência de `packages/extractor` (revisitar aí versão/estado de `standardFontDataUrl` em produção). `@napi-rs/canvas` nunca deve entrar no bundle do app (só CLI/testes). Revisar no S5 (auditoria de licenças) junto com ADR-005.
