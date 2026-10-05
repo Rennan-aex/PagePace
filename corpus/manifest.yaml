@@ -1,23 +1,90 @@
-# Manifest do corpus PÚBLICO. Preenchido na tarefa E0-T01b / E1-T05.
-# Regras: só material de domínio público ou licença aberta verificada. Nunca PDFs com copyright.
-# O script `pnpm corpus:fetch` baixa cada item para corpus/public/ e valida o sha256.
+# Manifest do corpus PÚBLICO. Preenchido na tarefa E0-T01b (o script `corpus:fetch` é da E1-T05).
+# Regras: só material de domínio público ou licença aberta verificada (CORPUS.md, "Regras de licença").
+# Nunca PDFs com copyright. Cada PDF é baixado uma única vez por PowerShell para corpus/public/ (ignorado).
 #
 # Esquema de cada entrada:
 #   - id: n1-en-0001            # único, estável
 #     level: N1                 # N1..N5
 #     lang: en                  # pt | en
 #     title: "..."
-#     source_url: "https://..."
-#     license: "public-domain | CC-BY-4.0 | ..."
+#     source_url: "https://..." # URL direta e estável do PDF (download)
+#     page_url: "https://..."   # página oficial onde a licença foi conferida
+#     license: "CC BY 4.0"      # linha exata da licença (curta)
+#     license_url: "https://..." # URL da licença citada em `license`
+#     verified_on: "2026-10-04" # data da verificação da licença
+#     pages: 548                # número de páginas
 #     sha256: "<64 hex>"
 #     features: [footnotes, two-column, hyphenation, equations, tagged, scanned]
 #     golden: none              # ou caminho relativo em corpus/golden/
 #     visibility: public
 #
-# Não usa `file` (ADR-014): aqui o arquivo vem de `source_url` e é baixado pelo script.
+# Não usa `file` (ADR-014): aqui o arquivo vem de `source_url` e é baixado pelo script (E1-T05).
 
 version: 1
-documents: []
+documents:
+  - id: n2-en-arxiv-phobos
+    level: N2
+    lang: en
+    title: "Tidal disruptions of rubble piles: The case of Phobos"
+    source_url: "https://arxiv.org/pdf/2602.21912v1"
+    page_url: "https://arxiv.org/abs/2602.21912"
+    license: "\"view license\" na página do artigo aponta para CC BY 4.0 (ícone by-4.0.png)"
+    license_url: "https://creativecommons.org/licenses/by/4.0/"
+    verified_on: "2026-10-04"
+    pages: 10
+    sha256: "68ae9ee63a091a8c5ec7f169cde1ab16bcf3b2d11b692d58fcd2b79f2f56d11b"
+    features: [two-column, hyphenation, equations]
+    golden: none
+    visibility: public
+
+  - id: n3-pt-scielo-wittgenstein
+    level: N3
+    lang: pt
+    title: "Wittgenstein e o ceticismo"
+    source_url: "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt"
+    page_url: "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?lang=pt"
+    license: "Este é um artigo publicado em acesso aberto sob uma licença Creative Commons (badge: Creative Common - by 4.0)"
+    license_url: "https://creativecommons.org/licenses/by/4.0/"
+    verified_on: "2026-10-04"
+    pages: 11
+    sha256: "f4013e92b72ad360ae6afba27dea7df8a7abb28ef4f75fd0a850281522dcbafb"
+    features: [footnotes, hyphenation]
+    golden: none
+    visibility: public
+
+  - id: n1-en-rebus-philosophy-mind
+    level: N1
+    lang: en
+    title: "Introduction to Philosophy: Philosophy of Mind"
+    source_url: "https://press.rebus.community/intro-to-phil-of-mind/open/download?type=pdf"
+    page_url: "https://press.rebus.community/intro-to-phil-of-mind/"
+    license: "licensed under a Creative Commons Attribution 4.0 International License, except where otherwise noted"
+    license_url: "https://creativecommons.org/licenses/by/4.0/"
+    verified_on: "2026-10-04"
+    pages: 99
+    sha256: "6160c11d7f12e829c3f41680567e1796d639a59e9d3538a06faace596bc407a5"
+    features: [tagged, footnotes]
+    golden: none
+    visibility: public
+
+  - id: n3-en-scielo-climatejustice
+    level: N3
+    lang: en
+    title: "Climate justice, land-use change emissions and global health"
+    source_url: "https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm?format=pdf&lang=en"
+    page_url: "https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm?lang=en"
+    license: "This is an open-access article distributed under the terms of the Creative Commons Attribution License (badge: Creative Common - by 4.0)"
+    license_url: "https://creativecommons.org/licenses/by/4.0/"
+    verified_on: "2026-10-04"
+    pages: 20
+    sha256: "a3402300bc90f00685e8286001e5b69b9fffd4c832205370b87a1ccaf36d8a3a"
+    features: [footnotes]
+    golden: none
+    visibility: public
 
 # Necessidades de cobertura (ver docs/extractor/CORPUS.md):
 #   N1: 2 pt, 2 en   N2: 2 en, 1 pt   N3: 3 pt, 3 en   N4: 1 pt, 2 en   N5: 2 mistos
+# Metas da E0-T01b (PO, 2026-10-04) — todas cumpridas com estes 4 PDFs (10,5 MB no total):
+#   1 N3 en digital ✓ (n3-en-scielo-climatejustice) · 1 N2 duas colunas ✓ (n2-en-arxiv-phobos)
+#   1 N3 pt ✓ (n3-pt-scielo-wittgenstein) · 1 tagged confiável ✓ (n1-en-rebus-philosophy-mind, S3 §4.3)
+#   Opcionais N4/N5 não incluídos nesta tarefa (podem entrar depois, mesmo processo).

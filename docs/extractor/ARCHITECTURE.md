@@ -40,7 +40,7 @@ Se existir **struct tree** (PDF tagged), ele entra como sinal forte nas camadas 
 5. **Processamento por página em streaming.** O app começa a ler enquanto o resto processa; resultado vai para cache em disco/IndexedDB.
 6. **Confiança em vez de silêncio.** Cada heurística pode rebaixar a confiança do bloco com um motivo (`flags`). Isso alimenta a tela de correção.
 7. **OCR é só outro adaptador de ingestão.** Produz `RawDocument`; o restante do pipeline é reaproveitado. Estilo vindo de OCR é pior, e a confiança reflete isso.
-8. **Orçamento de desempenho.** Metas provisórias (confirmadas no E0): ≤ 150 ms/página em celular de entrada, pico de memória ≤ 300 MB num livro de 500 páginas, primeira página legível em ≤ 2 s.
+8. **Orçamento de desempenho.** Metas: ≤ 150 ms/página em celular de entrada, pico de memória ≤ 300 MB, primeira página legível em ≤ 2 s. **Medido no E0 (S4, aparelho real Redmi Note 13):** caso normal de leitura bruta = **24,8 ms/página** (6× de folga) e **1ª página em 1,2 s** (fria, com download de 1,9 MB). O orçamento de **150 ms/página inclui leitura + extrator** — por ora **só a leitura foi medida** (o extrator ainda não existe; medir junto a partir da E1/E8). **Memória:** **livro comum ≤ 300 MB está atendido** (494 páginas = 178 MB RSS em Node); **PDFs de conteúdo pesado (ex.: 406 MB com só 14 páginas) não têm garantia** e exigem limite de memória e degradação controlada (**E8-T03**). Números e método: `spikes/S4-performance.md` §4.1 e §5.
 
 ## Estrutura interna do pacote `extractor` (alvo)
 ```

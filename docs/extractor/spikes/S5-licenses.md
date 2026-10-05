@@ -57,7 +57,7 @@ Leitura: nos PDFs do corpus as fontes de referência estão embutidas, então na
 **Consequências:**
 - **Extração (o produto): não precisa das fontes Liberation.** Texto, geometria e estilos saem iguais — este é o caminho das E1–E7.
 - **Render (recorte de figuras da ADR-016 e botão "ver original" da ADR-003): precisa**, sob pena de texto com fonte errada em PDFs Helvetica não embutidos.
-- **Decisão adiada para a E1-T02**, quando os assets do app forem copiados: (a) copiar só os `.pfb` Foxit e abrir mão da fidelidade do render em Helvetica, (b) copiar os 4 `.ttf` GPL e assumir as obrigações deles (entregar licença + fonte; os arquivos são separáveis do código Apache-2.0), ou (c) substituir por Liberation 2.x (relicenciada como OFL, mas divergiria do upstream). **Nada é distribuído hoje**, então isto não trava a E0; fica registrado na ADR-005 e no BACKLOG.
+- **Decisão adiada para a E1-T02**, quando os assets do app forem copiados: (a) copiar só os `.pfb` Foxit e abrir mão da fidelidade do render em Helvetica, (b) copiar os 4 `.ttf` GPL e assumir as obrigações deles (entregar licença + fonte; os arquivos são separáveis do código Apache-2.0), ou (c) substituir por Liberation 2.x (relicenciada como OFL, mas divergiria do upstream). **Nada é distribuído hoje**, então isto não trava a E0; fica registrado na ADR-005 e no BACKLOG. **Decidido pelo PO em 2026-10-04: opção (a) → ADR-020** (só `.pfb` Foxit; os `.ttf` não entram no app).
 
 ## 4. Candidatos: licença × tamanho × navegador
 

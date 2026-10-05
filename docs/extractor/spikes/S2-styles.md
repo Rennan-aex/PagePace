@@ -1,7 +1,7 @@
 # S2 · Negrito/itálico a partir do nome da fonte (spike da E0-T03)
 
 **Data:** 2026-10-04 · **Status:** concluído · **Script:** `packages/extractor/spikes/s2-styles.mjs` (descartável, commitado para reprodução) · **Saídas brutas:** `.pagepace-cache/spikes/S2/` (gitignored; contém texto do corpus — nunca commitar).
-**Atualização (2026-10-04, pedido do PO):** as estatísticas de estilo passaram a separar os **13 PDFs de texto digital nativo** dos **2 PDFs com camada de OCR embutida** (`n1-en-lostworld`, `n3-en-filosofia` — feature `scanned-ocr-layer`, ADR-019). Ver §2.1.
+**Atualização (2026-10-04, pedido do PO):** as estatísticas de estilo passaram a separar os **13 PDFs do grupo `digital`** — **11 com texto digital + 2 sem texto** (`n5-en-newton`, `n5-pt-astrofisica`: N5, só imagem) — dos **2 PDFs com camada de OCR embutida** (`n1-en-lostworld`, `n3-en-filosofia` — feature `scanned-ocr-layer`, ADR-019). Ver §2.1.
 
 ## 1. Método
 
@@ -16,7 +16,7 @@
 
 - Cada decisão grava `basis` (`convention` | `token` | `default` | `unknown`), além de `bold`, `italic`, `kind` (`text` | `math` | `symbol`), `role` e `family`.
 - **Definições:** *fonte de texto* = renderiza letras (`\p{L}`) e não é símbolo/matematical; *decidida* = `bold` e `italic` não nulos; *naive* = mesma leitura **sem** a tabela de convenções (só token + default); *conflito* = nome ≠ bytes (OS/2 `fsSelection`, `head.macStyle`, peso ≥ 700 ou regex no nome interno do arquivo); *faux* = estilo simulado na desenho (contorno `Tr` 2/5/6 ou corte/shear visível).
-- **Dois grupos de análise (decisão do PO, ADR-019, 2026-10-04):** `digital` = os **13 PDFs com texto digital nativo**; `ocrLayer` = **`n1-en-lostworld` + `n3-en-filosofia`**, scans com camada de OCR embutida (feature `scanned-ocr-layer`, todo o texto em `Tr 3`). A partir desta atualização as estatísticas são reportadas **separadas por grupo** (o script grava `summary.groups`).
+- **Dois grupos de análise (decisão do PO, ADR-019, 2026-10-04):** `digital` = os 13 PDFs sem OCR embutido (**11 com texto digital + 2 sem texto**, os N5 só imagem); `ocrLayer` = **`n1-en-lostworld` + `n3-en-filosofia`**, scans com camada de OCR embutida (feature `scanned-ocr-layer`, todo o texto em `Tr 3`). A partir desta atualização as estatísticas são reportadas **separadas por grupo** (o script grava `summary.groups`).
 - **Erros do naive (definição, reproduz a contagem da §2):** para cada fonte de texto compara-se a decisão **com** convenção (verdade) contra a decisão **sem** convenção (naive; silêncio vira regular). Categorias disjuntas: **negrito** = verdade negrito e naive não · **itálico** = verdade itálico e naive não · **papel** = verdade `typewriter`/`sans`/`small-caps` e naive regular, contada só quando não é erro de negrito/itálico. Uma fonte entra 1x no total.
 - Determinístico: mesma entrada, mesma saída (sem `Date.now()` na lógica).
 - Comandos: `node packages/extractor/spikes/s2-styles.mjs` e, para conferir no visual, `node .pagepace-cache/spikes/S2/render-crop.mjs <id> <pág> <x> <y> <largura> <altura> <nome> [escala]`.
@@ -54,7 +54,7 @@ Composição real do corpus: negrito 10.254 letras (0,28%) em 49 fontes; itálic
 
 ### 2.1 Separação: texto digital nativo × texto de OCR embutido (pedido do PO, 2026-10-04)
 
-| Métrica | digital (13 PDFs) | ocrLayer (2 PDFs) | total |
+| Métrica | digital (13 PDFs: 11 com texto + 2 sem texto, N5) | ocrLayer (2 PDFs) | total |
 |---|---:|---:|---:|
 | fontes | 296 | 113 | 409 |
 | fontes de texto | 196 | 61 | 257 |

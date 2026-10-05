@@ -16,7 +16,7 @@ Cada nível deve ter **pt e en** sempre que possível. Distribuição mínima de
 ### PDFs com camada de OCR embutido (feature `scanned-ocr-layer`)
 - `n1-en-lostworld` e `n3-en-filosofia` são **escaneados com texto de OCR já embutido** (todo o texto em `Tr 3`, invisível — achado do spike S2, ADR-019). Feature `scanned-ocr-layer` marcada no manifest privado.
 - **Eles não contam nas metas de N1 e N3:** a distribuição acima é contada sem eles, e as métricas deles entram em **baseline separada** (grupo "texto de OCR embutido: leitura com aviso", com confiança reduzida e sem estilo — nunca misturado com os PDFs digitais nativos).
-- **Falta para o N3:** um PDF **digital** de filosofia em inglês (não escaneado, sem OCR embutido) — hoje o único N3-en é `n3-en-filosofia`, que é scan. Enquanto não houver esse PDF, o N3-en não tem exemplar digital nativo.
+- **N3 em inglês digital (resolvido pela E0-T01b, 2026-10-04):** o corpus **público** agora tem `n3-en-scielo-climatejustice` (artigo digital nativo, Filosofia Unisinos, CC BY 4.0) — o N3-en privado `n3-en-filosofia` continua sendo escaneado com OCR embutido e não conta nas metas.
 
 ## Onde ficam os PDFs
 | Tipo | Local | No git? |
@@ -28,9 +28,21 @@ Cada nível deve ter **pt e en** sempre que possível. Distribuição mínima de
 
 Fontes sugeridas para públicos: arXiv e outros de acesso aberto (nível 2 e 4), Wikisource/Domínio Público/Project Gutenberg/Standard Ebooks (níveis 1 e 3, quando houver PDF), Internet Archive (nível 5). Verificar a **licença de cada item antes** de entrar no manifest.
 
+## Regras de licença (públicos) — decisão do PO, 2026-10-04
+| Situação | Veredito |
+|---|---|
+| CC BY · CC BY-SA · domínio público verificado | **Aceito** |
+| CC BY-NC-SA | **Aceito só enquanto o repositório for privado** — reavaliar antes de qualquer distribuição pública (viola a non-commercial se o app for pago/distribuído) |
+| CC BY-ND | **Não aceito** (sem obras derivadas) |
+| Exija login/cadastro para baixar | **Não aceito** |
+| Licença que eu não consegui confirmar abrindo a página oficial | **Não entra** — registrar a dúvida em `OPEN-QUESTIONS.md` |
+
+- **Nunca afirmar licença de memória.** Para cada entrada: URL da página oficial, **linha exata da licença** (curta) e **data da verificação** ficam registradas no manifest (campo `license` + `license_url` + `verified_on`).
+- Toda entrada passa também por: `source_url` direta e estável, SHA-256 calculado do arquivo baixado, número de páginas, nível confirmado abrindo o arquivo, idioma e features.
+
 ## Manifest (`corpus/manifest.yaml`)
-Cada entrada: `id`, `level`, `lang`, `title`, `source_url`, `license`, `sha256`, `features` (lista: `footnotes`, `two-column`, `hyphenation`, `equations`, `tagged`, `scanned`, `scanned-ocr-layer`...), `golden` (caminho ou `none`), `visibility` (`public`).
-O script `corpus:fetch` baixa, **valida o SHA-256** e falha se divergir.
+Cada entrada: `id`, `level`, `lang`, `title`, `source_url` (URL direta e estável do PDF), `page_url` (página oficial onde a licença foi conferida), `license` (linha exata da licença), `verified_on` (data da verificação), `pages` (número de páginas), `sha256`, `features` (lista: `footnotes`, `two-column`, `hyphenation`, `equations`, `tagged`, `scanned`, `scanned-ocr-layer`...), `golden` (caminho ou `none`), `visibility` (`public`).
+O script `corpus:fetch` (E1-T05) baixa, **valida o SHA-256** e falha se divergir.
 
 ## Gabaritos (golden)
 Quatro origens, em ordem de confiabilidade:

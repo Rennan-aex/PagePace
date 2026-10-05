@@ -7,18 +7,24 @@
 
 ## Tarefas
 
-### E1-T00 · Lint/format
-- **Objetivo:** escolher e configurar lint/format (registrar ADR). **Aceite:** `pnpm lint` e `pnpm format:check` no CI; `pnpm verify` inclui lint.
+### E1-T00 · Lint/format e versão do Node
+- **Objetivo:** escolher e configurar lint/format (registrar ADR) e **alinhar a versão do Node** usada no projeto.
+- **Versão do Node (pedido do PO, 2026-10-04):** hoje os spikes mediram em **Node 24**, o `engines` do `package.json` diz `>=20`, **não existe `.nvmrc`** e o workflow de CI (`ci.yml`) roda **Node 20**. Escolher **uma** versão e fazer os quatro apontarem para ela: `.nvmrc`, `engines` do `package.json`, `ci.yml` (`node-version`) e a versão citada nos relatórios/scripts.
+- **Aceite:** `pnpm lint` e `pnpm format:check` no CI; `pnpm verify` inclui lint; **o CI passa na versão do Node escolhida** (`.nvmrc` = `engines` = `node-version` do `ci.yml`).
 
 ### E1-T01 · Esquema 1.0 (`@pagepace/schema`)
 - **Objetivo:** transformar o rascunho de `SCHEMA.md` em tipos TS + validadores de runtime (`RawDocument`, `Book`, `Overlay`, `Anchor`).
-- **Passos:** escolher lib de validação (zod/valibot/ajv; licença e tamanho); implementar; exemplos válidos e inválidos como fixtures.
-- **Aceite:** testes de validação passam; `SCHEMA_VERSION = "1.0.0"`; changelog e tag `schema-v1.0.0` registrados; ADR da escolha.
+- **Passos:** escolher lib de validação (zod/valibot/ajv; licença e tamanho — decisão do PO, 2026-10-04: **escolher na própria E1-T01**, sem decidir antes); implementar; exemplos válidos e inválidos como fixtures.
+- **Árvore de tags (pedido do PO, 2026-10-04):** **não persistir a árvore de tags crua no `RawDocument`** (campo `structTree` não guarda a árvore do PDF). Guardar **só** o que o S3 §4 recomenda: **pistas normalizadas de parágrafo** (nós `P` como confirmação) e **`bbox` de figura** (`Figure`), depois de descartar `Span`/`alt` repetido, `Art`/nós sem `role` e `Link`. Marcar o documento como **"tagged confiável"** só quando passar na validação do **S3 §4.3** (`MarkInfo.Marked = true`; árvore não vazia em ≥ 90% das páginas com texto; sem hierarquia invertida e `P`/`Sect` majoritários; sem papéis não-padrão relevantes).
+- **Aceite:** testes de validação passam; `SCHEMA_VERSION = "1.0.0"`; changelog e tag `schema-v1.0.0` registrados; ADR da escolha; fixture com árvore crua/ruim **não** vaza para o `RawDocument` (só as pistas normalizadas).
 - **Fora de escopo:** lógica de extração.
 
 ### E1-T02 · Ingestão PDF.js → `RawDocument`
 - **Objetivo:** adaptador que lê bytes de PDF e devolve `RawDocument` validado.
-- **Aceite:** em 3 PDFs do corpus, saída valida no esquema; número de páginas confere; `source.sha256` correto; mesma entrada gera JSON idêntico (teste de determinismo).
+- **Versão fixa (pedido do PO, 2026-10-04):** **fixar a versão EXATA do `pdfjs-dist`** no `package.json` (sem `^` nem `~`; ex.: `6.4.299`) e criar um **teste de fumaça** que **falhe se a API mudar** (chama `getDocument`/`getTextContent`/`getMarkInfo`/`page.getStructTree` e confere os tipos esperados).
+- **Notas de API obrigatórias (armadilhas do S1 §5 e do S3):** (1) `getMarkInfo()` devolve um **`Map`**, não objeto; (2) a árvore de tags é **`page.getStructTree()` por página** — `pdf.getStructTree()` não existe em v6; (3) destruir com **`task.destroy()`** (`pdf.destroy()` não existe em v6); (4) `standardFontDataUrl`, `cMapUrl` e `wasmUrl` em Node precisam de **caminho de arquivo puro** (URL `file://` falha); (5) `fontExtraProperties: true` só no `getDocument` e segura `font.data` na memória (descartar depois, E8-T03); (6) prefixo de subset `XXXXXX+Nome` cortado antes de inferir família/estilo.
+- **Assets de fonte (ADR-020):** ao copiar os assets para o app, incluir **só os `.pfb` Foxit** e **não** copiar os 4 `LiberationSans*.ttf` (GPL).
+- **Aceite:** em 3 PDFs do corpus, saída valida no esquema; número de páginas confere; `source.sha256` correto; mesma entrada gera JSON idêntico (teste de determinismo); **com um PDF sintético Helvetica não embutido, comparar posição `(x, y)` e largura de cada item com e sem as fontes padrão do PDF.js: a diferença deve ser desprezível ou ficar registrada como aviso** (o S5 só mediu contagem de itens/caracteres/pixels, e a inferência de espaços da E2-T03 depende da largura); teste de fumaça da API verde.
 - **Detalhe:** leitura de arquivo só no CLI; o adaptador recebe `Uint8Array`.
 
 ### E1-T03 · Detecção de PDF escaneado/sem texto **e** de camada OCR invisível (ADR-018 + ADR-019)
@@ -33,7 +39,8 @@ Dois detectores, dois estados distintos (decisão do PO, 2026-10-04):
 
 ### E1-T05 · Corpus: manifest + `corpus:fetch`
 - **Passos:** o script resolve `CORPUS_PRIVATE_DIR` lendo primeiro a variável de ambiente e, se ela não existir, o arquivo `.env` na raiz do repositório (sem dependência nova: parser de `KEY=VALUE` mínimo, `.env` já está no `.gitignore`). Sem as duas fontes, seguir só com o corpus público e avisar uma vez, sem falhar.
-- **Aceite:** `pnpm corpus:fetch` baixa os públicos do manifest para `corpus/public/`, valida SHA-256 e falha em divergência; reexecutar não rebaixa o que já está certo; mescla o manifest privado se `CORPUS_PRIVATE_DIR` existir; `pnpm eval` acha `CORPUS_PRIVATE_DIR` pelo `.env` quando a variável não está no ambiente.
+- **Cache no CI (pedido do PO, 2026-10-04):** o workflow deve guardar `corpus/public/` em cache com **`actions/cache`**, com **chave baseada no `corpus/manifest.yaml`** (ex.: hash do arquivo) para não rebaixar a cada execução.
+- **Aceite:** `pnpm corpus:fetch` baixa os públicos do manifest para `corpus/public/`, valida SHA-256 e falha em divergência; reexecutar não rebaixa o que já está certo; mescla o manifest privado se `CORPUS_PRIVATE_DIR` existir; `pnpm eval` acha `CORPUS_PRIVATE_DIR` pelo `.env` quando a variável não está no ambiente; CI usa `actions/cache` em `corpus/public/` com chave derivada do manifest.
 
 ### E1-T06 · Runner de avaliação + métrica `text_cer`
 - **Objetivo:** `@pagepace/eval` roda o pipeline (por ora só ingestão + texto bruto concatenado) em cada documento do corpus com gabarito e calcula `text_cer`.
