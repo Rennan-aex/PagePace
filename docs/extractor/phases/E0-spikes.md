@@ -54,8 +54,10 @@
 - **Resultado:** **50 pacotes instalados (119,4 MB) = 50 conformes, 0 copyleft** (MIT 44 · Apache-2.0 3 · ISC 2 · BSD-3 1); 3 binários nativos, todos de build/teste; 45/50 com arquivo de licença. Candidatos todos aptos: geração de PDF `pdf-lib`/`pdfkit`/`jspdf` (MIT), validação `zod`/`ajv`/`valibot` (MIT), segmentação `compromise`/`sentence-splitter` (MIT; `natural` descartado por 14 dependências), Biome `MIT OR Apache-2.0` (confirma ADR-017); `mupdf` classificado **BLOQUEADA** (AGPL-3.0) valida a ADR-006; `pdf-parse` não serve (só Node). **Achado:** o `pdfjs-dist` distribui **4 fontes `LiberationSans*.ttf` sob GPLv2** para os Helvetica não embutidos — medido com `s5-fontprobe.mjs`: extração **idêntica sem elas** (24 páginas de 2 PDFs + 1 sintético), só o render muda (**1,8% dos pixels** no sintético) → **decisão do PO (2026-10-04): opção A — ADR-020**, no app só os `.pfb` Foxit (implementação na E1-T02). `Intl.Segmenter` nativo medido: parte abreviaturas (`O Sr.`, `Dra.`) → começar sem dependência. **ADR-005 → `accepted`** (condição de reabertura registrada na própria ADR: scan, página de 2,4 s e memória real Android viram critério de aceite da E8-T04); ADR-009/013/017 atualizadas com as evidências de licença.
 
 ## Checklist manual do PO
-- [ ] Li os relatórios S1–S5 e concordo com o veredito sobre o PDF.js.
-- [ ] Os PDFs do corpus representam o que leio de verdade.
+- [x] Li os relatórios S1–S5 e concordo com o veredito sobre o PDF.js. (PO: **sim**, 2026-10-05)
+- [x] Os PDFs do corpus representam o que leio de verdade. (PO: **sim**, 2026-10-05)
+
+**E0 encerrada em 2026-10-05:** PR #11 (`e0-t01b-corpus-publico`) mergeado na `main` (`74bf3dc`) e os dois itens acima respondidos pelo PO.
 
 ## Riscos
 PDF.js insuficiente para estilos → plano B: ler operadores/fontes de mais baixo nível, ainda dentro do PDF.js (API de operator list).

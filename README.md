@@ -35,10 +35,10 @@ scripts/             utilitários (corpus, verificações)
 
 ```bash
 pnpm install
-pnpm verify        # typecheck + testes + checagem de que nenhum PDF está no git
+pnpm verify        # typecheck + lint + formatação + testes + checagem de que nenhum PDF está no git
 ```
 
-Requisitos: Node 20+ e pnpm 9. Os PDFs de teste **não** ficam no repositório, ver `corpus/README.md`.
+Requisitos: **Node 24+** (a versão exata usada no projeto está em `.nvmrc`) e pnpm 9. Os PDFs de teste **não** ficam no repositório, ver `corpus/README.md`.
 
 ## Documentação
 

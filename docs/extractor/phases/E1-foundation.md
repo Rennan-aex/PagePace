@@ -7,10 +7,11 @@
 
 ## Tarefas
 
-### E1-T00 · Lint/format e versão do Node
+### E1-T00 · Lint/format e versão do Node · `done`
 - **Objetivo:** escolher e configurar lint/format (registrar ADR) e **alinhar a versão do Node** usada no projeto.
 - **Versão do Node (pedido do PO, 2026-10-04):** hoje os spikes mediram em **Node 24**, o `engines` do `package.json` diz `>=20`, **não existe `.nvmrc`** e o workflow de CI (`ci.yml`) roda **Node 20**. Escolher **uma** versão e fazer os quatro apontarem para ela: `.nvmrc`, `engines` do `package.json`, `ci.yml` (`node-version`) e a versão citada nos relatórios/scripts.
 - **Aceite:** `pnpm lint` e `pnpm format:check` no CI; `pnpm verify` inclui lint; **o CI passa na versão do Node escolhida** (`.nvmrc` = `engines` = `node-version` do `ci.yml`).
+- **Resultado (2026-10-05):** **Biome `2.5.15`** instalado (devDependency da raiz, `MIT OR Apache-2.0` — ADR-017 confirmada no S5) e configurado em **`biome.json`** (preset `recommended`, formatter 2 espaços/100 colunas/aspas duplas/LF; fora de propósito: `packages/extractor/spikes`, `.pagepace-cache`, `.opencode`, `corpus`, `*.md`). Scripts novos: **`pnpm lint`** = `biome check .`, **`pnpm format`** = `biome format --write .`, **`pnpm format:check`** = `biome format .`; o **`pnpm verify` agora roda typecheck → lint → format:check → testes → check:no-pdf** e o `ci.yml` ganhou as etapas `pnpm lint` e `pnpm format:check`. Primeira passada corrigiu 6 arquivos (só ordenação de imports). **Node 24** alinhado nos quatro apontamentos (**ADR-022**): `.nvmrc` = `24.18.0`, `engines.node` = `>=24`, `ci.yml` com `node-version-file: .nvmrc` (fonte única), README com "Node 24+" — e confirmado que **Node 20 está em EOL desde 2026-04-30** (cronograma oficial do nodejs/release). **ADR-017 → `accepted`** e **ADR-009 → `accepted`** (ferramental fechado). `pnpm verify` verde.
 
 ### E1-T01 · Esquema 1.0 (`@pagepace/schema`)
 - **Objetivo:** transformar o rascunho de `SCHEMA.md` em tipos TS + validadores de runtime (`RawDocument`, `Book`, `Overlay`, `Anchor`).
