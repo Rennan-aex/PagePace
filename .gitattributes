@@ -1,0 +1,11 @@
+# Line endings: everything text-like is stored as LF in the repository and
+# checked out as LF on every OS. This keeps `pnpm verify` (Biome with
+# `lineEnding: "lf"`) green on Windows and Linux regardless of each machine's
+# `core.autocrlf`. See docs/extractor/DECISIONS.md (ADR-023).
+* text=auto eol=lf
+
+# Binary assets are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary

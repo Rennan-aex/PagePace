@@ -1,6 +1,6 @@
-# Esquema (contrato) v0: rascunho
+# Esquema (contrato) v1.0.0
 
-> **Status:** rascunho. A versão `1.0.0` é fechada na tarefa E1-T01. Qualquer mudança segue as regras de versionamento abaixo. A fonte de verdade em código será `packages/schema`; este documento explica a intenção.
+> **Status:** **fechado em `1.0.0`** (E1-T01, 2026-10-05). A fonte de verdade em código é `packages/schema` (tipos TypeScript + validadores de runtime com `zod` — `parseRawDocument`, `parseBook`, `parseOverlay`, `parseAnchor`); este documento explica a intenção. Qualquer mudança segue as regras de versionamento abaixo.
 
 ## Versionamento
 `MAJOR.MINOR.PATCH` em `SCHEMA_VERSION`.
@@ -16,7 +16,7 @@ interface RawDocument {
   schemaVersion: string;
   source: { fileName: string; sha256: string; pageCount: number; producer?: string; tagged: boolean };
   outline?: RawOutlineItem[];            // bookmarks do PDF
-  structTree?: unknown;                  // se PDF tagged (normalizado na ingestão)
+  tagHints?: TagHints;                   // pistas normalizadas da árvore de tags (nunca a árvore crua)
   pages: RawPage[];
   ingest: { adapter: "pdfjs" | "ocr"; adapterVersion: string };
 }
@@ -36,7 +36,13 @@ interface RawTextItem {
   hasEOL?: boolean;
   charWidths?: number[];                 // opcional; ajuda a inferir espaços
 }
+interface TagHints {
+  reliable: boolean;                     // só true após a validação do S3 §4.3
+  paragraphs: { page: number; bbox: BBox }[];      // nós `P` confirmados
+  figures: { page: number; bbox: BBox; alt?: string }[];   // nós `Figure` (alt único)
+}
 ```
+**Árvore de tags (pedido do PO, 2026-10-04):** a árvore crua do PDF **nunca** entra no modelo. Só sobrevivem as pistas acima: confirmação de `P` e `bbox` de `Figure`, depois de descartar `Span`/`alt` repetido, `Art`/nós sem `role` e `Link`. `source.tagged` diz que o PDF *declara* `MarkInfo.Marked = true`; `tagHints.reliable` é a validação do S3 §4.3 (árvore não vazia em ≥ 90% das páginas com texto, sem hierarquia invertida, `P`/`Sect` majoritários). Validação: um input com `structTree` (ou qualquer chave extra) é **rejeitado** — objetos estritos.
 
 ## 2. `Book` (saída do extrator, entrada do app)
 ```ts
@@ -122,5 +128,6 @@ type CorrectionOp = { id: string; createdAt: string; target: Anchor } & (
 
 ## Changelog
 - `0.0.0`: placeholder do pacote.
-- `0.1.0-draft`: este rascunho (E1-T01 o transforma em `1.0.0`).
+- `0.1.0-draft`: rascunho inicial (E1-T01 o transforma em `1.0.0`).
 - `0.1.0-draft` (doc, 2026-10-04): códigos de `extraction.warnings` documentados (`"ocr-text-layer"`) e a tabela dos dois estados de PDF escaneado — só documentação, **nenhum tipo mudou** (ADR-019).
+- `1.0.0` (2026-10-05, E1-T01): contrato fechado em código. `structTree?: unknown` → **`tagHints?: TagHints`** (a árvore crua não é persistida — ADR-025). Validação de runtime com `zod` (ADR-024): objetos estritos (chaves desconhecidas rejeitadas), `confidence`/`avgConfidence` em 0..1, `blocks` e `runs` não vazios, `heading` exige `level`, `origin.pageTo >= pageFrom`, `Anchor.end >= start`, `CorrectionOp` como união discriminada por `op`, `createdAt` ISO-8601 com fuso. Fixtures válidas e inválidas em `packages/schema/src/fixtures.ts`.
