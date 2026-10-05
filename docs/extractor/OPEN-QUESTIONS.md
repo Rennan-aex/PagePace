@@ -4,6 +4,22 @@ Regra: se uma decisão muda o rumo do produto, a IA registra aqui, marca a taref
 
 ## Abertas
 2. **Fontes de PDFs públicos** para o corpus N3 em pt: levantar candidatos de domínio público com PDF digital (tarefa E0-T01b). **Atualização (2026-10-04):** também falta um PDF **digital de filosofia em inglês** para o N3 — o único N3-en hoje (`n3-en-filosofia`) é scan com OCR embutido (ver CORPUS.md).
+6. **Regra do campo `reliable` (pistas de estrutura, `tagHints`)** — pergunta da E1-T02 (2026-10-05), **bloqueia a E1-T02**. O texto do S3 §4.3 diz "`P`/`Sect` como nós **majoritários**", mas "majoritários" tem duas leituras possíveis e elas dão respostas diferentes no corpus (medido com a implementação atual, cobertura = páginas com árvore útil ÷ páginas com texto):
+
+  | PDF | Cobertura | Hierarquia invertida | Papéis não-padrão | P/títulos/Document ÷ total | Estrutura de bloco ÷ total |
+  |---|---|---|---|---|---|
+  | `n1-en-rebus` (público, Prince XML) | 97,9% | 0 | 0 | **36,6%** | **58,8%** |
+  | `n1-en-sofia` (privado) | 100% | 0 | 0 | 99,0% | 100% |
+  | `n4-en-fisica` (privado) | 100% | 0 | 0 | 69,9% | 70,3% |
+  | `n1-en-curinga` (privado) | 100% | **81** (`Sect` dentro de `P`) | 0 | 16,5% | 16,5% |
+  | `n1-en-lostworld` (privado) | **0%** (raiz vazia) | 0 | 0 | 0% | 0% |
+
+  A E0-T01b registrou no STATE que o `n1-en-rebus` é "tagged confiável… Document/P majoritários" — ou seja, a leitura literal (coluna 5) **contradiz** o registro. Alternativas:
+  - **(a) Literal (implementada agora):** P + títulos + `Sect`/`Div`/`Document`/`Part` precisam somar ≥ 50% de **todos** os nós → `rebus` = **não confiável**, `sofia`/`fisica` = confiáveis, `curinga` = não.
+  - **(b) Estrutura de bloco ≥ 50% (recomendada):** entram no numerador P, títulos, `Sect`/`Div`/`Document`/`Part`, listas (`L`/`LI`/`LBody`/`Lbl`), tabelas (`Table`/`TR`/`TH`/`TD`), `Figure`/`Caption`, `Note`/`BlockQuote`; `Span`/`Link` e nós sem papel ficam **fora do numerador** (mas continuam no denominador) → `rebus` = **confiável (58,8%)**, `curinga` continua fora (16,5% e hierarquia invertida), `lostworld` continua fora (0% de cobertura). Reproduz o registro da E0-T01b e mantém a regra "a maioria é estrutura, não ruído inline".
+  - **(c) Papel mais frequente:** só passa se o nó mais comum do documento for estrutura (`P`/`Sect`/…) e não `Span` → mesmo resultado da (b) nestes 5 PDFs, com regra ainda mais curta.
+
+  Em **todas** as opções as pistas (`paragraphs`/`figures`) continuam sendo emitidas; `reliable` só muda em quem **confia** nelas (E2 usa a árvore só como confirmação, S3 §4.1).
 
 ## Respondidas
 1. **Figuras no modo de leitura normal:** mostrar um recorte de imagem da figura (renderizado do PDF) conta como exceção à regra "nunca mostrar o PDF"? **Resposta do PO (2026-10-04):** opção A — recorte de imagem só de figuras/tabelas/equações complexas, só no modo de leitura normal; na leitura dinâmica são pulados. Registrado em ADR-016 (exceção à ADR-003).
