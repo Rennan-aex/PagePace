@@ -68,8 +68,10 @@ describe("ingestPdfjs - synthetic PDFs", () => {
 
     expect(item).toBeDefined();
     expect(item?.x).toBeCloseTo(72, 3);
-    // Baseline at y=700 with a 14pt em box: the box starts 14 points above it.
-    expect(item?.y).toBeCloseTo(686, 3);
+    // pdf.js reports the baseline in PDF user space (origin bottom-left), on
+    // an 800pt page: 800 - 700 = 100 from the top; the 14pt em box starts
+    // that many points higher.
+    expect(item?.y).toBeCloseTo(86, 3);
     expect(item?.height).toBeCloseTo(14, 3);
     expect(item?.width).toBeGreaterThan(0);
     expect(item?.fontSize).toBeCloseTo(14, 3);

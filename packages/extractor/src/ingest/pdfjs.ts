@@ -83,16 +83,19 @@ function readMarked(markInfo: unknown): boolean {
   return false;
 }
 
-function glyphBox(item: PdfjsTextItem): BBox {
+function glyphBox(item: PdfjsTextItem, view: readonly [number, number, number, number]): BBox {
   const transform = item.transform;
   const height = Number.isFinite(item.height) && item.height >= 0 ? item.height : 0;
   const width = Number.isFinite(item.width) && item.width >= 0 ? item.width : 0;
-  const x = Number.isFinite(transform[4] ?? Number.NaN) ? (transform[4] as number) : 0;
+  const rawX = Number.isFinite(transform[4] ?? Number.NaN) ? (transform[4] as number) : 0;
   const baselineY = Number.isFinite(transform[5] ?? Number.NaN) ? (transform[5] as number) : 0;
-  // pdf.js anchors the item on the baseline; the schema wants a box whose
-  // origin is the top-left corner, so the box goes from the baseline up to
-  // `height` points (the em box of the run).
-  return { x, y: baselineY - height, width, height };
+  // `getTextContent()` reports positions in PDF user space: origin at the
+  // bottom-left, y growing up (measured against `n1-en-rebus` p1: baseline
+  // 689 renders at y≈86 of a 792pt page). The schema wants page coordinates
+  // with the origin at the top-left corner, so the baseline is mirrored
+  // around `view[3]` first and the box then grows `height` points upward.
+  const baselineFromTop = view[3] - baselineY;
+  return { x: rawX - view[0], y: baselineFromTop - height, width, height };
 }
 
 function fontSizeOf(item: PdfjsTextItem): number {
@@ -138,7 +141,10 @@ function fontFlagsOf(
  * to boxes, keyed by the struct-tree content id. Every id in the marker stack
  * receives the box (a `Span` inside a `P` contributes to both).
  */
-function collectMcidBoxes(items: readonly unknown[]): Map<string, BBox> {
+function collectMcidBoxes(
+  items: readonly unknown[],
+  view: readonly [number, number, number, number],
+): Map<string, BBox> {
   const boxes = new Map<string, BBox>();
   const stack: (string | null)[] = [];
   for (const raw of items) {
@@ -153,7 +159,7 @@ function collectMcidBoxes(items: readonly unknown[]): Map<string, BBox> {
       continue;
     }
     if (typeof item.str !== "string" || stack.length === 0) continue;
-    const box = glyphBox(item as PdfjsTextItem);
+    const box = glyphBox(item as PdfjsTextItem, view);
     for (const id of stack) {
       if (!id) continue;
       const current = boxes.get(id);
@@ -237,6 +243,12 @@ async function readPage(
   const page = await pdf.getPage(pageNumber);
   try {
     const viewport = page.getViewport({ scale: 1 });
+    const view: [number, number, number, number] = [
+      viewport.viewBox[0] ?? 0,
+      viewport.viewBox[1] ?? 0,
+      viewport.viewBox[2] ?? 0,
+      viewport.viewBox[3] ?? 0,
+    ];
     const textContent = await page.getTextContent({ includeMarkedContent: true });
 
     // The real font name only reaches the main thread after the operator list
@@ -250,7 +262,7 @@ async function readPage(
       const item = raw as Partial<PdfjsTextItem> & PdfjsMarkedItem;
       if (typeof item.str !== "string") continue;
       const textItem = item as PdfjsTextItem;
-      const box = glyphBox(textItem);
+      const box = glyphBox(textItem, view);
       const flags = fontFlagsOf(styles, textItem.fontName);
       const rawItem: RawTextItem = {
         text: textItem.str,
@@ -276,15 +288,10 @@ async function readPage(
 
     const tagInput: PageTagInput = {
       index: pageNumber - 1,
-      view: [
-        viewport.viewBox[0] ?? 0,
-        viewport.viewBox[1] ?? 0,
-        viewport.viewBox[2] ?? 0,
-        viewport.viewBox[3] ?? 0,
-      ],
+      view,
       tree: structTree ?? null,
       hasText: items.length > 0,
-      mcidBoxes: collectMcidBoxes(textContent.items),
+      mcidBoxes: collectMcidBoxes(textContent.items, view),
     };
     return { page: outputPage, tagInput };
   } finally {

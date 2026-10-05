@@ -136,8 +136,16 @@ const STANDARD_ROLES = new Set([
   "Lbl",
 ]);
 
-/** Roles counted as "structural blocks" for the P/Sect dominance rule (S3 §4.3). */
-const DOMINANT_ROLES = new Set([
+/**
+ * Roles counted as **block structure** for the share behind `reliable`
+ * (S3 §4.3, read as "structure of the block, not of the inline run" —
+ * ADR-028): paragraphs, headings, sections, lists, tables, figures, notes and
+ * quotes. Inline roles (`Span`, `Link`, `Reference`, ...) and nodes without a
+ * role stay out of the numerator while still counting in the denominator, so
+ * a document made mostly of inline markup never looks trustworthy and the
+ * rule errs towards "do not trust" (the geometric path of E2 is the main one).
+ */
+export const BLOCK_STRUCTURE_ROLES: ReadonlySet<string> = new Set([
   "Document",
   "Part",
   "Sect",
@@ -150,15 +158,34 @@ const DOMINANT_ROLES = new Set([
   "H4",
   "H5",
   "H6",
+  "L",
+  "LI",
+  "LBody",
+  "Lbl",
+  "Table",
+  "TR",
+  "TH",
+  "TD",
+  "Figure",
+  "Caption",
+  "Note",
+  "BlockQuote",
 ]);
 
 const MIN_COVERAGE = 0.9;
-const MIN_DOMINANCE = 0.5;
+/**
+ * Minimum share of block-structure nodes among the counted roles.
+ *
+ * **Provisional** (ADR-028): calibrated with the four tagged PDFs of the
+ * corpus — `n1-en-sofia` 99,0% · `n4-en-fisica` 70,3% · `n1-en-rebus` 58,8%
+ * pass; `n1-en-curinga` 16,5% fails. Revisit when a fifth tagged PDF lands.
+ */
+export const MIN_BLOCK_SHARE = 0.5;
 
 interface PageStats {
   contentNodes: number;
   roleNodes: number;
-  dominantNodes: number;
+  blockNodes: number;
   nonStandardNodes: number;
   invalidNesting: number;
   nonStandardRoles: Set<string>;
@@ -167,7 +194,7 @@ interface PageStats {
 const emptyStats = (): PageStats => ({
   contentNodes: 0,
   roleNodes: 0,
-  dominantNodes: 0,
+  blockNodes: 0,
   nonStandardNodes: 0,
   invalidNesting: 0,
   nonStandardRoles: new Set<string>(),
@@ -248,7 +275,7 @@ function walkPage(page: PageTagInput, tree: StructNode): WalkResult {
     // counted towards the role statistics.
     if (parentRole !== null) {
       stats.roleNodes += 1;
-      if (DOMINANT_ROLES.has(role)) stats.dominantNodes += 1;
+      if (BLOCK_STRUCTURE_ROLES.has(role)) stats.blockNodes += 1;
       if (role !== "(none)" && !STANDARD_ROLES.has(role)) {
         stats.nonStandardNodes += 1;
         stats.nonStandardRoles.add(role);
@@ -306,7 +333,7 @@ function collect(input: TagHintsInput): Collected {
     figures.push(...result.figures);
     totals.contentNodes += result.stats.contentNodes;
     totals.roleNodes += result.stats.roleNodes;
-    totals.dominantNodes += result.stats.dominantNodes;
+    totals.blockNodes += result.stats.blockNodes;
     totals.nonStandardNodes += result.stats.nonStandardNodes;
     totals.invalidNesting += result.stats.invalidNesting;
     for (const role of result.stats.nonStandardRoles) totals.nonStandardRoles.add(role);
@@ -323,10 +350,10 @@ export interface TagStats {
   pagesWithUsableTree: number;
   /** `pagesWithUsableTree / pagesWithText`. */
   coverage: number;
-  /** Share of `P`/`Sect`-style blocks among the counted roles. */
-  dominance: number;
+  /** Share of `BLOCK_STRUCTURE_ROLES` nodes among the counted roles. */
+  blockShare: number;
   roleNodes: number;
-  dominantNodes: number;
+  blockNodes: number;
   nonStandardNodes: number;
   invalidNesting: number;
   /** Non-standard roles found, sorted; empty when none. */
@@ -339,24 +366,27 @@ export interface TagStats {
 function summarise(marked: boolean, collected: Collected): TagStats {
   const { stats, pagesWithText, pagesWithUsableTree } = collected;
   const coverage = pagesWithText > 0 ? pagesWithUsableTree / pagesWithText : 0;
-  const dominance = stats.roleNodes > 0 ? stats.dominantNodes / stats.roleNodes : 0;
+  const blockShare = stats.roleNodes > 0 ? stats.blockNodes / stats.roleNodes : 0;
 
   const reasons: string[] = [];
   if (!marked) reasons.push("not-marked");
   if (pagesWithText === 0) reasons.push("no-text");
   if (pagesWithText > 0 && coverage < MIN_COVERAGE) reasons.push("low-coverage");
+  // A single inverted pair (`Sect` inside `P`) is enough on its own: the
+  // document's structure contradicts itself, no percentage can excuse that
+  // (condition of the PO's answer to OPEN-QUESTIONS #6).
   if (stats.invalidNesting > 0) reasons.push("inverted-hierarchy");
   if (stats.nonStandardNodes > 0) reasons.push("non-standard-role");
-  if (dominance < MIN_DOMINANCE) reasons.push("low-dominance");
+  if (blockShare < MIN_BLOCK_SHARE) reasons.push("low-block-share");
 
   return {
     marked,
     pagesWithText,
     pagesWithUsableTree,
     coverage,
-    dominance,
+    blockShare,
     roleNodes: stats.roleNodes,
-    dominantNodes: stats.dominantNodes,
+    blockNodes: stats.blockNodes,
     nonStandardNodes: stats.nonStandardNodes,
     invalidNesting: stats.invalidNesting,
     nonStandardRoles: [...stats.nonStandardRoles].sort(),
@@ -375,10 +405,15 @@ export function evaluateTagStats(input: TagHintsInput): TagStats {
  * Builds `TagHints` (or `undefined` when the document declares no marking and
  * no page returned a tree).
  *
- * `reliable` follows S3 §4.3: `MarkInfo.Marked = true`, a non-empty tree on at
- * least 90% of the pages with text, no inverted hierarchy, `P`/`Sect`-style
- * blocks dominant and no non-standard role. Nodes without a role are treated
- * as "no information" (S3 §4.4), not as a defect.
+ * `reliable` follows S3 §4.3 as decided in ADR-028: `MarkInfo.Marked = true`,
+ * a non-empty tree on at least 90% of the pages with text, no inverted
+ * hierarchy (which alone is always disqualifying), no non-standard role and at
+ * least `MIN_BLOCK_SHARE` of the counted roles being block structure. Nodes
+ * without a role are "no information" (S3 §4.4), not a defect, but they still
+ * count against the share.
+ *
+ * The hints themselves (`paragraphs`, `figures`) are emitted regardless of
+ * `reliable`: they are confirmations, never the only source (E2, E10).
  */
 export function buildTagHints(input: TagHintsInput): TagHints | undefined {
   const collected = collect(input);
