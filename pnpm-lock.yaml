@@ -33,7 +33,14 @@ importers:
         specifier: workspace:*
         version: link:../extractor
 
-  packages/eval: {}
+  packages/eval:
+    dependencies:
+      '@pagepace/extractor':
+        specifier: workspace:*
+        version: link:../extractor
+      '@pagepace/schema':
+        specifier: workspace:*
+        version: link:../schema
 
   packages/extractor:
     dependencies:

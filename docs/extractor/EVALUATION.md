@@ -39,6 +39,14 @@
 ## Relatórios
 `pnpm eval` imprime tabela por nível e por documento e grava `packages/eval/out/report.json` (ignorado). `pnpm eval --diff` mostra o que mudou contra o baseline.
 
+## Como o runner mede hoje (E1-T06, ADR-035)
+- **Pipeline:** ingestão PDF.js → texto bruto (`pageText`/`documentText`) → normalização (`normalizeText`: NFC, sem soft hyphen, espaços colapsados) → `text_cer` = Levenshtein ÷ tamanho do gabarito.
+- **Junção provisória dos itens:** `hasEOL` → quebra de linha; distância horizontal > 0,15 em → espaço; encostado → nada. **Provisória até a E2-T03.**
+- **Cobertura:** `coverage.pages` (1-based) recorta a extração **e** o gabarito; sem cobertura, o documento inteiro entra na medição.
+- **Só mede quem tem golden:** `golden: none` sai na tabela como `no golden`. Hoje **0 de 19** documentos têm gabarito (a E1-T07 cria os primeiros), então o runner avisa e sai com 0.
+- **Códigos de saída:** 0 = sucesso (mesmo sem nada medido, com aviso) · 1 = algum documento falhou (PDF/golden ausente, SHA divergente, PDF escaneado, JSON inválido) · 2 = opção desconhecida.
+- **Ainda não existem** `--diff`, `--ci` e `--update-baseline` (chegam com a E1-T08, junto do `baseline.json`).
+
 ## Testes golden de página
 Para depurar, além do corpus: pares `fixture de itens brutos (JSON) → blocos esperados (JSON)` por camada, em `packages/extractor/test/fixtures/`. Eles não contêm texto com copyright (texto sintético ou domínio público).
 

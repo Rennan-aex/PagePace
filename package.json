@@ -19,7 +19,7 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:no-pdf",
     "pagepace": "tsx packages/cli/src/main.ts",
     "corpus:fetch": "tsx packages/eval/src/fetch.ts",
-    "eval": "echo 'not implemented yet: task E1-T08' && exit 1"
+    "eval": "tsx packages/eval/src/eval.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

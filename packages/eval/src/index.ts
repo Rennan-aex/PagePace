@@ -1,5 +1,6 @@
-// @pagepace/eval - evaluation runner. `corpus.ts` ships now (E1-T05, ADR-031);
-// the metrics themselves arrive with the roadmap phases (docs/extractor/ROADMAP.md).
+// @pagepace/eval - evaluation runner: corpus manifests (E1-T05, ADR-031),
+// `text_cer` metric and the `pnpm eval` runner (E1-T06, ADR-035). The
+// baseline/gate flags arrive with the roadmap phases (docs/extractor/ROADMAP.md).
 export const PACKAGE_NAME = "@pagepace/eval";
 
 export {
@@ -15,3 +16,36 @@ export {
   resolveCorpusPrivateDir,
   resolveCorpusPrivateDirDetailed,
 } from "./corpus";
+
+export {
+  type DocumentResult,
+  type DocumentStatus,
+  type EvalIo,
+  type EvalOptions,
+  type EvalResult,
+  EXIT_ERROR as EVAL_EXIT_ERROR,
+  EXIT_OK as EVAL_EXIT_OK,
+  EXIT_USAGE as EVAL_EXIT_USAGE,
+  HELP as EVAL_HELP,
+  type IngestFn,
+  type LevelSummary,
+  runEval,
+  runEvalCli,
+} from "./eval";
+
+export {
+  GOLDEN_SOURCES,
+  type Golden,
+  type GoldenBlock,
+  GoldenError,
+  type GoldenOrigin,
+  type GoldenRun,
+  goldenText,
+  hasGolden,
+  parseGolden,
+  resolveGoldenPath,
+} from "./golden";
+
+export { type CerOptions, type CerResult, MAX_CER_CELLS, normalizeText, textCer } from "./metrics";
+
+export { documentText, pageText, SPACE_GAP_EM } from "./text";

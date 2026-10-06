@@ -4,5 +4,9 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "dependencies": {
+    "@pagepace/extractor": "workspace:*",
+    "@pagepace/schema": "workspace:*"
+  }
 }
