@@ -8,6 +8,7 @@
 #     lang: en                  # pt | en
 #     title: "..."
 #     source_url: "https://..." # URL direta e estável do PDF (download)
+#     fallback_urls: ["https://"] # opcional: URLs extras testadas em ordem se a primeira falhar
 #     page_url: "https://..."   # página oficial onde a licença foi conferida
 #     license: "CC BY 4.0"      # linha exata da licença (curta)
 #     license_url: "https://..." # URL da licença citada em `license`
@@ -41,7 +42,13 @@ documents:
     level: N3
     lang: pt
     title: "Wittgenstein e o ceticismo"
-    source_url: "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt"
+    # O SciELO (BunnyCDN) devolve 403 para os endereços do GitHub Actions,
+    # então a principal é a cópia na entrega corpus-public-v1 deste repositório
+    # (arquivo n3-pt-scielo-wittgenstein.pdf, id 614311768 - mesmos bytes,
+    # mesmo SHA-256; ADR-034). A URL da API do GitHub é a única que aceita o
+    # token do CI; as URLs do SciELO ficam como reserva e valem fora do CI.
+    source_url: "https://api.github.com/repos/Rennan-aex/PagePace/releases/assets/614311768"
+    fallback_urls: ["https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt&ilang=en", "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt"]
     page_url: "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?lang=pt"
     license: "Este é um artigo publicado em acesso aberto sob uma licença Creative Commons (badge: Creative Common - by 4.0)"
     license_url: "https://creativecommons.org/licenses/by/4.0/"
@@ -71,7 +78,12 @@ documents:
     level: N3
     lang: en
     title: "Climate justice, land-use change emissions and global health"
-    source_url: "https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm?format=pdf&lang=en"
+    # Mesmo espelho da entrega corpus-public-v1 (arquivo
+    # n3-en-scielo-climatejustice.pdf, id 614311837 - mesmos bytes, mesmo
+    # SHA-256; ADR-034): o SciELO bloqueia os endereços do GitHub Actions
+    # (403 medido). As URLs do SciELO ficam como reserva e valem fora do CI.
+    source_url: "https://api.github.com/repos/Rennan-aex/PagePace/releases/assets/614311837"
+    fallback_urls: ["https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm/?format=pdf&lang=en&ilang=en", "https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm?format=pdf&lang=en"]
     page_url: "https://www.scielo.br/j/fun/a/FGkJX86jxHMfgWwD6VqyZrm?lang=en"
     license: "This is an open-access article distributed under the terms of the Creative Commons Attribution License (badge: Creative Common - by 4.0)"
     license_url: "https://creativecommons.org/licenses/by/4.0/"

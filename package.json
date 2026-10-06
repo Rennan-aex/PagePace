@@ -18,7 +18,7 @@
     "check:no-pdf": "bash scripts/check-no-pdf.sh",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:no-pdf",
     "pagepace": "tsx packages/cli/src/main.ts",
-    "corpus:fetch": "echo 'not implemented yet: task E1-T05' && exit 1",
+    "corpus:fetch": "tsx packages/eval/src/fetch.ts",
     "eval": "echo 'not implemented yet: task E1-T08' && exit 1"
   },
   "devDependencies": {
