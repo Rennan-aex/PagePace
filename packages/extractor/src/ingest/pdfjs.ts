@@ -5,6 +5,8 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { sha256Hex } from "./sha256";
 import type { PageTagInput } from "./tag-hints";
 import { buildTagHints } from "./tag-hints";
+import type { RenderModeChars } from "./text-layer";
+import { countRenderModeChars, isOcrTextLayer, ScannedPdfError } from "./text-layer";
 
 /**
  * PDF.js ingestion: bytes in, validated `RawDocument` out.
@@ -239,7 +241,7 @@ function readProducer(metadata: { info?: unknown } | null): string | undefined {
 async function readPage(
   pdf: PDFDocumentProxy,
   pageNumber: number,
-): Promise<{ page: RawPage; tagInput: PageTagInput }> {
+): Promise<{ page: RawPage; tagInput: PageTagInput; chars: RenderModeChars | null }> {
   const page = await pdf.getPage(pageNumber);
   try {
     const viewport = page.getViewport({ scale: 1 });
@@ -253,7 +255,8 @@ async function readPage(
 
     // The real font name only reaches the main thread after the operator list
     // resolves the fonts (S1 §5); a broken page must not lose its text.
-    await page.getOperatorList().catch(() => null);
+    // The same list is what detector B reads (`Tr 3` characters, ADR-019).
+    const operatorList = await page.getOperatorList().catch(() => null);
     const structTree = await page.getStructTree().catch(() => null);
 
     const styles = (textContent.styles ?? {}) as Record<string, PdfjsFontStyle>;
@@ -293,15 +296,44 @@ async function readPage(
       hasText: items.length > 0,
       mcidBoxes: collectMcidBoxes(textContent.items, view),
     };
-    return { page: outputPage, tagInput };
+    const chars = operatorList ? countRenderModeChars(operatorList) : null;
+    return { page: outputPage, tagInput, chars };
   } finally {
     page.cleanup();
   }
 }
 
 /**
+ * Detector A (ADR-018): does the document have any text at all?
+ *
+ * Runs before the real read and stops at the first page with text, so a
+ * digital book pays for a single extra `getTextContent` while a scan is
+ * recognised without ever building (or faking) a `RawDocument`.
+ */
+async function documentHasText(pdf: PDFDocumentProxy): Promise<boolean> {
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    try {
+      const content = await page.getTextContent();
+      const hasText = content.items.some((item) => {
+        const text = (item as Partial<PdfjsTextItem>).str;
+        return typeof text === "string" && text.trim() !== "";
+      });
+      if (hasText) return true;
+    } finally {
+      page.cleanup();
+    }
+  }
+  return false;
+}
+
+/**
  * Reads a PDF from memory and returns a `RawDocument` that passes the
  * `@pagepace/schema` validator (throws `SchemaValidationError` otherwise).
+ *
+ * Throws `ScannedPdfError` when the file has no text layer (ADR-018), and
+ * flags `source.ocrTextLayer` when most characters come from an invisible
+ * OCR layer (ADR-019).
  */
 export async function ingestPdfjs(
   bytes: Uint8Array,
@@ -342,6 +374,10 @@ export async function ingestPdfjs(
     }
     const lastPage = Math.min(to, pageCount);
 
+    // Detector A (ADR-018): a document without a text layer is a scan, not an
+    // empty book — refuse here, before anything else is assembled.
+    if (!(await documentHasText(pdf))) throw new ScannedPdfError();
+
     const markInfo: unknown = await pdf.getMarkInfo().catch(() => null);
     const tagged = readMarked(markInfo);
     const metadata = await pdf.getMetadata().catch(() => null);
@@ -349,15 +385,21 @@ export async function ingestPdfjs(
 
     const pages: RawPage[] = [];
     const tagPages: PageTagInput[] = [];
+    const renderChars: RenderModeChars[] = [];
     for (let pageNumber = from; pageNumber <= lastPage; pageNumber++) {
-      const { page, tagInput } = await readPage(pdf, pageNumber);
+      const { page, tagInput, chars } = await readPage(pdf, pageNumber);
       pages.push(page);
       tagPages.push(tagInput);
+      if (chars) renderChars.push(chars);
     }
 
     const tagHints = buildTagHints({ marked: tagged, pages: tagPages });
 
     const producer = readProducer(metadata);
+
+    // Detector B (ADR-019): most characters invisible -> the text layer of a
+    // scan. Measured on the pages actually read (a `pageRange` is a sample).
+    const ocrTextLayer = isOcrTextLayer(renderChars);
 
     const document: RawDocument = {
       schemaVersion: SCHEMA_VERSION,
@@ -367,6 +409,7 @@ export async function ingestPdfjs(
         pageCount,
         ...(producer ? { producer } : {}),
         tagged,
+        ...(ocrTextLayer ? { ocrTextLayer: true } : {}),
       },
       ...(outline ? { outline } : {}),
       ...(tagHints ? { tagHints } : {}),

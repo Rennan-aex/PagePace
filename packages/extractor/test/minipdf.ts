@@ -32,6 +32,8 @@ export interface TextStreamOptions {
   /** Emit `/Role <</MCID n>> BDC ... EMC` around the text. */
   markRole?: string;
   mcid?: number;
+  /** Text rendering mode (`Tr`) before the show op — `3` is invisible (ADR-019). */
+  renderMode?: number;
 }
 
 const escapeLiteral = (value: string): string =>
@@ -39,10 +41,11 @@ const escapeLiteral = (value: string): string =>
 
 /** A `BT ... ET` content stream showing `text` at a baseline position. */
 export function textStream(text: string, options: TextStreamOptions = {}): string {
-  const { x = 72, y = 400, size = 12, markRole, mcid = 0 } = options;
+  const { x = 72, y = 400, size = 12, markRole, mcid = 0, renderMode } = options;
+  const mode = renderMode === undefined ? "" : `${renderMode} Tr `;
   const body = markRole
-    ? `/${markRole} <</MCID ${mcid}>> BDC (${escapeLiteral(text)}) Tj EMC`
-    : `(${escapeLiteral(text)}) Tj`;
+    ? `/${markRole} <</MCID ${mcid}>> BDC ${mode}(${escapeLiteral(text)}) Tj EMC`
+    : `${mode}(${escapeLiteral(text)}) Tj`;
   return `BT /F1 ${size} Tf ${x} ${y} Td ${body} ET`;
 }
 

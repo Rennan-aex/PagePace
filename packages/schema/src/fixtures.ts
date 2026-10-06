@@ -6,7 +6,7 @@ import type { RawDocument } from "./raw";
 export const FIXTURE_SHA256 = "0123456789abcdef".repeat(4);
 
 export const validRawDocument: RawDocument = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "1.1.0",
   source: {
     fileName: "n1-en-rebus-philosophy-mind.pdf",
     sha256: FIXTURE_SHA256,
@@ -85,6 +85,12 @@ export const validRawDocument: RawDocument = {
   ingest: { adapter: "pdfjs", adapterVersion: "6.4.299" },
 };
 
+/** ADR-019: most characters come from an invisible OCR layer (`Tr 3`). */
+export const validRawDocumentOcrTextLayer: RawDocument = {
+  ...validRawDocument,
+  source: { ...validRawDocument.source, fileName: "n1-en-lostworld.pdf", ocrTextLayer: true },
+};
+
 export const validAnchor: Anchor = {
   blockId: "b-para-1",
   start: 0,
@@ -138,7 +144,7 @@ export const figureBlock: Block = {
 };
 
 export const validBook: Book = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "1.1.0",
   id: FIXTURE_SHA256,
   source: { fileName: "n1-en-rebus-philosophy-mind.pdf", pageCount: 99 },
   metadata: {
@@ -171,7 +177,7 @@ export const validBookOcrTextLayer: Book = {
 };
 
 export const validOverlay: Overlay = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "1.1.0",
   bookId: FIXTURE_SHA256,
   ops: [
     { id: "op-1", createdAt: "2026-10-05T12:00:00Z", target: validAnchor, op: "merge_with_next" },
@@ -283,6 +289,12 @@ export const invalidFixtures: InvalidFixture[] = [
     target: "RawDocument",
     reason: "pageCount is at least 1",
     data: { ...validRawDocument, source: { ...validRawDocument.source, pageCount: 0 } },
+  },
+  {
+    name: "raw-document-ocr-text-layer-not-a-boolean",
+    target: "RawDocument",
+    reason: "ocrTextLayer is a boolean flag (ADR-019)",
+    data: { ...validRawDocument, source: { ...validRawDocument.source, ocrTextLayer: "yes" } },
   },
   {
     name: "book-with-struct-tree",

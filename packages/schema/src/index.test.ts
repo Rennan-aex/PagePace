@@ -6,6 +6,7 @@ import {
   validBookOcrTextLayer,
   validOverlay,
   validRawDocument,
+  validRawDocumentOcrTextLayer,
 } from "./fixtures";
 import {
   PACKAGE_NAME,
@@ -33,14 +34,21 @@ describe("@pagepace/schema", () => {
     expect(PACKAGE_NAME).toBe("@pagepace/schema");
   });
 
-  it("publishes schema version 1.0.0", () => {
-    expect(SCHEMA_VERSION).toBe("1.0.0");
+  it("publishes schema version 1.1.0", () => {
+    expect(SCHEMA_VERSION).toBe("1.1.0");
   });
 });
 
 describe("valid fixtures round-trip", () => {
   it("parses the sample RawDocument", () => {
     expect(parseRawDocument(validRawDocument)).toEqual(validRawDocument);
+  });
+
+  it("parses the OCR-text-layer RawDocument (ADR-019 flag on `source`)", () => {
+    const document = parseRawDocument(validRawDocumentOcrTextLayer);
+    expect(document.source.ocrTextLayer).toBe(true);
+    // Absent (not false) on a normal document: consumers test truthiness.
+    expect(parseRawDocument(validRawDocument).source.ocrTextLayer).toBeUndefined();
   });
 
   it("parses the sample Book", () => {

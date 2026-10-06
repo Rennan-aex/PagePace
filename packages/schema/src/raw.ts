@@ -88,6 +88,13 @@ export interface RawDocument {
     producer?: string;
     /** True when the PDF declares `MarkInfo.Marked = true` — not the same as "reliable" (see `tagHints.reliable`). */
     tagged: boolean;
+    /**
+     * True when most characters are drawn with the invisible text rendering
+     * mode (`Tr 3`): the text layer of a scanned book (ADR-019). The reader
+     * keeps working, but the `Book` must warn `ocr-text-layer`, drop
+     * bold/italic and lower its confidence.
+     */
+    ocrTextLayer?: boolean;
   };
   outline?: RawOutlineItem[];
   tagHints?: TagHints;
@@ -154,6 +161,7 @@ export const rawDocumentSchema: z.ZodType<RawDocument> = z.strictObject({
     pageCount: z.number().int().min(1),
     producer: z.string().min(1).optional(),
     tagged: z.boolean(),
+    ocrTextLayer: z.boolean().optional(),
   }),
   outline: z.array(rawOutlineItemSchema).optional(),
   tagHints: tagHintsSchema.optional(),

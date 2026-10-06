@@ -1,6 +1,6 @@
-# Esquema (contrato) v1.0.0
+# Esquema (contrato) v1.1.0
 
-> **Status:** **fechado em `1.0.0`** (E1-T01, 2026-10-05). A fonte de verdade em código é `packages/schema` (tipos TypeScript + validadores de runtime com `zod` — `parseRawDocument`, `parseBook`, `parseOverlay`, `parseAnchor`); este documento explica a intenção. Qualquer mudança segue as regras de versionamento abaixo.
+> **Status:** **`1.1.0`** — fechado em `1.0.0` pela E1-T01 (2026-10-05) e ampliado pela E1-T03 (campo `source.ocrTextLayer`, 2026-10-05, ver changelog). A fonte de verdade em código é `packages/schema` (tipos TypeScript + validadores de runtime com `zod` — `parseRawDocument`, `parseBook`, `parseOverlay`, `parseAnchor`); este documento explica a intenção. Qualquer mudança segue as regras de versionamento abaixo.
 
 ## Versionamento
 `MAJOR.MINOR.PATCH` em `SCHEMA_VERSION`.
@@ -14,7 +14,8 @@ Formato comum para PDF.js e para OCR.
 ```ts
 interface RawDocument {
   schemaVersion: string;
-  source: { fileName: string; sha256: string; pageCount: number; producer?: string; tagged: boolean };
+  source: { fileName: string; sha256: string; pageCount: number; producer?: string; tagged: boolean;
+            ocrTextLayer?: boolean };   // true = texto de OCR invisível (Tr 3, ADR-019)
   outline?: RawOutlineItem[];            // bookmarks do PDF
   tagHints?: TagHints;                   // pistas normalizadas da árvore de tags (nunca a árvore crua)
   pages: RawPage[];
@@ -43,6 +44,7 @@ interface TagHints {
 }
 ```
 **Árvore de tags (pedido do PO, 2026-10-04):** a árvore crua do PDF **nunca** entra no modelo. Só sobrevivem as pistas acima: confirmação de `P` e `bbox` de `Figure`, depois de descartar `Span`/`alt` repetido, `Art`/nós sem `role` e `Link`. `source.tagged` diz que o PDF *declara* `MarkInfo.Marked = true`; `tagHints.reliable` é a validação do S3 §4.3 (árvore não vazia em ≥ 90% das páginas com texto, sem hierarquia invertida, `P`/`Sect` majoritários). Validação: um input com `structTree` (ou qualquer chave extra) é **rejeitado** — objetos estritos.
+**Camada de OCR (ADR-019, E1-T03):** `source.ocrTextLayer` é `true` quando a **maioria** dos caracteres do documento é desenhada com render mode invisível (`Tr 3`) — o texto de um scan que já veio reconhecido. A chave só aparece quando é `true` (documento digital não a tem). Um PDF **sem** camada de texto nenhum não chega a virar `RawDocument`: a ingestão interrompe com `ScannedPdfError` e a mensagem exata da ADR-018 (`PDF escaneado: leitura exige OCR, ainda não disponível`). Os dois estados e o que cada um vira no `Book` estão na tabela da §2.
 
 ## 2. `Book` (saída do extrator, entrada do app)
 ```ts
@@ -131,3 +133,4 @@ type CorrectionOp = { id: string; createdAt: string; target: Anchor } & (
 - `0.1.0-draft`: rascunho inicial (E1-T01 o transforma em `1.0.0`).
 - `0.1.0-draft` (doc, 2026-10-04): códigos de `extraction.warnings` documentados (`"ocr-text-layer"`) e a tabela dos dois estados de PDF escaneado — só documentação, **nenhum tipo mudou** (ADR-019).
 - `1.0.0` (2026-10-05, E1-T01): contrato fechado em código. `structTree?: unknown` → **`tagHints?: TagHints`** (a árvore crua não é persistida — ADR-025). Validação de runtime com `zod` (ADR-024): objetos estritos (chaves desconhecidas rejeitadas), `confidence`/`avgConfidence` em 0..1, `blocks` e `runs` não vazios, `heading` exige `level`, `origin.pageTo >= pageFrom`, `Anchor.end >= start`, `CorrectionOp` como união discriminada por `op`, `createdAt` ISO-8601 com fuso. Fixtures válidas e inválidas em `packages/schema/src/fixtures.ts`.
+- `1.1.0` (2026-10-05, E1-T03): **MINOR** — campo opcional `source.ocrTextLayer?: boolean` no `RawDocument`, marcado quando a maioria dos caracteres vem de uma camada de OCR invisível (`Tr 3`, ADR-019/ADR-029); é ele que o construtor do `Book` transforma em `extraction.warnings: ["ocr-text-layer"]`, confiança reduzida e runs sem negrito/itálico. Sem migração (nada foi removido); como `schemaVersion` é literal, JSON gravado como `1.0.0` deixa de validar — hoje não existe nenhum artefato gravado. Detector A (ADR-018) não acrescenta campo: PDF sem camada de texto não gera `RawDocument` (`ScannedPdfError`).
