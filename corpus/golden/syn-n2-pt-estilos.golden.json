@@ -1,0 +1,107 @@
+{
+  "id": "syn-n2-pt-estilos",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "Estilos na página"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Um parágrafo comum pode conter uma\npalavra "
+        },
+        {
+          "text": "destacada",
+          "bold": true
+        },
+        {
+          "text": " no meio da linha,\ncomo acontece em avisos e\nrótulos de manuais."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Outras vezes o texto muda de voz no\nmeio da frase: um termo "
+        },
+        {
+          "text": "emprestado",
+          "italic": true
+        },
+        {
+          "text": ",\nque veio de outra língua e ficou\nno lugar sem tradução."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Trechos citados"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "blockquote",
+      "runs": [
+        {
+          "text": "Ler é deslocar o olho sem pressa, linha\napós linha, até que a página pare de ser\numa superfície e vire um lugar onde\nas coisas acontecem."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "Primeiro ponto: a margem esquerda fica\nsempre no mesmo lugar."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "Segundo ponto: o parágrafo seguinte\nrespeita a mesma régua."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

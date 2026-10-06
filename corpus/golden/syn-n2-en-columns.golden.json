@@ -1,0 +1,92 @@
+{
+  "id": "syn-n2-en-columns",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Notes on Light"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Light is not a thing but a\nway of seeing. The same room\nholds a different room at\nnoon and at dusk, and the\nwalls keep both of them."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "We name the hours by the sun\nand then forget the sun, as\nif the clock were a kind of\nweather of its own, made of\nmetal and glass in the hall."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A window frames the same\nstreet all day long. Only\nthe shadows move across it,\ndrawing slow lines on the\nfloor and then erasing them."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Ask ten people what light is\nand you will hear ten\nanswers, none of them wrong:\na particle, a wave, a gift,\na habit of the morning."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The oldest lamp in the house\nstill sits above the door,\nthough nothing is lit with\nit now. It keeps the shape\nof the light it used to give."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Between the two columns of\nthis page runs a narrow\ngutter, and the eye crosses\nit without a sound, one\nline after the other."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

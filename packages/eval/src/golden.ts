@@ -1,12 +1,16 @@
 // Golden (ground truth) files: format, validation and path resolution
-// (E1-T06, ADR-035). The shape follows the `write-golden-test` skill:
+// (E1-T06 created the validator, E1-T07 closed the format — ADR-036). The
+// shape follows the `write-golden-test` skill:
 //
 //   corpus/golden/<id>.golden.json                    (public documents)
 //   $CORPUS_PRIVATE_DIR/golden/<id>.golden.json       (private documents)
 //
-// Validation lives here, in `@pagepace/eval`, because the format is still
-// owned by E1-T07; when it stabilises it moves to `@pagepace/schema`.
+// Validation lives here, in `@pagepace/eval` (ADR-035), because the golden
+// format is versioned on its own (`GOLDEN_FORMAT_VERSION`), not by
+// `@pagepace/schema`.
+
 import path from "node:path";
+import { BLOCK_KINDS, type BlockKind } from "@pagepace/schema";
 import type { CorpusEntry } from "./corpus";
 
 export class GoldenError extends Error {
@@ -16,8 +20,19 @@ export class GoldenError extends Error {
   }
 }
 
+/**
+ * Version of the golden file format itself. `schemaVersion` in a golden is
+ * this value; a golden declaring another major version is rejected (minors
+ * and patches are forward compatible — unknown fields are always rejected).
+ */
+export const GOLDEN_FORMAT_VERSION = "1.0.0";
+
 export interface GoldenRun {
   text: string;
+  /** Mirrors `Run.bold` of `@pagepace/schema` (ground truth for `style_f1`). */
+  bold?: boolean;
+  /** Mirrors `Run.italic` of `@pagepace/schema` (ground truth for `style_f1`). */
+  italic?: boolean;
 }
 
 export interface GoldenOrigin {
@@ -26,7 +41,10 @@ export interface GoldenOrigin {
 }
 
 export interface GoldenBlock {
-  kind: string;
+  /** Same closed list as `Book.blocks` (`BLOCK_KINDS`). */
+  kind: BlockKind;
+  /** Required for `kind: "heading"` (1..6), exactly like `Book.blocks`. */
+  level?: number;
   runs: GoldenRun[];
   origin: GoldenOrigin | null;
 }
@@ -43,10 +61,15 @@ export interface Golden {
 /** `source` values allowed by the `write-golden-test` skill. */
 export const GOLDEN_SOURCES = ["synthetic", "tagged", "epub-pair", "hand-annotated"];
 
+/** Block kinds of the golden: the schema's `BLOCK_KINDS`, re-exported. */
+export const GOLDEN_KINDS: readonly string[] = BLOCK_KINDS;
+
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const FORMAT_MAJOR = GOLDEN_FORMAT_VERSION.split(".")[0];
 const TOP_LEVEL_KEYS = new Set(["id", "schemaVersion", "source", "coverage", "blocks"]);
-const BLOCK_KEYS = new Set(["kind", "runs", "origin"]);
+const BLOCK_KEYS = new Set(["kind", "level", "runs", "origin"]);
+const RUN_KEYS = new Set(["text", "bold", "italic"]);
 
 function fail(source: string, message: string): never {
   throw new GoldenError(`${source}: ${message}`);
@@ -75,6 +98,7 @@ function expectPages(value: unknown, source: string, where: string): number[] {
     if (pages.includes(page)) fail(source, `${where} repeats page ${page}`);
     pages.push(page);
   }
+  if (pages.length === 0) fail(source, `${where} must hold at least one page`);
   if (
     pages.some((page, index) => {
       const previous = pages[index - 1];
@@ -103,8 +127,12 @@ export function parseGolden(text: string, source: string): Golden {
   if (!ID_PATTERN.test(id)) fail(source, `invalid id "${id}"`);
 
   const schemaVersion = expectString(root.schemaVersion, source, "schemaVersion");
-  if (!VERSION_PATTERN.test(schemaVersion)) {
-    fail(source, `schemaVersion must look like "1.2.3", got "${schemaVersion}"`);
+  if (!VERSION_PATTERN.test(schemaVersion) || schemaVersion.split(".")[0] !== FORMAT_MAJOR) {
+    fail(
+      source,
+      `schemaVersion must be ${FORMAT_MAJOR}.x.x (golden format ${GOLDEN_FORMAT_VERSION}), ` +
+        `got "${schemaVersion}"`,
+    );
   }
 
   const goldenSource = expectString(root.source, source, "source");
@@ -123,21 +151,44 @@ export function parseGolden(text: string, source: string): Golden {
   }
 
   if (!Array.isArray(root.blocks)) fail(source, "blocks must be an array");
+  if (root.blocks.length === 0) fail(source, "blocks must hold at least one block");
   const blocks: GoldenBlock[] = root.blocks.map((rawBlock, index) => {
     const where = `blocks[${index}]`;
     const block = expectObject(rawBlock, source, where);
     const blockKeys = Object.keys(block).filter((key) => !BLOCK_KEYS.has(key));
     if (blockKeys.length > 0) fail(source, `${where}: unknown field(s): ${blockKeys.join(", ")}`);
 
-    const kind = expectString(block.kind, source, `${where}.kind`);
+    const kind = expectString(block.kind, source, `${where}.kind`) as BlockKind;
+    if (!BLOCK_KINDS.includes(kind)) {
+      fail(source, `${where}.kind must be one of ${BLOCK_KINDS.join(", ")} (got "${kind}")`);
+    }
+
+    let level: number | undefined;
+    if (block.level !== undefined && block.level !== null) {
+      const value = block.level;
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 6) {
+        fail(source, `${where}.level must be an integer 1..6`);
+      }
+      level = value;
+    }
+    if (kind === "heading" && level === undefined) {
+      fail(source, `${where}: heading blocks need "level" (1..6)`);
+    }
+
     if (!Array.isArray(block.runs)) fail(source, `${where}.runs must be an array`);
     const runs: GoldenRun[] = block.runs.map((rawRun, runIndex) => {
-      const run = expectObject(rawRun, source, `${where}.runs[${runIndex}]`);
-      const runKeys = Object.keys(run).filter((key) => key !== "text");
-      if (runKeys.length > 0) {
-        fail(source, `${where}.runs[${runIndex}]: unknown field(s): ${runKeys.join(", ")}`);
+      const runWhere = `${where}.runs[${runIndex}]`;
+      const run = expectObject(rawRun, source, runWhere);
+      const runKeys = Object.keys(run).filter((key) => !RUN_KEYS.has(key));
+      if (runKeys.length > 0) fail(source, `${runWhere}: unknown field(s): ${runKeys.join(", ")}`);
+      const parsed: GoldenRun = { text: expectString(run.text, source, `${runWhere}.text`) };
+      for (const flag of ["bold", "italic"] as const) {
+        const value = run[flag];
+        if (value === undefined) continue;
+        if (typeof value !== "boolean") fail(source, `${runWhere}.${flag} must be a boolean`);
+        parsed[flag] = value;
       }
-      return { text: expectString(run.text, source, `${where}.runs[${runIndex}].text`) };
+      return parsed;
     });
 
     let origin: GoldenOrigin | null = null;
@@ -159,8 +210,31 @@ export function parseGolden(text: string, source: string): Golden {
       origin = { pageFrom, pageTo };
     }
 
-    return { kind, runs, origin };
+    return { kind, ...(level !== undefined ? { level } : {}), runs, origin };
   });
+
+  // A partial golden measures only `coverage.pages` (the runner crops the
+  // extraction to them), so every annotated block must point at a page that
+  // is actually there — otherwise the comparison is against text that was
+  // cropped away and the error is guaranteed.
+  if (coverage !== null) {
+    const allowed = new Set(coverage);
+    blocks.forEach((block, index) => {
+      const where = `blocks[${index}]`;
+      if (block.origin === null) {
+        fail(source, `${where}: origin is required when the golden declares coverage.pages`);
+      }
+      for (let page = block.origin.pageFrom; page <= block.origin.pageTo; page++) {
+        if (!allowed.has(page)) {
+          fail(
+            source,
+            `${where}.origin covers page ${page}, which is outside coverage.pages ` +
+              `[${coverage.join(", ")}]`,
+          );
+        }
+      }
+    });
+  }
 
   return { id, schemaVersion, source: goldenSource, coverage, blocks };
 }
@@ -172,6 +246,31 @@ export function parseGolden(text: string, source: string): Golden {
  */
 export function goldenText(golden: Golden): string {
   return golden.blocks.map((block) => block.runs.map((run) => run.text).join("")).join("\n");
+}
+
+/**
+ * Canonical serialisation of a golden: 2-space indent, LF, trailing newline
+ * and `coverage` omitted (not `null`) when the golden covers the whole
+ * document — `parseGolden(serializeGolden(g)) === g`.
+ */
+export function serializeGolden(golden: Golden): string {
+  const document = {
+    id: golden.id,
+    schemaVersion: golden.schemaVersion,
+    source: golden.source,
+    ...(golden.coverage !== null ? { coverage: { pages: golden.coverage } } : {}),
+    blocks: golden.blocks.map((block) => ({
+      kind: block.kind,
+      ...(block.level !== undefined ? { level: block.level } : {}),
+      runs: block.runs.map((run) => ({
+        text: run.text,
+        ...(run.bold !== undefined ? { bold: run.bold } : {}),
+        ...(run.italic !== undefined ? { italic: run.italic } : {}),
+      })),
+      origin: block.origin,
+    })),
+  };
+  return `${JSON.stringify(document, null, 2)}\n`;
 }
 
 /** `golden: none` (or an absent field) means "this document has no golden". */

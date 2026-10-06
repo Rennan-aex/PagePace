@@ -43,9 +43,14 @@
 - **Pipeline:** ingestão PDF.js → texto bruto (`pageText`/`documentText`) → normalização (`normalizeText`: NFC, sem soft hyphen, espaços colapsados) → `text_cer` = Levenshtein ÷ tamanho do gabarito.
 - **Junção provisória dos itens:** `hasEOL` → quebra de linha; distância horizontal > 0,15 em → espaço; encostado → nada. **Provisória até a E2-T03.**
 - **Cobertura:** `coverage.pages` (1-based) recorta a extração **e** o gabarito; sem cobertura, o documento inteiro entra na medição.
-- **Só mede quem tem golden:** `golden: none` sai na tabela como `no golden`. Hoje **0 de 19** documentos têm gabarito (a E1-T07 cria os primeiros), então o runner avisa e sai com 0.
+- **Só mede quem tem golden:** `golden: none` sai na tabela como `no golden`. Desde a **E1-T07 (2026-10-06)** o corpus tem **5 de 24** documentos com gabarito (os 5 sintéticos `syn-*`), todos medindo **`text_cer = 0.0000`** — os primeiros gabaritos dos PDFs reais chegam com as fases E2+.
 - **Códigos de saída:** 0 = sucesso (mesmo sem nada medido, com aviso) · 1 = algum documento falhou (PDF/golden ausente, SHA divergente, PDF escaneado, JSON inválido) · 2 = opção desconhecida.
 - **Ainda não existem** `--diff`, `--ci` e `--update-baseline` (chegam com a E1-T08, junto do `baseline.json`).
+
+## Golden e corpus sintético (E1-T07, ADR-013/036/037)
+- **Formato:** `*.golden.json` com `schemaVersion` = versão do **formato do golden** (`GOLDEN_FORMAT_VERSION`, hoje `1.0.0`), `source` fechado, `blocks` com `kind` do `@pagepace/schema` e runs `bold`/`italic` (gabarito do `style_f1`). Validação em `@pagepace/eval` (`parseGolden`).
+- **Gerador:** `pnpm corpus:synthetic` deriva **PDF + golden** da mesma especificação (`packages/eval/src/specs.ts`) — determinístico, sem dependência nova. O `pnpm corpus:fetch` gera o PDF sintético que faltar e confere o SHA-256.
+- **5 sintéticos** (`syn-*`) cobrem N1 pt/en (parágrafos, acentos), N2 pt/en (duas colunas, negrito/itálico) e N3 en (notas de rodapé, golden parcial `coverage.pages: [2]`). Eles são **cassos controlados** (heurística nova deve dar 0 neles) e **não contam na cobertura por nível do `CORPUS.md`** — a cobertura continua sendo dos PDFs reais.
 
 ## Testes golden de página
 Para depurar, além do corpus: pares `fixture de itens brutos (JSON) → blocos esperados (JSON)` por camada, em `packages/extractor/test/fixtures/`. Eles não contêm texto com copyright (texto sintético ou domínio público).

@@ -15,6 +15,7 @@ export {
   REPO_ROOT,
   resolveCorpusPrivateDir,
   resolveCorpusPrivateDirDetailed,
+  SYNTHETIC_DIR,
 } from "./corpus";
 
 export {
@@ -34,6 +35,8 @@ export {
 } from "./eval";
 
 export {
+  GOLDEN_FORMAT_VERSION,
+  GOLDEN_KINDS,
   GOLDEN_SOURCES,
   type Golden,
   type GoldenBlock,
@@ -44,8 +47,18 @@ export {
   hasGolden,
   parseGolden,
   resolveGoldenPath,
+  serializeGolden,
 } from "./golden";
 
 export { type CerOptions, type CerResult, MAX_CER_CELLS, normalizeText, textCer } from "./metrics";
+export { SYNTHETIC_SPECS, syntheticSpecOf } from "./specs";
+export {
+  buildSynthetic,
+  type SyntheticArtifact,
+  type SyntheticBlockSpec,
+  type SyntheticRunSpec,
+  type SyntheticSpec,
+  SyntheticSpecError,
+} from "./synthetic";
 
 export { documentText, pageText, SPACE_GAP_EM } from "./text";

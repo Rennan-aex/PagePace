@@ -8,6 +8,14 @@ import { fileURLToPath } from "node:url";
 /** Repository root derived from this file (`<root>/packages/eval/src`). */
 export const REPO_ROOT = path.resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
+/**
+ * Subdirectory of `corpus/public/` holding the generated documents (ADR-037):
+ * a `generated: true` entry resolves to `corpus/public/synthetic/<id>.pdf`
+ * instead of `corpus/public/<id>.pdf`, and `pnpm corpus:fetch` builds that
+ * file from its specification instead of downloading it.
+ */
+export const SYNTHETIC_DIR = "synthetic";
+
 /** Where the private corpus directory came from (ADR-031). */
 export type PrivateDirSource = "environment" | ".env";
 
@@ -90,6 +98,12 @@ export interface ManifestEntry {
   features: string[];
   golden: string | null;
   visibility: string | null;
+  /**
+   * Built from a specification in `packages/eval/src/specs.ts` instead of
+   * downloaded (ADR-037). Public manifest only; lives under
+   * `corpus/public/synthetic/` and is never committed.
+   */
+  generated: boolean;
   /** File name relative to `$CORPUS_PRIVATE_DIR` (ADR-014); private manifests only. */
   file: string | null;
 }
@@ -129,7 +143,14 @@ const STRING_FIELDS = [
   "file",
   "sha256",
 ];
-const KNOWN_FIELDS = new Set(["id", "pages", "features", "fallback_urls", ...STRING_FIELDS]);
+const KNOWN_FIELDS = new Set([
+  "id",
+  "pages",
+  "features",
+  "fallback_urls",
+  "generated",
+  ...STRING_FIELDS,
+]);
 const HTTP_URL_PATTERN = /^https?:\/\/\S+$/;
 
 interface RawField {
@@ -181,6 +202,14 @@ function asStringList(value: unknown, key: string, source: string, line: number)
   if (value === null) return [];
   if (Array.isArray(value)) return value.map((item) => String(item));
   throw new CorpusError(`${source}:${line}: field "${key}" must be a list like [a, b]`);
+}
+
+function asBoolean(value: unknown, key: string, source: string, line: number): boolean {
+  if (value === null) return false;
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new CorpusError(`${source}:${line}: field "${key}" must be true or false`);
 }
 
 function toEntry(rawFields: readonly RawField[], source: string, entryLine: number): ManifestEntry {
@@ -242,6 +271,12 @@ function toEntry(rawFields: readonly RawField[], source: string, entryLine: numb
     features: asStringList(readField(fields, "features"), "features", source, entryLine),
     golden: asString(readField(fields, "golden"), "golden", source, entryLine),
     visibility: asString(readField(fields, "visibility"), "visibility", source, entryLine),
+    generated: asBoolean(
+      readField(fields, "generated"),
+      "generated",
+      source,
+      fields.get("generated")?.line ?? entryLine,
+    ),
     file: asString(readField(fields, "file"), "file", source, entryLine),
   };
 }
@@ -352,9 +387,11 @@ export interface LoadCorpusOptions extends ResolveOptions {
 /**
  * Merges the public manifest with the private one (ADR-031).
  *
- * Public entries resolve to `<repo>/corpus/public/<id>.pdf`; private entries
- * must declare `file` and resolve to `$CORPUS_PRIVATE_DIR/<file>`. A repeated
- * id â€” inside one manifest or across the two â€” is an error.
+ * Public entries resolve to `<repo>/corpus/public/<id>.pdf`, or to
+ * `<repo>/corpus/public/synthetic/<id>.pdf` when `generated: true` (ADR-037);
+ * private entries must declare `file` and resolve to
+ * `$CORPUS_PRIVATE_DIR/<file>`. A repeated id — inside one manifest or across
+ * the two — is an error.
  */
 export function loadCorpus(options: LoadCorpusOptions = {}): LoadedCorpus {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
@@ -363,13 +400,21 @@ export function loadCorpus(options: LoadCorpusOptions = {}): LoadedCorpus {
   const publicEntries = readManifest(
     path.join(repoRoot, "corpus", "manifest.yaml"),
     publicSource,
-  ).map((entry) => ({ ...entry, path: path.join(publicDir, `${entry.id}.pdf`) }));
+  ).map((entry) => ({
+    ...entry,
+    path: path.join(publicDir, ...(entry.generated ? [SYNTHETIC_DIR] : []), `${entry.id}.pdf`),
+  }));
 
   const { dir: privateDir, source: privateDirSource } = resolveCorpusPrivateDirDetailed(options);
   const privateEntries: CorpusEntry[] = [];
   if (privateDir) {
     const privateSource = path.join(privateDir, "manifest.yaml");
     for (const entry of readManifest(privateSource, privateSource)) {
+      if (entry.generated) {
+        throw new CorpusError(
+          `${privateSource}:${entry.line}: generated entries belong to corpus/manifest.yaml`,
+        );
+      }
       if (!entry.file) {
         throw new CorpusError(
           `${privateSource}:${entry.line}: private entry "${entry.id}" has no file`,

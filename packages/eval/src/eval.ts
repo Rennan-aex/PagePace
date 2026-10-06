@@ -2,8 +2,8 @@
 //
 // For every corpus document that declares a golden: ingest the PDF, take the
 // raw text, compare it with the golden and report `text_cer`. Documents
-// without a golden are listed but not measured (their golden arrives with
-// E1-T07); the baseline/gate flags arrive with E1-T08.
+// without a golden are listed but not measured; the baseline/gate flags
+// arrive with E1-T08.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -326,7 +326,8 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
 
   if (withGolden === 0) {
     warn(
-      "no document declares a golden yet (corpus/golden/ is filled by task E1-T07): nothing was measured",
+      "no document declares a golden (corpus/manifest.yaml: golden: none everywhere): " +
+        "nothing was measured",
     );
   }
 

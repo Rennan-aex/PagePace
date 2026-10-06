@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { githubRequestHeaders, runFetch, runFetchCli } from "./fetch";
+import { syntheticSpecOf } from "./specs";
+import { buildSynthetic, type SyntheticSpec } from "./synthetic";
 
 /**
  * E1-T05: `pnpm corpus:fetch` against a local HTTP server (`node:http`).
@@ -525,6 +527,94 @@ describe("runFetch", () => {
 
     expect(result.code).toBe(1);
     expect(io.errors()).toContain("n1-en-a has no source_url");
+  });
+
+  it("generates a missing synthetic document and reuses it on the second run", async () => {
+    const spec = syntheticSpecOf("syn-n1-en-paragraphs") as SyntheticSpec;
+    const artifact = buildSynthetic(spec);
+    const root = await tempDir();
+    await mkdir(path.join(root, "corpus"), { recursive: true });
+    await writeFile(
+      path.join(root, "corpus", "manifest.yaml"),
+      [
+        "version: 1",
+        "documents:",
+        "",
+        "  - id: syn-n1-en-paragraphs",
+        "    generated: true",
+        `    sha256: "${artifact.sha256}"`,
+        "    golden: syn-n1-en-paragraphs.golden.json",
+        "",
+      ].join("\n"),
+    );
+    const target = path.join(root, "corpus", "public", "synthetic", "syn-n1-en-paragraphs.pdf");
+    const io = capture();
+
+    const first = await runFetch({ repoRoot: root, env: {}, out: io.out, err: io.err });
+
+    expect(first.code).toBe(0);
+    expect(first.generated).toEqual(["syn-n1-en-paragraphs"]);
+    expect(await readFile(target)).toEqual(Buffer.from(artifact.pdf));
+    expect(io.text()).toContain("generated syn-n1-en-paragraphs");
+
+    const second = await runFetch({ repoRoot: root, env: {}, out: io.out, err: io.err });
+
+    expect(second.code).toBe(0);
+    expect(second.generated).toEqual([]);
+    expect(second.reused).toEqual(["syn-n1-en-paragraphs"]);
+    expect(io.text()).toContain("no request");
+  });
+
+  it("regenerates a synthetic document whose digest does not match", async () => {
+    const root = await tempDir();
+    await mkdir(path.join(root, "corpus", "public", "synthetic"), { recursive: true });
+    await writeFile(
+      path.join(root, "corpus", "manifest.yaml"),
+      [
+        "version: 1",
+        "documents:",
+        "",
+        "  - id: syn-n1-en-paragraphs",
+        "    generated: true",
+        `    sha256: "${sha("not what the specification builds")}"`,
+        "    golden: syn-n1-en-paragraphs.golden.json",
+        "",
+      ].join("\n"),
+    );
+    const target = path.join(root, "corpus", "public", "synthetic", "syn-n1-en-paragraphs.pdf");
+    await writeFile(target, "stale bytes");
+    const io = capture();
+
+    const result = await runFetch({ repoRoot: root, env: {}, out: io.out, err: io.err });
+
+    expect(result.code).toBe(1);
+    expect(io.errors()).toContain("digest mismatch for syn-n1-en-paragraphs");
+    expect(io.errors()).toContain("the specification and corpus/manifest.yaml disagree");
+    expect(io.errors()).toContain("pnpm corpus:synthetic");
+    expect(await readFile(target, "utf8")).toBe("stale bytes");
+  });
+
+  it("fails when a generated entry has no specification", async () => {
+    const root = await tempDir();
+    await mkdir(path.join(root, "corpus"), { recursive: true });
+    await writeFile(
+      path.join(root, "corpus", "manifest.yaml"),
+      [
+        "version: 1",
+        "documents:",
+        "",
+        "  - id: syn-ghost",
+        "    generated: true",
+        `    sha256: "${sha(BODY)}"`,
+        "",
+      ].join("\n"),
+    );
+    const io = capture();
+
+    const result = await runFetch({ repoRoot: root, env: {}, out: io.out, err: io.err });
+
+    expect(result.code).toBe(1);
+    expect(io.errors()).toContain("syn-ghost is marked generated but has no specification");
   });
 });
 

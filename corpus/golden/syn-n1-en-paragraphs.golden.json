@@ -1,0 +1,93 @@
+{
+  "id": "syn-n1-en-paragraphs",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "A Quiet Morning"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The light came slowly over the low hills, and the village\nwoke to the sound of a single bell. Doors opened, pots\nwere set on stoves, and the smell of bread drifted along\nthe narrow street that ran down to the river.\nYou could walk its whole length before the sun cleared\nthe roof of the old mill, and no one hurried."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Beyond the bridge the road turned to gravel and then to\ngrass. Marta counted the turns she had learned as a child:\nfirst the bent willow, then the stone with a flat top, then\nthe place where the stream crossed the path. She counted\nthem now out of habit, and because counting kept her even."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "The Long Path Home"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Home was a house with a blue door and a garden that never\nquite kept to its beds. Mint grew through the bricks and\ntomatoes leaned on the fence, and in August the whole yard\nsmelled of warm leaves and dust."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Her grandmother had planted the pear tree in the first\nyear they lived there. It was still small enough to shade\nonly the corner of the wall, but in autumn it gave four or\nfive fruits, enough for the whole street to taste."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The evening ended the way it always did, with chairs\ncarried out to the pavement and the neighbours arguing\ngently about weather and prices, until the first lamps\ncame on and the children were called in."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

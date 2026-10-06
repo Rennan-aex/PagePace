@@ -1,5 +1,8 @@
+import { BLOCK_KINDS } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
 import {
+  GOLDEN_FORMAT_VERSION,
+  GOLDEN_KINDS,
   GOLDEN_SOURCES,
   GoldenError,
   goldenText,
@@ -8,19 +11,24 @@ import {
   resolveGoldenPath,
 } from "./golden";
 
+const PARAGRAPH = {
+  kind: "paragraph",
+  runs: [{ text: "First block." }],
+  origin: { pageFrom: 1, pageTo: 1 },
+};
+const HEADING = {
+  kind: "heading",
+  level: 2,
+  runs: [{ text: "Second " }, { text: "block." }],
+  origin: { pageFrom: 2, pageTo: 2 },
+};
+
 const VALID = {
   id: "n1-en-sample",
-  schemaVersion: "1.1.0",
+  schemaVersion: "1.0.0",
   source: "synthetic",
   coverage: { pages: [1, 2] },
-  blocks: [
-    {
-      kind: "paragraph",
-      runs: [{ text: "First block." }],
-      origin: { pageFrom: 1, pageTo: 1 },
-    },
-    { kind: "heading", runs: [{ text: "Second " }, { text: "block." }] },
-  ],
+  blocks: [PARAGRAPH, HEADING],
 };
 
 const parse = (value: unknown, source = "golden.json"): ReturnType<typeof parseGolden> =>
@@ -30,15 +38,21 @@ describe("parseGolden", () => {
   it("accepts the documented shape", () => {
     const golden = parse(VALID);
     expect(golden.id).toBe("n1-en-sample");
+    expect(golden.schemaVersion).toBe("1.0.0");
     expect(golden.coverage).toEqual([1, 2]);
     expect(golden.blocks).toHaveLength(2);
     expect(golden.blocks[0]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
-    expect(golden.blocks[1]?.origin).toBeNull();
+    expect(golden.blocks[1]?.level).toBe(2);
   });
 
-  it("accepts a golden without coverage (whole document)", () => {
+  it("accepts a golden without coverage (whole document) and without origins", () => {
     const { coverage: _coverage, ...withoutCoverage } = VALID;
-    expect(parse(withoutCoverage).coverage).toBeNull();
+    const golden = parse({
+      ...withoutCoverage,
+      blocks: [{ kind: "paragraph", runs: [{ text: "First block." }] }],
+    });
+    expect(golden.coverage).toBeNull();
+    expect(golden.blocks[0]?.origin).toBeNull();
   });
 
   it("rejects invalid JSON with the file name in the message", () => {
@@ -55,8 +69,13 @@ describe("parseGolden", () => {
     expect(() => parse({ ...VALID, id: "" })).toThrow(/non-empty string/);
   });
 
-  it("rejects a schemaVersion that is not x.y.z", () => {
+  it("pins schemaVersion to the golden format major", () => {
+    expect(GOLDEN_FORMAT_VERSION).toBe("1.0.0");
     expect(() => parse({ ...VALID, schemaVersion: "1.x.x" })).toThrow(/schemaVersion/);
+    expect(() => parse({ ...VALID, schemaVersion: "2.0.0" })).toThrow(
+      /schemaVersion must be 1\.x\.x/,
+    );
+    expect(parse({ ...VALID, schemaVersion: "1.4.2" }).schemaVersion).toBe("1.4.2");
   });
 
   it("rejects a source outside the documented list", () => {
@@ -64,11 +83,70 @@ describe("parseGolden", () => {
     expect(GOLDEN_SOURCES).toEqual(["synthetic", "tagged", "epub-pair", "hand-annotated"]);
   });
 
+  it("uses the block kinds of @pagepace/schema", () => {
+    expect(GOLDEN_KINDS).toEqual([...BLOCK_KINDS]);
+    expect(() => parse({ ...VALID, blocks: [{ kind: "chapter", runs: [{ text: "x" }] }] })).toThrow(
+      /kind must be one of/,
+    );
+  });
+
+  it("requires level 1..6 on heading blocks and rejects other levels", () => {
+    const { level: _level, ...headingWithoutLevel } = HEADING;
+    expect(() => parse({ ...VALID, blocks: [headingWithoutLevel] })).toThrow(
+      /heading blocks need "level"/,
+    );
+    expect(() => parse({ ...VALID, blocks: [{ ...HEADING, level: 7 }] })).toThrow(
+      /level must be an integer 1\.\.6/,
+    );
+    expect(() => parse({ ...VALID, blocks: [{ ...HEADING, level: "2" }] })).toThrow(
+      /level must be an integer 1\.\.6/,
+    );
+  });
+
+  it("accepts optional boolean style flags on runs and rejects other values", () => {
+    const golden = parse({
+      ...VALID,
+      blocks: [
+        {
+          kind: "paragraph",
+          runs: [{ text: "bold", bold: true }, { text: " normal" }],
+          origin: { pageFrom: 1, pageTo: 1 },
+        },
+      ],
+    });
+    expect(golden.blocks[0]?.runs[0]).toEqual({ text: "bold", bold: true });
+    expect(golden.blocks[0]?.runs[1]).toEqual({ text: " normal" });
+    expect(() =>
+      parse({ ...VALID, blocks: [{ kind: "paragraph", runs: [{ text: "x", bold: "yes" }] }] }),
+    ).toThrow(/bold must be a boolean/);
+  });
+
   it("rejects broken coverage page lists", () => {
     expect(() => parse({ ...VALID, coverage: { pages: [2, 1] } })).toThrow(/sorted ascending/);
     expect(() => parse({ ...VALID, coverage: { pages: [1, 1] } })).toThrow(/repeats page 1/);
     expect(() => parse({ ...VALID, coverage: { pages: [0] } })).toThrow(/1-based positive/);
+    expect(() => parse({ ...VALID, coverage: { pages: [] } })).toThrow(/at least one page/);
     expect(() => parse({ ...VALID, coverage: { sheets: [1] } })).toThrow(/unknown field.*sheets/);
+  });
+
+  it("ties every covered block to a page inside coverage.pages", () => {
+    expect(() =>
+      parse({
+        ...VALID,
+        blocks: [{ kind: "paragraph", runs: [{ text: "x" }] }],
+      }),
+    ).toThrow(/origin is required when the golden declares coverage\.pages/);
+    expect(() =>
+      parse({
+        ...VALID,
+        coverage: { pages: [1] },
+        blocks: [HEADING],
+      }),
+    ).toThrow(/covers page 2, which is outside coverage\.pages/);
+  });
+
+  it("rejects an empty block list", () => {
+    expect(() => parse({ ...VALID, blocks: [] })).toThrow(/at least one block/);
   });
 
   it("rejects unknown block/run fields and bad origins", () => {
@@ -81,7 +159,7 @@ describe("parseGolden", () => {
     expect(() =>
       parse({
         ...VALID,
-        blocks: [{ kind: "p", runs: [{ text: "x" }], origin: { pageFrom: 3, pageTo: 1 } }],
+        blocks: [{ kind: "paragraph", runs: [{ text: "x" }], origin: { pageFrom: 3, pageTo: 1 } }],
       }),
     ).toThrow(/pageTo must be integer >= pageFrom|pageTo must be an integer/);
   });

@@ -1,0 +1,93 @@
+{
+  "id": "syn-n1-pt-acentos",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "Uma manhã qualquer"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A manhã chegou devagar às colinas baixas e a vila\nacordou com o som de um único sino. As portas se\nabriram, as panelas foram ao fogo e o cheiro de pão\nsubiu pela rua estreita que descia até o rio.\nDava para atravessar a rua inteira antes que o sol\nlimpasse a cumprida do moinho velho, e ninguém tinha pressa."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Além da ponte o caminho virava cascalho e depois capim.\nMarta contava as curvas aprendidas na infância: o\nsalgueiro torto, a pedra de topo chato e o lugar onde\no riacho cruzava a trilha. Ainda contava por hábito,\ne porque contar mantinha o passo igual."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "O jardim de dona Inês"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A casa tinha uma porta azul e um jardim que nunca\nficava dentro dos canteiros. Hortelã crescia entre os\ntijolos, os tomates se apoiavam na cerca e as folhas\nde limão cobriam o muro nas razões do verão.\nHavia uma saída estreita para os fundos."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A avó plantou a pereira no primeiro ano em que moraram\nali. Ela ainda era pequena e dava sombra só à quina\nda parede, mas no outono dava quatro ou cinco frutos\nque bastavam para a avó pôr na mesa."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "O fim do dia terminava como sempre: cadeiras levadas\npara a calçada e os vizinhos discutindo aos poucos\nsobre o tempo e as razões do ano, até acender a\nprimeira luz e chamar os meninos para dentro."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

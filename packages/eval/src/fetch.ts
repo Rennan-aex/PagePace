@@ -1,11 +1,22 @@
 // `pnpm corpus:fetch` — downloads the public corpus, verifies every SHA-256
 // digest and merges the private manifest (ADR-031, ADR-032, ADR-034).
+// Entries marked `generated: true` are built from their specification instead
+// of downloaded (ADR-037, E1-T07).
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CorpusError, type LoadedCorpus, loadCorpus, REPO_ROOT } from "./corpus";
+import {
+  CorpusError,
+  type LoadedCorpus,
+  loadCorpus,
+  type ManifestEntry,
+  REPO_ROOT,
+  SYNTHETIC_DIR,
+} from "./corpus";
+import { syntheticSpecOf } from "./specs";
+import { buildSynthetic } from "./synthetic";
 
 export const EXIT_OK = 0;
 export const EXIT_ERROR = 1;
@@ -67,6 +78,9 @@ CORPUS_PRIVATE_DIR (environment variable, then the .env file at the repo root).
 
 Behaviour:
   - a file that already matches its digest is reused without any request;
+  - an entry with "generated: true" is built from its specification in
+    packages/eval/src/specs.ts into corpus/public/synthetic/ (never fetched),
+    and its digest must match the manifest (ADR-037);
   - network errors, HTTP 5xx, HTTP 429 and HTTP 403 are retried 3 times (1 s, 2 s);
   - when the manifest lists fallback_urls they are tried in order, after the
     retries of the previous URL are exhausted;
@@ -101,6 +115,8 @@ export interface FetchResult {
   code: number;
   corpus: LoadedCorpus | null;
   downloaded: string[];
+  /** `generated: true` entries built from their specification (ADR-037). */
+  generated: string[];
   reused: string[];
   warnings: string[];
 }
@@ -261,6 +277,42 @@ async function download(params: DownloadParams): Promise<DownloadOutcome> {
   };
 }
 
+type GenerateOutcome = { ok: true; bytes: number } | { ok: false; message: string };
+
+/**
+ * Builds a `generated: true` entry from its specification (ADR-037).
+ *
+ * The digest of the freshly built bytes must equal the manifest digest: a
+ * mismatch means `packages/eval/src/specs.ts` and `corpus/manifest.yaml`
+ * drifted apart, which is an error and never a silent re-hash.
+ */
+async function generate(entry: ManifestEntry, target: string): Promise<GenerateOutcome> {
+  const spec = syntheticSpecOf(entry.id);
+  if (!spec) {
+    return {
+      ok: false,
+      message:
+        `${entry.id} is marked generated but has no specification in ` +
+        "packages/eval/src/specs.ts",
+    };
+  }
+  const artifact = buildSynthetic(spec);
+  if (entry.sha256 !== null && artifact.sha256 !== entry.sha256) {
+    return {
+      ok: false,
+      message:
+        `digest mismatch for ${entry.id}\n` +
+        `  manifest: ${entry.sha256}\n` +
+        `  spec:     ${artifact.sha256}\n` +
+        "  the specification and corpus/manifest.yaml disagree: run `pnpm corpus:synthetic` " +
+        "and update the manifest entry",
+    };
+  }
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, artifact.pdf);
+  return { ok: true, bytes: artifact.pdf.length };
+}
+
 function warnOrphans(
   dir: string,
   knownNames: ReadonlySet<string>,
@@ -300,7 +352,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
   } catch (error) {
     const message = error instanceof CorpusError ? error.message : messageOf(error);
     err(`corpus: ${message}\n`);
-    return { code: EXIT_ERROR, corpus: null, downloaded: [], reused: [], warnings };
+    return { code: EXIT_ERROR, corpus: null, downloaded: [], generated: [], reused: [], warnings };
   }
 
   if (!corpus.privateDir) {
@@ -308,6 +360,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
   }
 
   const downloaded: string[] = [];
+  const generated: string[] = [];
   const reused: string[] = [];
   await mkdir(corpus.publicDir, { recursive: true });
 
@@ -319,12 +372,26 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         out(`corpus: ${entry.id} already present and verified (no request)\n`);
         continue;
       }
-      warn(`${entry.id}: present file does not match the manifest digest, downloading again`);
+      warn(
+        `${entry.id}: present file does not match the manifest digest, ` +
+          `${entry.generated ? "regenerating" : "downloading again"}`,
+      );
+    }
+
+    if (entry.generated) {
+      const outcome = await generate(entry, entry.path);
+      if (!outcome.ok) {
+        err(`corpus: ${outcome.message}\n`);
+        return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
+      }
+      generated.push(entry.id);
+      out(`corpus: generated ${entry.id} (${outcome.bytes} bytes, synthetic)\n`);
+      continue;
     }
 
     if (!entry.sourceUrl) {
       err(`corpus: ${entry.id} has no source_url in corpus/manifest.yaml\n`);
-      return { code: EXIT_ERROR, corpus, downloaded, reused, warnings };
+      return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
     }
 
     const outcome = await download({
@@ -340,7 +407,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     });
     if (!outcome.ok) {
       err(`corpus: ${outcome.message}\n`);
-      return { code: EXIT_ERROR, corpus, downloaded, reused, warnings };
+      return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
     }
 
     downloaded.push(entry.id);
@@ -349,7 +416,16 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
 
   warnOrphans(
     corpus.publicDir,
-    new Set(corpus.publicEntries.map((entry) => `${entry.id}.pdf`)),
+    new Set(
+      corpus.publicEntries.filter((entry) => !entry.generated).map((entry) => `${entry.id}.pdf`),
+    ),
+    warn,
+  );
+  warnOrphans(
+    path.join(corpus.publicDir, SYNTHETIC_DIR),
+    new Set(
+      corpus.publicEntries.filter((entry) => entry.generated).map((entry) => `${entry.id}.pdf`),
+    ),
     warn,
   );
   if (corpus.privateDir) {
@@ -362,10 +438,10 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
 
   out(
     `corpus: ${corpus.publicEntries.length} public ` +
-      `(${downloaded.length} downloaded, ${reused.length} reused), ` +
+      `(${downloaded.length} downloaded, ${generated.length} generated, ${reused.length} reused), ` +
       `${corpus.privateEntries.length} private entries merged\n`,
   );
-  return { code: EXIT_OK, corpus, downloaded, reused, warnings };
+  return { code: EXIT_OK, corpus, downloaded, generated, reused, warnings };
 }
 
 /** CLI entry: `--help` and usage errors live here, downloads in `runFetch`. */

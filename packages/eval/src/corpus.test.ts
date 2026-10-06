@@ -132,7 +132,7 @@ describe("resolveCorpusPrivateDir", () => {
 });
 
 describe("parseManifest", () => {
-  it("reads the real public manifest (4 entries)", () => {
+  it("reads the real public manifest (4 downloaded + 5 synthetic entries)", () => {
     const text = readFileSync(path.join(REPO_ROOT, "corpus", "manifest.yaml"), "utf8");
     const entries = parseManifest(text, "corpus/manifest.yaml");
 
@@ -141,6 +141,11 @@ describe("parseManifest", () => {
       "n3-pt-scielo-wittgenstein",
       "n1-en-rebus-philosophy-mind",
       "n3-en-scielo-climatejustice",
+      "syn-n1-en-paragraphs",
+      "syn-n1-pt-acentos",
+      "syn-n2-en-columns",
+      "syn-n2-pt-estilos",
+      "syn-n3-en-footnotes",
     ]);
     expect(entries.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256 ?? ""))).toBe(true);
     const phobos = entries[0];
@@ -149,6 +154,7 @@ describe("parseManifest", () => {
     expect(phobos?.features).toEqual(["two-column", "hyphenation", "equations"]);
     expect(phobos?.sourceUrl).toContain("arxiv.org");
     expect(phobos?.visibility).toBe("public");
+    expect(phobos?.generated).toBe(false);
     expect(entries[2]?.features).toContain("tagged");
     // ADR-034: the two SciELO PDFs come from the release mirror first and
     // keep both SciELO URLs (CDN variant, canonical) as fallbacks.
@@ -164,6 +170,35 @@ describe("parseManifest", () => {
     );
     expect(entries[3]?.fallbackUrls).toHaveLength(2);
     expect(entries[0]?.fallbackUrls).toEqual([]);
+    // ADR-037: the synthetic documents are generated, never downloaded.
+    const synthetic = entries.slice(4);
+    expect(synthetic.every((entry) => entry.generated)).toBe(true);
+    expect(synthetic.every((entry) => entry.sourceUrl === null)).toBe(true);
+    expect(synthetic.every((entry) => entry.golden === `${entry.id}.golden.json`)).toBe(true);
+    expect(synthetic[4]?.features).toEqual(["synthetic", "footnotes"]);
+    expect(synthetic[4]?.golden).toBe("syn-n3-en-footnotes.golden.json");
+  });
+
+  it("reads generated: true, generated: false and rejects anything else", () => {
+    const text = [
+      "documents:",
+      "  - id: n1-en-a",
+      "    generated: true",
+      `    sha256: "${sha("a")}"`,
+      "  - id: n1-en-b",
+      "    generated: false",
+      `    sha256: "${sha("b")}"`,
+      "  - id: n1-en-c",
+      `    sha256: "${sha("c")}"`,
+      "",
+    ].join("\n");
+
+    const entries = parseManifest(text, "sample.yaml");
+
+    expect(entries.map((entry) => entry.generated)).toEqual([true, false, false]);
+    expect(() =>
+      parseManifest(text.replace("generated: true", "generated: yes"), "bad.yaml"),
+    ).toThrowError(/field "generated" must be true or false/);
   });
 
   it("ignores column-0 prose and parses every value shape", () => {
@@ -401,11 +436,63 @@ describe("loadCorpus", () => {
   it("loads the real repository manifest", () => {
     const corpus = loadCorpus({ repoRoot: REPO_ROOT, env: {} });
 
-    expect(corpus.publicEntries).toHaveLength(4);
+    expect(corpus.publicEntries).toHaveLength(9);
     expect(corpus.publicEntries.map((entry) => entry.id)).toContain("n1-en-rebus-philosophy-mind");
     for (const entry of corpus.publicEntries) {
       expect(entry.path.startsWith(corpus.publicDir)).toBe(true);
       expect(entry.path.endsWith(".pdf")).toBe(true);
+      // ADR-037: generated documents live in corpus/public/synthetic/.
+      expect(entry.path.includes(path.join("public", "synthetic"))).toBe(entry.generated);
     }
+  });
+
+  it("resolves a generated entry to corpus/public/synthetic/<id>.pdf", async () => {
+    const repoRoot = await tempDir();
+    await mkdir(path.join(repoRoot, "corpus"), { recursive: true });
+    await writeFile(
+      path.join(repoRoot, "corpus", "manifest.yaml"),
+      [
+        "documents:",
+        "",
+        "  - id: syn-n1-en-fixture",
+        "    generated: true",
+        `    sha256: "${sha("synthetic")}"`,
+        "    golden: syn-n1-en-fixture.golden.json",
+        "",
+      ].join("\n"),
+    );
+
+    const corpus = loadCorpus({ repoRoot, env: {} });
+
+    expect(corpus.publicEntries[0]?.path).toBe(
+      path.join(repoRoot, "corpus", "public", "synthetic", "syn-n1-en-fixture.pdf"),
+    );
+    expect(corpus.publicEntries[0]?.generated).toBe(true);
+  });
+
+  it("rejects a generated entry in the private manifest", async () => {
+    const repoRoot = await tempDir();
+    const privateDir = await tempDir();
+    await mkdir(path.join(repoRoot, "corpus"), { recursive: true });
+    await writeFile(
+      path.join(repoRoot, "corpus", "manifest.yaml"),
+      manifestOf([{ id: "n1-en-public", sha256: sha("public") }]),
+    );
+    await writeFile(
+      path.join(privateDir, "manifest.yaml"),
+      [
+        "documents:",
+        "",
+        "  - id: n1-pt-private",
+        "    file: n1-pt-private.pdf",
+        "    generated: true",
+        `    sha256: "${sha("private")}"`,
+        "",
+      ].join("\n"),
+    );
+
+    expect(() => loadCorpus({ repoRoot, env: { CORPUS_PRIVATE_DIR: privateDir } })).toThrowError(
+      /generated entries belong to corpus\/manifest\.yaml/,
+    );
   });
 });

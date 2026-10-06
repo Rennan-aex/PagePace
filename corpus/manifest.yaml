@@ -20,6 +20,11 @@
 #     visibility: public
 #
 # Não usa `file` (ADR-014): aqui o arquivo vem de `source_url` e é baixado pelo script (E1-T05).
+#
+# Entradas sintéticas (ADR-037, E1-T07): `generated: true` não tem `source_url` —
+# o PDF é construído a partir de packages/eval/src/specs.ts pelo
+# `pnpm corpus:synthetic` (PDFs e gabaritos), e o `pnpm corpus:fetch` só o
+# reconstrói se faltar. Ficam em corpus/public/synthetic/ (ignorado pelo git).
 
 version: 1
 documents:
@@ -92,6 +97,75 @@ documents:
     sha256: "a3402300bc90f00685e8286001e5b69b9fffd4c832205370b87a1ccaf36d8a3a"
     features: [footnotes]
     golden: none
+    visibility: public
+
+# Sintéticos (E1-T07, ADR-013/ADR-037): texto original escrito para o
+# repositório, PDF e gabarito construídos a partir de uma especificação única
+# em packages/eval/src/specs.ts (`pnpm corpus:synthetic`). Servem de base
+# medida do extrator: qualquer heurística nova pode ser testada contra eles.
+  - id: syn-n1-en-paragraphs
+    level: N1
+    lang: en
+    title: "A Quiet Morning (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-06"
+    generated: true
+    pages: 2
+    sha256: "df565729acbc4ece8bc5dc5d79a8d60824e5ae7dbe9b19f669a60c85205a7dd4"
+    features: [synthetic]
+    golden: syn-n1-en-paragraphs.golden.json
+    visibility: public
+
+  - id: syn-n1-pt-acentos
+    level: N1
+    lang: pt
+    title: "Uma manhã qualquer (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-06"
+    generated: true
+    pages: 2
+    sha256: "06fa8b5454385fcdc05cf6e553d62321ec342be5f1da5cdff2bf38be6637617c"
+    features: [synthetic]
+    golden: syn-n1-pt-acentos.golden.json
+    visibility: public
+
+  - id: syn-n2-en-columns
+    level: N2
+    lang: en
+    title: "Notes on Light (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-06"
+    generated: true
+    pages: 2
+    sha256: "599c050547e3cc8c95401742520df45da2bed5ba4ff19d79ef9866ecd64d5ec4"
+    features: [synthetic, two-column]
+    golden: syn-n2-en-columns.golden.json
+    visibility: public
+
+  - id: syn-n2-pt-estilos
+    level: N2
+    lang: pt
+    title: "Estilos na página (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-06"
+    generated: true
+    pages: 2
+    sha256: "19a27cd24ab69d7ea08aefb46a0ad1424c8533b2fc3789fa1688e0f821649d27"
+    features: [synthetic, styles]
+    golden: syn-n2-pt-estilos.golden.json
+    visibility: public
+
+  - id: syn-n3-en-footnotes
+    level: N3
+    lang: en
+    title: "Two Notes on Memory (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-06"
+    generated: true
+    pages: 2
+    sha256: "aee577d4f1511790c0851811d487bcc84cd124e65555cd1931e231f59ffdb107"
+    features: [synthetic, footnotes]
+    golden: syn-n3-en-footnotes.golden.json
     visibility: public
 
 # Necessidades de cobertura (ver docs/extractor/CORPUS.md):

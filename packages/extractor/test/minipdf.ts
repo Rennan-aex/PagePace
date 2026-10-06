@@ -16,8 +16,15 @@ export interface OutlineSpec {
 }
 
 export interface BuildPdfOptions {
-  /** `BaseFont` of the single font resource. Defaults to `Helvetica`. */
+  /** `BaseFont` of the default `F1` resource. Defaults to `Helvetica`. */
   baseFont?: string;
+  /**
+   * Font resources by name (`F1`, `F2`, ...) → `BaseFont`. Defaults to
+   * `{ F1: baseFont }`. Every resource is written as a non-embedded Type 1
+   * font with `/Encoding /WinAnsiEncoding`, which is what pdf.js needs to
+   * decode accented Latin-1 text with the standard 14 fonts.
+   */
+  fonts?: Record<string, string>;
   /** Build a struct tree (`Document > P`, one `MCID` per page). */
   tagged?: boolean;
   /** Build an `/Outlines` tree. */
@@ -29,6 +36,8 @@ export interface TextStreamOptions {
   x?: number;
   y?: number;
   size?: number;
+  /** Font resource of this text object. Defaults to `F1`. */
+  font?: string;
   /** Emit `/Role <</MCID n>> BDC ... EMC` around the text. */
   markRole?: string;
   mcid?: number;
@@ -41,12 +50,44 @@ const escapeLiteral = (value: string): string =>
 
 /** A `BT ... ET` content stream showing `text` at a baseline position. */
 export function textStream(text: string, options: TextStreamOptions = {}): string {
-  const { x = 72, y = 400, size = 12, markRole, mcid = 0, renderMode } = options;
+  const { x = 72, y = 400, size = 12, font = "F1", markRole, mcid = 0, renderMode } = options;
   const mode = renderMode === undefined ? "" : `${renderMode} Tr `;
   const body = markRole
     ? `/${markRole} <</MCID ${mcid}>> BDC ${mode}(${escapeLiteral(text)}) Tj EMC`
     : `${mode}(${escapeLiteral(text)}) Tj`;
-  return `BT /F1 ${size} Tf ${x} ${y} Td ${body} ET`;
+  return `BT /${font} ${size} Tf ${x} ${y} Td ${body} ET`;
+}
+
+export interface LineRun {
+  text: string;
+  /** Font resource of this run. Defaults to `F1`. */
+  font?: string;
+}
+
+export interface LineStreamOptions {
+  x?: number;
+  y?: number;
+  size?: number;
+}
+
+/**
+ * A single text object holding several styled runs on one line: the text
+ * matrix advances automatically between the `Tj` operators, so runs sit at
+ * the right x without any width table (the layout engine of the synthetic
+ * generator, E1-T07, relies on this).
+ */
+export function lineStream(runs: readonly LineRun[], options: LineStreamOptions = {}): string {
+  const { x = 72, y = 400, size = 12 } = options;
+  if (runs.length === 0) throw new Error("lineStream: at least one run is required");
+  const body = runs
+    .map((run, index) => {
+      const text = `(${escapeLiteral(run.text)}) Tj`;
+      return index === 0
+        ? `/${run.font ?? "F1"} ${size} Tf ${x} ${y} Td ${text}`
+        : ` /${run.font ?? "F1"} ${size} Tf ${text}`;
+    })
+    .join("");
+  return `BT ${body} ET`;
 }
 
 interface OutlineRecord {
@@ -90,7 +131,13 @@ function flattenOutline(records: OutlineRecord[], output: OutlineRecord[] = []):
  */
 export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}): Uint8Array {
   if (contentStreams.length === 0) throw new Error("buildPdf: at least one page is required");
-  const { baseFont = "Helvetica", tagged = false, outlines, mediaBox = [0, 0, 600, 800] } = options;
+  const {
+    baseFont = "Helvetica",
+    fonts,
+    tagged = false,
+    outlines,
+    mediaBox = [0, 0, 600, 800],
+  } = options;
   const pageCount = contentStreams.length;
 
   const objects: string[] = [];
@@ -109,7 +156,17 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
   for (const stream of contentStreams) {
     contentNumbers.push(push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`));
   }
-  const fontNumber = push(`<< /Type /Font /Subtype /Type1 /BaseFont /${baseFont} >>`);
+  const fontEntries = Object.entries(fonts ?? { F1: baseFont });
+  const fontNumbers = new Map<string, number>();
+  for (const [resource, base] of fontEntries) {
+    fontNumbers.set(
+      resource,
+      push(`<< /Type /Font /Subtype /Type1 /BaseFont /${base} /Encoding /WinAnsiEncoding >>`),
+    );
+  }
+  const fontResources = [...fontNumbers]
+    .map(([name, number]) => `/${name} ${number} 0 R`)
+    .join(" ");
 
   // One `P` element per marked-content id; ids restart at 0 on each page.
   const structNumbers: number[] = [];
@@ -164,7 +221,7 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     const structParents = tagged ? ` /StructParents ${index}` : "";
     objects[(pageNumbers[index] as number) - 1] =
       `<< /Type /Page /Parent ${pagesNumber} 0 R /MediaBox [${mediaBox.join(" ")}]` +
-      ` /Contents ${contentNumbers[index]} 0 R /Resources << /Font << /F1 ${fontNumber} 0 R >> >>` +
+      ` /Contents ${contentNumbers[index]} 0 R /Resources << /Font << ${fontResources} >> >>` +
       `${structParents} >>`;
   }
 

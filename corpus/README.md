@@ -7,17 +7,19 @@ corpus/
   manifest.yaml     lista de PDFs públicos (id, nível, idioma, licença, sha256...)   [git]
   golden/           gabaritos dos PDFs públicos                                      [git]
   public/           PDFs públicos baixados por `pnpm corpus:fetch`                    [ignorado]
+    synthetic/      PDFs sintéticos gerados a partir das especificações               [ignorado]
 ```
 
 ## Baixar os PDFs públicos
 
 ```bash
-pnpm corpus:fetch          # baixa o que falta e valida o SHA-256 de tudo
+pnpm corpus:fetch          # baixa o que falta + gera os sintéticos que faltarem
 pnpm corpus:fetch --help   # comportamento e códigos de saída
 ```
 
 - Arquivo já presente com o hash certo → **nenhuma requisição** (é o que o cache do CI usa).
 - Hash do arquivo baixado divergente → apaga o `.tmp` e sai com `exit 1`, mostrando o esperado × o obtido.
+- Entrada com `generated: true` (sintético) → o PDF é **construído** a partir de `packages/eval/src/specs.ts` se faltar; se o SHA-256 não bater com o manifest, falha dizendo para rodar `pnpm corpus:synthetic` (nunca sobrescreve sozinho).
 - Rede instável → **3 tentativas** (espera de 1 s e 2 s) em erro de rede, `5xx`, `429` ou `403`; os outros erros HTTP não repetem.
 - URL principal esgotada → passa para a `fallback_urls` da entrada (mesmo SHA-256), na ordem do manifest — ADR-033.
 - As requisições parecem um navegador (`accept`, `accept-language`, `referer` da página do artigo) e reenviam o cookie que o CDN devolve, porque o SciELO protege o endpoint de PDF (BunnyCDN).
@@ -39,8 +41,21 @@ documents:
 ```
 
 - Público: obrigatório `source_url` (URL direta do PDF) e `sha256`; opcional `fallback_urls: ["https://..."]` (URLs reserva, testadas em ordem se a principal falhar — ADR-033).
+- **Sintético (ADR-037):** `generated: true` **no lugar** de `source_url` (os dois juntos = erro; `generated: yes` = erro, o campo é booleano). O PDF fica em `corpus/public/synthetic/<id>.pdf` e é construído pelo gerador — nunca é baixado. No manifest **privado** esse campo é proibido.
 - Privado: obrigatório `file` (nome do PDF dentro da pasta privada) e `sha256`; **não** tem `source_url`.
 - Linha na coluna 0 (`version:`, `documents:`, comentários, texto livre) é ignorada; linha indentada que não parseia é erro com o número da linha.
+
+## PDFs sintéticos (gerados)
+Cinco documentos `syn-*` cuja **especificação é a própria verdade** (`packages/eval/src/specs.ts`) — gerador determinístico do `@pagepace/eval` sobre o `minipdf`, sem dependência nova (ADR-013/036):
+
+```bash
+pnpm corpus:synthetic          # grava os PDFs em corpus/public/synthetic/ e os goldens em corpus/golden/
+pnpm corpus:synthetic --check  # só valida (spec × manifest × golden em disco), sem gravar
+```
+
+- **Versionados:** as especificações, o gerador e os `corpus/golden/*.golden.json`. **Ignorados:** os PDFs (`corpus/public/synthetic/`).
+- O script **só regrava quando o conteúdo muda** (git fica limpo em execução repetida) e falha se o `sha256` do manifest divergir do que a spec gera.
+- Os 5 são **casos controlados** para a avaliação: heurística nova deve continuar dando `text_cer = 0` neles; eles **não contam** na cobertura de níveis do `CORPUS.md`.
 
 ## PDFs pessoais (com copyright)
 Ficam **fora** do repositório. O script lê `CORPUS_PRIVATE_DIR` da **variável de ambiente** ou, na falta dela, de um arquivo `.env` na raiz (ignorado pelo git):

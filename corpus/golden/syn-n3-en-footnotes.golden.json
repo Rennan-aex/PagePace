@@ -1,0 +1,61 @@
+{
+  "id": "syn-n3-en-footnotes",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "coverage": {
+    "pages": [
+      2
+    ]
+  },
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "A Short Argument"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "If memory repaints, then accuracy is not fidelity to\nthe first day but loyalty to the later ones. We keep\nwhat we have agreed to keep, and we call the result\nourselves. The witness who hesitates may be the only\nhonest one in the room."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "None of this makes memory useless. A tool that changes\nwith the hand is still a tool, and the stories we\nretell are the only ones that survive a family.\nThe rest is weather."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "footnote",
+      "runs": [
+        {
+          "text": "1. The image of the repainted room is borrowed from a\nseminar note taken in the winter of 2019 and copied here\nwithout correction, which is the point of the footnote."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

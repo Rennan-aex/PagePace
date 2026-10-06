@@ -8,7 +8,8 @@ description: Use para rodar e interpretar a avaliação do corpus (métricas do 
 ## Comandos
 - `pnpm eval`: roda o corpus (público + privado, se `CORPUS_PRIVATE_DIR` definido) e imprime tabela por nível/documento.
 - `pnpm eval --help`: o que existe hoje.
-- `pnpm corpus:fetch`: baixa/valida os PDFs públicos antes.
+- `pnpm corpus:fetch`: baixa/valida os PDFs públicos antes (e gera os sintéticos que faltarem).
+- `pnpm corpus:synthetic`: (re)gera os PDFs `syn-*` e seus goldens a partir das especificações, se você mexer numa spec.
 
 **Só existem a partir da E1-T08** (hoje qualquer opção desconhecida = exit 2): `--diff`, `--ci`, `--update-baseline`.
 
