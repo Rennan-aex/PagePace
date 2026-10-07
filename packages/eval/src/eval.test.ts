@@ -1,10 +1,11 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SCANNED_PDF_MESSAGE, sha256Hex } from "@pagepace/extractor";
+import { ingestPdfjs, SCANNED_PDF_MESSAGE, sha256Hex } from "@pagepace/extractor";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
-import { HELP, runEval, runEvalCli } from "./eval";
+import { HELP, type IngestFn, runEval, runEvalCli } from "./eval";
+import { documentText } from "./text";
 
 interface EntrySpec {
   id: string;
@@ -371,6 +372,243 @@ describe("runEval", () => {
   });
 });
 
+const LONG_LINE = "a".repeat(79);
+
+/** A 20-line page: long enough that one corrupted character stays under 0,002. */
+function longPdf(): Uint8Array {
+  return buildPdf(
+    Array.from({ length: 20 }, (_, index) =>
+      textStream(LONG_LINE, { x: 72, y: 400 - index * 12, size: 12 }),
+    ),
+  );
+}
+
+/** A repository whose single document extracts exactly what its golden says. */
+async function measuredRepo(): Promise<string> {
+  const id = "n1-en-sample";
+  const bytes = longPdf();
+  const document = await ingestPdfjs(bytes, { fileName: `${id}.pdf` });
+  const extracted = documentText(document, null);
+  const repoRoot = await repo([
+    { id, sha256: sha256Hex(bytes), pages: 1, golden: `${id}.golden.json` },
+  ]);
+  await writeFile(path.join(repoRoot, "corpus", "public", `${id}.pdf`), bytes);
+  await writeGolden(repoRoot, id, goldenValue(id, [paragraph(extracted)]));
+  return repoRoot;
+}
+
+/** An injected reader that corrupts the first `edits` characters it extracts. */
+function corruptingIngest(edits: number): IngestFn {
+  return async (bytes, fileName) => {
+    const document = await ingestPdfjs(bytes, { fileName });
+    let budget = edits;
+    for (const page of document.pages) {
+      for (const item of page.items) {
+        if (budget <= 0) break;
+        const take = Math.min(budget, item.text.length);
+        item.text = `${"x".repeat(take)}${item.text.slice(take)}`;
+        budget -= take;
+      }
+      if (budget <= 0) break;
+    }
+    return document;
+  };
+}
+
+const baselineFile = (repoRoot: string): string =>
+  path.join(repoRoot, "packages", "eval", "baseline.json");
+
+describe("baseline and CI gate", () => {
+  it("writes packages/eval/baseline.json and keeps the bytes stable", async () => {
+    const repoRoot = await measuredRepo();
+    const logs = capture();
+
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      updateBaseline: true,
+    });
+
+    expect(result.code).toBe(0);
+    expect(logs.out.join("")).toMatch(/baseline updated: packages\/eval\/baseline\.json/);
+    const first = await readFile(baselineFile(repoRoot), "utf8");
+    expect(JSON.parse(first)).toEqual({
+      version: 1,
+      tolerance: 0.002,
+      documents: { "n1-en-sample": { text_cer: 0 } },
+    });
+
+    await runEval({
+      repoRoot,
+      env: {},
+      out: () => {},
+      err: () => {},
+      writeReport: false,
+      updateBaseline: true,
+    });
+    expect(await readFile(baselineFile(repoRoot), "utf8")).toBe(first);
+  });
+
+  it("exits 0 in --ci when the run matches the baseline", async () => {
+    const repoRoot = await measuredRepo();
+    await runEval({
+      repoRoot,
+      env: {},
+      out: () => {},
+      err: () => {},
+      writeReport: false,
+      updateBaseline: true,
+    });
+    const logs = capture();
+
+    const result = await runEval({ repoRoot, env: {}, ...logs.io, writeReport: false, ci: true });
+
+    expect(result.code).toBe(0);
+    expect(logs.err.join("")).not.toMatch(/regression/);
+  });
+
+  it("fails --ci when a forced worsening goes beyond the tolerance", async () => {
+    const repoRoot = await measuredRepo();
+    await runEval({
+      repoRoot,
+      env: {},
+      out: () => {},
+      err: () => {},
+      writeReport: false,
+      updateBaseline: true,
+    });
+    const logs = capture();
+
+    // 5 corrupted characters out of 1599 = text_cer 0.0031 > 0.002.
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      ci: true,
+      ingest: corruptingIngest(5),
+    });
+
+    expect(result.code).toBe(1);
+    const errors = logs.err.join("");
+    expect(errors).toMatch(/regression: n1-en-sample text_cer 0\.0000 -> 0\.0031/);
+    expect(errors).toMatch(/worse by 0\.0031, tolerance 0\.0020/);
+    expect(errors).toMatch(/--update-baseline/);
+  });
+
+  it("accepts in --ci a worsening that stays inside the tolerance", async () => {
+    const repoRoot = await measuredRepo();
+    await runEval({
+      repoRoot,
+      env: {},
+      out: () => {},
+      err: () => {},
+      writeReport: false,
+      updateBaseline: true,
+    });
+    const logs = capture();
+
+    // 1 corrupted character out of 1599 = text_cer 0.0006 <= 0.002.
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      ci: true,
+      ingest: corruptingIngest(1),
+    });
+
+    expect(result.code).toBe(0);
+    expect(logs.err.join("")).not.toMatch(/regression/);
+  });
+
+  it("prints the baseline side by side with --diff", async () => {
+    const repoRoot = await measuredRepo();
+    await runEval({
+      repoRoot,
+      env: {},
+      out: () => {},
+      err: () => {},
+      writeReport: false,
+      updateBaseline: true,
+    });
+    const logs = capture();
+
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      diff: true,
+      ingest: corruptingIngest(5),
+    });
+
+    expect(result.code).toBe(0);
+    const text = logs.out.join("");
+    expect(text).toMatch(/Baseline diff against packages\/eval\/baseline\.json/);
+    expect(text).toMatch(/n1-en-sample\s+text_cer\s+0\.0000\s+0\.0031\s+\+0\.0031\s+worse/);
+  });
+
+  it("fails --ci when the baseline file is missing", async () => {
+    const repoRoot = await measuredRepo();
+    const logs = capture();
+
+    const result = await runEval({ repoRoot, env: {}, ...logs.io, writeReport: false, ci: true });
+
+    expect(result.code).toBe(1);
+    expect(logs.err.join("")).toMatch(/baseline not found at packages\/eval\/baseline\.json/);
+    expect(logs.err.join("")).toMatch(/--update-baseline/);
+  });
+
+  it("refuses to update the baseline when a document failed", async () => {
+    const repoRoot = await repo([
+      {
+        id: "n1-en-sample",
+        sha256: DIGEST_OF_NOTHING,
+        pages: 1,
+        golden: "n1-en-sample.golden.json",
+      },
+    ]);
+    await writeGolden(
+      repoRoot,
+      "n1-en-sample",
+      goldenValue("n1-en-sample", [paragraph("Hello world.")]),
+    );
+    const logs = capture();
+
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      updateBaseline: true,
+    });
+
+    expect(result.code).toBe(1);
+    expect(logs.err.join("")).toMatch(/refusing to update the baseline: 1 document\(s\) failed/);
+    await expect(readFile(baselineFile(repoRoot), "utf8")).rejects.toThrow();
+  });
+
+  it("refuses to write a baseline when nothing was measured", async () => {
+    const repoRoot = await repo([{ id: "n1-en-sample", sha256: DIGEST_OF_NOTHING }]);
+    const logs = capture();
+
+    const result = await runEval({
+      repoRoot,
+      env: {},
+      ...logs.io,
+      writeReport: false,
+      updateBaseline: true,
+    });
+
+    expect(result.code).toBe(1);
+    expect(logs.err.join("")).toMatch(/no document was measured/);
+    await expect(readFile(baselineFile(repoRoot), "utf8")).rejects.toThrow();
+  });
+});
+
 describe("runEvalCli", () => {
   it("prints the help and exits 0", async () => {
     const logs = capture();
@@ -378,12 +616,20 @@ describe("runEvalCli", () => {
     expect(code).toBe(0);
     expect(logs.out.join("")).toBe(HELP);
     expect(logs.out.join("")).toMatch(/Exit codes/);
+    expect(logs.out.join("")).toMatch(/--update-baseline/);
   });
 
   it("rejects unknown options with exit code 2", async () => {
     const logs = capture();
-    const code = await runEvalCli(["--ci"], logs.io);
+    const code = await runEvalCli(["--nope"], logs.io);
     expect(code).toBe(2);
-    expect(logs.err.join("")).toMatch(/unknown option: --ci/);
+    expect(logs.err.join("")).toMatch(/unknown option: --nope/);
+  });
+
+  it("rejects --update-baseline combined with --ci or --diff", async () => {
+    const logs = capture();
+    expect(await runEvalCli(["--update-baseline", "--ci"], logs.io)).toBe(2);
+    expect(await runEvalCli(["--update-baseline", "--diff"], logs.io)).toBe(2);
+    expect(logs.err.join("")).toMatch(/--update-baseline cannot be combined/);
   });
 });

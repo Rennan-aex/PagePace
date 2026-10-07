@@ -50,8 +50,10 @@ jobs:
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
       - run: pnpm test
       - run: pnpm check:no-pdf
-      # Corpus evaluation gate (the "golden rule": no metric may regress).
-      # Enabled automatically once the eval package ships its baseline (task E1-T08).
+      # Corpus evaluation gate (the "golden rule", ADR-008): `pnpm eval --ci`
+      # exits 1 when any metric is worse than packages/eval/baseline.json by
+      # more than 0.002 absolute. The step only runs while the baseline exists,
+      # so the gate turns itself on with the first `--update-baseline`.
       - name: Corpus evaluation
         if: hashFiles('packages/eval/baseline.json') != ''
         env:

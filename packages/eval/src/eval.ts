@@ -1,14 +1,27 @@
-// `pnpm eval` — evaluation runner (E1-T06, ADR-035).
+// `pnpm eval` — evaluation runner (E1-T06, ADR-035) plus the baseline gate
+// (E1-T08, ADR-008).
 //
 // For every corpus document that declares a golden: ingest the PDF, take the
 // raw text, compare it with the golden and report `text_cer`. Documents
-// without a golden are listed but not measured; the baseline/gate flags
-// arrive with E1-T08.
+// without a golden are listed but not measured. `--update-baseline` records
+// the run as accepted, `--diff` shows it against the baseline and `--ci`
+// fails when a metric got worse than the tolerance.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ingestPdfjs, ScannedPdfError } from "@pagepace/extractor";
 import type { RawDocument } from "@pagepace/schema";
+import {
+  BASELINE_FORMAT_VERSION,
+  BASELINE_RELATIVE_PATH,
+  BASELINE_TOLERANCE,
+  type Baseline,
+  type BaselineComparison,
+  type BaselineDocuments,
+  compareBaseline,
+  readBaseline,
+  writeBaseline,
+} from "./baseline";
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import { textCer } from "./metrics";
@@ -20,6 +33,9 @@ export const EXIT_USAGE = 2;
 
 export const HELP = `Usage:
   pnpm eval
+  pnpm eval --diff
+  pnpm eval --ci
+  pnpm eval --update-baseline
   pnpm eval --help
 
 Runs the extraction pipeline over the corpus and measures text_cer (character
@@ -31,12 +47,18 @@ $CORPUS_PRIVATE_DIR/golden/).
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
   - documents with "golden: none" are listed as "no golden" and not measured;
   - prints a table per document and per level and writes
-    packages/eval/out/report.json (ignored by git);
-  - "--diff", "--ci" and "--update-baseline" arrive with task E1-T08.
+    packages/eval/out/report.json (ignored by git).
+
+Baseline flags (packages/eval/baseline.json, task E1-T08):
+  --diff              prints this run side by side with the baseline
+  --ci                exits 1 when a metric is worse than the baseline by more
+                      than 0.002 absolute (the golden rule, ADR-008)
+  --update-baseline   rewrites the baseline with this run (not combinable)
 
 Exit codes:
   0  success (a run with nothing measured still exits 0, with a warning)
-  1  a document failed: missing PDF or golden, ingestion error, digest mismatch
+  1  a document failed: missing PDF or golden, ingestion error, digest
+     mismatch, or a metric worse than the baseline (--ci)
   2  usage error
 `;
 
@@ -57,6 +79,12 @@ export interface EvalOptions {
   ingest?: IngestFn;
   /** Write `packages/eval/out/report.json` (default `true`). */
   writeReport?: boolean;
+  /** Rewrite `packages/eval/baseline.json` with this run. */
+  updateBaseline?: boolean;
+  /** Fail (exit 1) when a metric is worse than the baseline (ADR-008). */
+  ci?: boolean;
+  /** Print this run side by side with the baseline. */
+  diff?: boolean;
 }
 
 export type DocumentStatus = "measured" | "no-golden" | "error";
@@ -362,8 +390,25 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
     }
   }
 
+  let code = errors > 0 ? EXIT_ERROR : EXIT_OK;
+  const metrics = metricsOf(documents);
+
+  if (options.updateBaseline) {
+    code = await applyUpdateBaseline(repoRoot, metrics, { errors, out, err });
+  } else if (options.ci === true || options.diff === true) {
+    code = await applyBaselineGate(repoRoot, metrics, {
+      ci: options.ci === true,
+      diff: options.diff === true,
+      measured,
+      out,
+      err,
+      warn,
+    });
+    if (errors > 0) code = EXIT_ERROR;
+  }
+
   return {
-    code: errors > 0 ? EXIT_ERROR : EXIT_OK,
+    code,
     documents,
     levels,
     measured,
@@ -371,6 +416,152 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
     withGolden,
     warnings,
   };
+}
+
+/** Measured documents as `id -> metric -> value`, the baseline shape. */
+function metricsOf(documents: DocumentResult[]): BaselineDocuments {
+  const metrics: BaselineDocuments = {};
+  for (const document of documents) {
+    if (document.status !== "measured" || document.cer === null) continue;
+    metrics[document.id] = { text_cer: document.cer };
+  }
+  return metrics;
+}
+
+async function applyUpdateBaseline(
+  repoRoot: string,
+  metrics: BaselineDocuments,
+  io: { errors: number; out: (text: string) => void; err: (text: string) => void },
+): Promise<number> {
+  const count = Object.keys(metrics).length;
+  if (io.errors > 0) {
+    io.err(`eval: refusing to update the baseline: ${io.errors} document(s) failed in this run\n`);
+    return EXIT_ERROR;
+  }
+  if (count === 0) {
+    io.err("eval: refusing to update the baseline: no document was measured\n");
+    return EXIT_ERROR;
+  }
+  const baseline: Baseline = {
+    version: BASELINE_FORMAT_VERSION,
+    tolerance: BASELINE_TOLERANCE,
+    documents: metrics,
+  };
+  await writeBaseline(repoRoot, baseline);
+  io.out(`\nbaseline updated: ${BASELINE_RELATIVE_PATH} (${count} document(s), text_cer)\n`);
+  return EXIT_OK;
+}
+
+async function applyBaselineGate(
+  repoRoot: string,
+  metrics: BaselineDocuments,
+  io: {
+    ci: boolean;
+    diff: boolean;
+    measured: number;
+    out: (text: string) => void;
+    err: (text: string) => void;
+    warn: (message: string) => void;
+  },
+): Promise<number> {
+  let baseline: Baseline | null;
+  try {
+    baseline = await readBaseline(repoRoot);
+  } catch (error) {
+    io.err(`eval: ${messageOf(error)}\n`);
+    return EXIT_ERROR;
+  }
+  if (baseline === null) {
+    io.err(
+      `eval: baseline not found at ${BASELINE_RELATIVE_PATH} - ` +
+        "run `pnpm eval --update-baseline` first\n",
+    );
+    return EXIT_ERROR;
+  }
+
+  let comparison: BaselineComparison;
+  try {
+    comparison = compareBaseline(baseline, metrics);
+  } catch (error) {
+    io.err(`eval: ${messageOf(error)}\n`);
+    return EXIT_ERROR;
+  }
+
+  if (io.diff) io.out(`\n${renderDiff(comparison)}`);
+
+  if (io.ci && io.measured === 0 && comparison.missing.length > 0) {
+    io.err(
+      `eval: --ci measured no document while the baseline holds ` +
+        `${comparison.missing.length} document(s): nothing was checked\n`,
+    );
+    return EXIT_ERROR;
+  }
+
+  for (const gap of comparison.missing) {
+    io.warn(
+      gap.metric === null
+        ? `${gap.id} is in the baseline but was not measured in this run`
+        : `${gap.id} has no ${gap.metric} in this run (baseline entry kept)`,
+    );
+  }
+  for (const gap of comparison.added) {
+    io.warn(
+      gap.metric === null
+        ? `${gap.id} is not in the baseline - run \`pnpm eval --update-baseline\``
+        : `${gap.id} ${gap.metric} is not in the baseline - run \`pnpm eval --update-baseline\``,
+    );
+  }
+
+  if (!io.ci || comparison.regressions.length === 0) return EXIT_OK;
+
+  for (const regression of comparison.regressions) {
+    io.err(
+      `eval: regression: ${regression.id} ${regression.metric} ` +
+        `${formatCer(regression.baseline)} -> ${formatCer(regression.current)} ` +
+        `(worse by ${formatCer(regression.worsening)}, tolerance ${formatCer(comparison.tolerance)})\n`,
+    );
+  }
+  io.err(
+    `eval: ${comparison.regressions.length} metric(s) worse than the baseline ` +
+      `(tolerance ${formatCer(comparison.tolerance)}): fix the regression or, if the ` +
+      `trade-off is deliberate, record it in DECISIONS.md and run ` +
+      `\`pnpm eval --update-baseline\`\n`,
+  );
+  return EXIT_ERROR;
+}
+
+function formatSigned(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(4)}`;
+}
+
+function renderDiff(comparison: BaselineComparison): string {
+  const rows: string[][] = comparison.changes.map((change) => [
+    change.id,
+    change.metric,
+    formatCer(change.baseline),
+    formatCer(change.current),
+    formatSigned(change.delta),
+    change.status,
+  ]);
+  for (const gap of comparison.added) {
+    rows.push([gap.id, gap.metric ?? "all", "-", "-", "-", "new"]);
+  }
+  for (const gap of comparison.missing) {
+    rows.push([gap.id, gap.metric ?? "all", formatCer(null), "-", "-", "missing"]);
+  }
+  const table = renderTable(
+    [
+      { name: "document", align: "left" },
+      { name: "metric", align: "left" },
+      { name: "baseline", align: "right" },
+      { name: "current", align: "right" },
+      { name: "delta", align: "right" },
+      { name: "status", align: "left" },
+    ],
+    rows,
+  );
+  return `Baseline diff against ${BASELINE_RELATIVE_PATH} (tolerance ${formatCer(comparison.tolerance)})\n\n${table}\n`;
 }
 
 function summarizeLevels(documents: DocumentResult[]): LevelSummary[] {
@@ -453,17 +644,36 @@ function renderReport(
   return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}\n`;
 }
 
-/** CLI entry: `--help` and usage errors live here, the work in `runEval`. */
+/** CLI entry: `--help`, the baseline flags and usage errors live here. */
 export async function runEvalCli(argv: readonly string[], io: EvalIo): Promise<number> {
+  let updateBaseline = false;
+  let ci = false;
+  let diff = false;
   for (const arg of argv) {
     if (arg === "-h" || arg === "--help" || arg === "help") {
       io.out(HELP);
       return EXIT_OK;
     }
+    if (arg === "--update-baseline") {
+      updateBaseline = true;
+      continue;
+    }
+    if (arg === "--ci") {
+      ci = true;
+      continue;
+    }
+    if (arg === "--diff") {
+      diff = true;
+      continue;
+    }
     io.err(`eval: unknown option: ${arg}\n\n${HELP}`);
     return EXIT_USAGE;
   }
-  const result = await runEval({ out: io.out, err: io.err });
+  if (updateBaseline && (ci || diff)) {
+    io.err(`eval: --update-baseline cannot be combined with --ci or --diff\n\n${HELP}`);
+    return EXIT_USAGE;
+  }
+  const result = await runEval({ out: io.out, err: io.err, updateBaseline, ci, diff });
   return result.code;
 }
 

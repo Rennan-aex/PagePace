@@ -36,6 +36,16 @@
 - Piorar de propósito (trade-off) exige entrada em `DECISIONS.md` explicando o ganho que compensa.
 - O corpus privado também é medido localmente com as mesmas regras (sem commitar resultados detalhados).
 
+## Flags do runner (E1-T08, ADR-038)
+| Flag | O que faz | Sai com |
+|---|---|---|
+| `pnpm eval` | mede e imprime a tabela | 0 (1 se algum documento falhou) |
+| `pnpm eval --diff` | tabela ao lado do baseline (documento, métrica, antes, depois, delta, status) — informativa | 0 |
+| `pnpm eval --ci` | o **gate**: qualquer métrica pior além de 0,002 = falha | **1** |
+| `pnpm eval --update-baseline` | regrava o baseline com este run (recusa se houve erro ou nada medido) | 0 / 1 |
+
+`--update-baseline` não combina com `--ci`/`--diff` (exit 2). Documento do baseline que não foi medido (ex.: corpus privado ausente no CI) e documento medido fora do baseline são **avisos**, não falhas. O CI roda `pnpm eval --ci` na etapa `Corpus evaluation` sempre que `packages/eval/baseline.json` existir.
+
 ## Relatórios
 `pnpm eval` imprime tabela por nível e por documento e grava `packages/eval/out/report.json` (ignorado). `pnpm eval --diff` mostra o que mudou contra o baseline.
 
@@ -44,8 +54,8 @@
 - **Junção provisória dos itens:** `hasEOL` → quebra de linha; distância horizontal > 0,15 em → espaço; encostado → nada. **Provisória até a E2-T03.**
 - **Cobertura:** `coverage.pages` (1-based) recorta a extração **e** o gabarito; sem cobertura, o documento inteiro entra na medição.
 - **Só mede quem tem golden:** `golden: none` sai na tabela como `no golden`. Desde a **E1-T07 (2026-10-06)** o corpus tem **5 de 24** documentos com gabarito (os 5 sintéticos `syn-*`), todos medindo **`text_cer = 0.0000`** — os primeiros gabaritos dos PDFs reais chegam com as fases E2+.
-- **Códigos de saída:** 0 = sucesso (mesmo sem nada medido, com aviso) · 1 = algum documento falhou (PDF/golden ausente, SHA divergente, PDF escaneado, JSON inválido) · 2 = opção desconhecida.
-- **Ainda não existem** `--diff`, `--ci` e `--update-baseline` (chegam com a E1-T08, junto do `baseline.json`).
+- **Códigos de saída:** 0 = sucesso (mesmo sem nada medido, com aviso) · 1 = algum documento falhou (PDF/golden ausente, SHA divergente, PDF escaneado, JSON inválido) **ou uma métrica piorou além da tolerância (`--ci`)** · 2 = opção desconhecida.
+- **Flags de baseline (`--diff`, `--ci`, `--update-baseline`)** existem desde a **E1-T08 (2026-10-06)** — ver a seção "Flags do runner" acima.
 
 ## Golden e corpus sintético (E1-T07, ADR-013/036/037)
 - **Formato:** `*.golden.json` com `schemaVersion` = versão do **formato do golden** (`GOLDEN_FORMAT_VERSION`, hoje `1.0.0`), `source` fechado, `blocks` com `kind` do `@pagepace/schema` e runs `bold`/`italic` (gabarito do `style_f1`). Validação em `@pagepace/eval` (`parseGolden`).

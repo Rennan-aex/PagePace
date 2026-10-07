@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "tolerance": 0.002,
+  "documents": {
+    "syn-n1-en-paragraphs": {
+      "text_cer": 0
+    },
+    "syn-n1-pt-acentos": {
+      "text_cer": 0
+    },
+    "syn-n2-en-columns": {
+      "text_cer": 0
+    },
+    "syn-n2-pt-estilos": {
+      "text_cer": 0
+    },
+    "syn-n3-en-footnotes": {
+      "text_cer": 0
+    }
+  }
+}

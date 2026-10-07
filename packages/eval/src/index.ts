@@ -1,7 +1,27 @@
 // @pagepace/eval - evaluation runner: corpus manifests (E1-T05, ADR-031),
-// `text_cer` metric and the `pnpm eval` runner (E1-T06, ADR-035). The
-// baseline/gate flags arrive with the roadmap phases (docs/extractor/ROADMAP.md).
+// `text_cer` metric and the `pnpm eval` runner (E1-T06, ADR-035), plus the
+// baseline and the CI regression gate (E1-T08, ADR-008).
 export const PACKAGE_NAME = "@pagepace/eval";
+
+export {
+  BASELINE_FORMAT_VERSION,
+  BASELINE_RELATIVE_PATH,
+  BASELINE_TOLERANCE,
+  type Baseline,
+  type BaselineChange,
+  type BaselineComparison,
+  type BaselineDocuments,
+  BaselineError,
+  type BaselineGap,
+  baselinePath,
+  compareBaseline,
+  METRIC_DIRECTIONS,
+  type MetricDirection,
+  parseBaseline,
+  readBaseline,
+  serializeBaseline,
+  writeBaseline,
+} from "./baseline";
 
 export {
   type CorpusEntry,
