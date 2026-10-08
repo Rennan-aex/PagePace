@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { ingestPdfjs, SCANNED_PDF_MESSAGE, ScannedPdfError } from "@pagepace/extractor";
+import {
+  documentStats,
+  ingestPdfjs,
+  SCANNED_PDF_MESSAGE,
+  ScannedPdfError,
+  StatsError,
+} from "@pagepace/extractor";
 
 export const PACKAGE_NAME = "@pagepace/cli";
 
@@ -14,18 +20,24 @@ export interface CliIo {
   err: (text: string) => void;
 }
 
+type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
+
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
+  pnpm pagepace inspect <arquivo.pdf>
   pnpm pagepace --help`;
 
 export const HELP = `pagepace — extrator de PDF do PagePace
 
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
+  pnpm pagepace inspect <arquivo.pdf>
   pnpm pagepace --help
 
 Comandos:
   dump-raw <arquivo.pdf>   Lê o PDF e escreve o RawDocument (JSON) no console
+  inspect <arquivo.pdf>    Mostra as estatísticas do documento (corpo, entrelinha,
+                           margens e largura de coluna)
 
 Opções:
   --pages 1-5              Só as páginas de 1 a 5 (1-based, inclusivo)
@@ -79,6 +91,31 @@ function describeIngestError(file: string, error: unknown): string {
   return `Falha ao ler ${file}: ${messageOf(error)}\n`;
 }
 
+type LoadResult = { document: RawDocument } | { error: string; code: number };
+
+async function loadDocument(file: string, pageRange?: PageRange): Promise<LoadResult> {
+  let bytes: Uint8Array;
+  try {
+    // pdf.js rejects a Node `Buffer` even though it extends `Uint8Array`.
+    bytes = new Uint8Array(await readFile(file));
+  } catch (error) {
+    return { error: describeReadError(file, error), code: EXIT_ERROR };
+  }
+
+  try {
+    const document = await ingestPdfjs(bytes, { fileName: basename(file), pageRange });
+    return { document };
+  } catch (error) {
+    if (error instanceof ScannedPdfError) {
+      return { error: `${SCANNED_PDF_MESSAGE}\n`, code: EXIT_SCANNED };
+    }
+    if (error instanceof RangeError) {
+      return { error: `Faixa de páginas inválida: ${messageOf(error)}\n`, code: EXIT_USAGE };
+    }
+    return { error: describeIngestError(file, error), code: EXIT_ERROR };
+  }
+}
+
 async function dumpRaw(args: readonly string[], io: CliIo): Promise<number> {
   let file: string | undefined;
   let pageRange: PageRange | undefined;
@@ -119,30 +156,73 @@ async function dumpRaw(args: readonly string[], io: CliIo): Promise<number> {
     return EXIT_USAGE;
   }
 
-  let bytes: Uint8Array;
-  try {
-    // pdf.js rejects a Node `Buffer` even though it extends `Uint8Array`.
-    bytes = new Uint8Array(await readFile(file));
-  } catch (error) {
-    io.err(describeReadError(file, error));
-    return EXIT_ERROR;
+  const loaded = await loadDocument(file, pageRange);
+  if ("error" in loaded) {
+    io.err(loaded.error);
+    return loaded.code;
+  }
+  io.out(`${JSON.stringify(loaded.document, null, 2)}\n`);
+  return EXIT_OK;
+}
+
+function formatStats(
+  file: string,
+  document: RawDocument,
+  stats: ReturnType<typeof documentStats>,
+): string {
+  const pt = (value: number): string => `${value.toFixed(2)} pt`;
+  const { margins } = stats;
+  return [
+    `Arquivo: ${file}`,
+    `Páginas medidas: ${stats.pagesMeasured} de ${document.source.pageCount}`,
+    `Itens de texto: ${stats.itemsMeasured}`,
+    `Corpo (moda ponderada): ${pt(stats.bodyFontSize)}`,
+    `Entrelinha típica: ${pt(stats.lineHeight)}`,
+    `Margens: topo ${pt(margins.top)} · direita ${pt(margins.right)} · base ${pt(margins.bottom)} · esquerda ${pt(margins.left)}`,
+    `Largura de coluna: ${pt(stats.columnWidth)}`,
+    "",
+  ].join("\n");
+}
+
+async function inspect(args: readonly string[], io: CliIo): Promise<number> {
+  let file: string | undefined;
+
+  for (const arg of args) {
+    if (arg === "-h" || arg === "--help") {
+      io.out(HELP);
+      return EXIT_OK;
+    }
+    if (arg.startsWith("-")) {
+      io.err(`Opção desconhecida: ${arg}\n\n${USAGE}\n`);
+      return EXIT_USAGE;
+    }
+    if (file !== undefined) {
+      io.err(`Só é possível ler um arquivo por vez: ${file} e ${arg}\n`);
+      return EXIT_USAGE;
+    }
+    file = arg;
+  }
+
+  if (file === undefined) {
+    io.err(`Falta o arquivo PDF.\n\n${USAGE}\n`);
+    return EXIT_USAGE;
+  }
+
+  const loaded = await loadDocument(file);
+  if ("error" in loaded) {
+    io.err(loaded.error);
+    return loaded.code;
   }
 
   try {
-    const document = await ingestPdfjs(bytes, { fileName: basename(file), pageRange });
-    io.out(`${JSON.stringify(document, null, 2)}\n`);
+    io.out(formatStats(file, loaded.document, documentStats(loaded.document)));
     return EXIT_OK;
   } catch (error) {
-    if (error instanceof ScannedPdfError) {
-      io.err(`${SCANNED_PDF_MESSAGE}\n`);
-      return EXIT_SCANNED;
+    if (error instanceof StatsError) {
+      io.err(`Não foi possível medir o documento ${file}: ${error.message}\n`);
+      return EXIT_ERROR;
     }
-    if (error instanceof RangeError) {
-      io.err(`Faixa de páginas inválida: ${messageOf(error)}\n`);
-      return EXIT_USAGE;
-    }
-    io.err(describeIngestError(file, error));
-    return EXIT_ERROR;
+    throw error;
   }
 }
 
@@ -163,6 +243,7 @@ export async function run(argv: readonly string[], io: CliIo): Promise<number> {
     return EXIT_OK;
   }
   if (command === "dump-raw") return dumpRaw(args, io);
+  if (command === "inspect") return inspect(args, io);
   io.err(`Comando desconhecido: ${command}\n\n${USAGE}\n`);
   return EXIT_USAGE;
 }

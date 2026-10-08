@@ -100,8 +100,8 @@ Dois detectores, dois estados distintos (decisão do PO, 2026-10-04):
   - **(5) CI:** a etapa `Corpus evaluation` do `ci.yml` **já existia** condicionada a `hashFiles('packages/eval/baseline.json') != ''` (ADR-032) — com o baseline versionado ela passa a rodar de verdade (`pnpm corpus:fetch` + `pnpm eval --ci`, com `GITHUB_TOKEN`); só o comentário foi atualizado. **Pendência:** confirmar na 1ª execução do CI (o passo só roda no PR).
 
 ## Checklist manual do PO
-- [ ] `pnpm corpus:fetch` em máquina limpa reproduz o corpus.
-- [ ] Vi o primeiro relatório de métricas e entendi as colunas.
+- [x] `pnpm corpus:fetch` em máquina limpa reproduz o corpus. — respondido pelo PO (2026-10-07); conferido pela IA: `9 public (0 downloaded, 0 generated, 9 reused) + 15 private entries merged`, exit 0.
+- [x] Vi o primeiro relatório de métricas e entendi as colunas. — respondido pelo PO (2026-10-07); conferido pela IA: `pnpm eval --ci` com 24 documentos, 5 medidos, `text_cer = 0.0000`, exit 0.
 
 ## Riscos
 Esquema 1.0 mal fechado causa migrações cedo: manter campos opcionais para o que ainda é incerto.

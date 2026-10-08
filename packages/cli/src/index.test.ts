@@ -172,3 +172,55 @@ describe("dump-raw", () => {
     expect(document.source.ocrTextLayer).toBe(true);
   });
 });
+
+describe("inspect", () => {
+  it("prints body size, line height, margins and column width", async () => {
+    const file = await writePdf(
+      "lines.pdf",
+      buildPdf([
+        [
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+          textStream("line three", { x: 72, y: 360, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const streams = capture();
+    const code = await run(["inspect", file], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).toBe("");
+    expect(streams.out()).toContain("Páginas medidas: 1 de 1");
+    expect(streams.out()).toContain("Itens de texto: 3");
+    expect(streams.out()).toContain("Corpo (moda ponderada): 12.00 pt");
+    expect(streams.out()).toContain("Entrelinha típica: 20.00 pt");
+    expect(streams.out()).toContain("esquerda 72.00 pt");
+    expect(streams.out()).toContain("Largura de coluna:");
+  });
+
+  it("reports usage and read errors without printing statistics", async () => {
+    const missing = capture();
+    expect(await run(["inspect"], missing.io)).toBe(EXIT_USAGE);
+    expect(missing.err()).toContain("Falta o arquivo PDF.");
+
+    const unknown = capture();
+    expect(await run(["inspect", "a.pdf", "--force"], unknown.io)).toBe(EXIT_USAGE);
+    expect(unknown.err()).toContain("Opção desconhecida: --force");
+
+    const absent = capture();
+    expect(await run(["inspect", path.join(dir, "nope.pdf")], absent.io)).toBe(EXIT_ERROR);
+    expect(absent.err()).toContain("Arquivo não encontrado:");
+    expect(absent.out()).toBe("");
+  });
+
+  it("reports a scanned PDF with the ADR-018 message", async () => {
+    const file = await writePdf("scan-inspect.pdf", buildPdf([""]));
+    const streams = capture();
+    const code = await run(["inspect", file], streams.io);
+
+    expect(code).toBe(EXIT_SCANNED);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+  });
+});

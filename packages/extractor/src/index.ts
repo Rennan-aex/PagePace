@@ -11,4 +11,12 @@ export {
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
 } from "./ingest/text-layer";
+export type { DocumentMargins, DocumentStats } from "./stats";
+export {
+  documentStats,
+  LINE_HEIGHT_FALLBACK_FACTOR,
+  LINE_HEIGHT_MAX_FACTOR,
+  LINE_HEIGHT_MIN_FACTOR,
+  StatsError,
+} from "./stats";
 export const PACKAGE_NAME = "@pagepace/extractor";
