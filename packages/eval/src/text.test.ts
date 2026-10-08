@@ -1,6 +1,7 @@
+import { SPACE_GAP_FACTOR } from "@pagepace/extractor";
 import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
-import { documentText, pageText, SPACE_GAP_EM } from "./text";
+import { documentText, pageText } from "./text";
 
 const item = (text: string, x: number, options: Partial<RawTextItem> = {}): RawTextItem => ({
   text,
@@ -44,17 +45,23 @@ describe("pageText", () => {
     expect(pageText(page([first, second]))).toBe("philosophy");
   });
 
-  it("separates runs whose horizontal gap is above SPACE_GAP_EM", () => {
+  it("separates runs whose horizontal gap is above SPACE_GAP_FACTOR", () => {
     const first = item("Hello", 72);
-    const second = item("world", 97); // gap 5 > 0.15 * 10
+    const second = item("world", 97); // gap 5 = 0.5 em
     expect(pageText(page([first, second]))).toBe("Hello world");
-    expect(SPACE_GAP_EM).toBe(0.15);
+    expect(SPACE_GAP_FACTOR).toBe(0.12);
   });
 
   it("does not separate at exactly the threshold", () => {
-    const first = item("Hello", 72);
-    const second = item("world", 93.5); // gap 1.5 = 0.15 * 10 → not above
+    const first = item("Hello", 72, { fontSize: 100 }); // ends at 92
+    const second = item("world", 104, { fontSize: 100 }); // gap 12 = 0.12 * 100 → not above
     expect(pageText(page([first, second]))).toBe("Helloworld");
+  });
+
+  it("never doubles a space the run already carries", () => {
+    const first = item("word ", 72, { width: 40 }); // ends at 112, text ends with a space
+    const second = item("next", 132); // gap 20 → a separator if the text had none
+    expect(pageText(page([first, second]))).toBe("word next");
   });
 
   it("breaks the line where pdf.js reports hasEOL", () => {

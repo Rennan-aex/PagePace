@@ -82,4 +82,4 @@ export {
   SyntheticSpecError,
 } from "./synthetic";
 
-export { documentText, pageText, SPACE_GAP_EM } from "./text";
+export { documentText, pageText } from "./text";
