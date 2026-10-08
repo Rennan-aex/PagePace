@@ -38,4 +38,5 @@ description: Use para criar gabaritos (golden) e testes golden do extrator, seja
 ## Regras
 - Golden de PDF com copyright **nunca** vai ao git.
 - Textos de exemplo em testes/commits/PRs: trechos mínimos de domínio público ou sintéticos.
+- **`\n` dentro de uma run = fim de linha visual** (layout da página, ADR-039): é o que o teste de aceite da E2-T02 conta (`goldenLinesPerPage`, ±2% por página em N1). Grave só quando souber o layout — o gerador sintético sempre grava; um golden sem nenhuma quebra de linha é **pulado** por esse teste (não é erro, só não responde à pergunta). Nunca comece nem termine uma run com `\n`.
 - Todo golden precisa passar pela validação do formato (`parseGolden` do `@pagepace/eval`) **e** do esquema quando o bloco virar `Book.blocks` (`@pagepace/schema`).

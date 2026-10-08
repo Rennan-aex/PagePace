@@ -11,6 +11,13 @@ export {
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
 } from "./ingest/text-layer";
+export type { TextLine } from "./lines";
+export {
+  documentLines,
+  groupLines,
+  LINE_BASELINE_TOLERANCE_FACTOR,
+  LINE_OVERLAP_MIN_FACTOR,
+} from "./lines";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {
   documentStats,

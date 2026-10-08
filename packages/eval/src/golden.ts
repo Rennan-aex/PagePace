@@ -249,6 +249,35 @@ export function goldenText(golden: Golden): string {
 }
 
 /**
+ * Visual lines the golden declares for each 1-based page, or `null` when the
+ * golden cannot answer a line-count question (E2-T02, ADR-039).
+ *
+ * A run carries the layout line breaks (`\n`) only when its author annotated
+ * them — the synthetic generator always does (ADR-013), hand-annotated
+ * goldens may not. So: no run breaking the line anywhere = the golden does
+ * not record the layout, and a block without `origin`, or spanning more than
+ * one page, cannot be attributed to a page. A block counts as
+ * `1 + line breaks` (a block with no break is a one-line block); runs never
+ * start or end with a break.
+ */
+export function goldenLinesPerPage(golden: Golden): Map<number, number> | null {
+  const perPage = new Map<number, number>();
+  let recordsLayout = false;
+  for (const block of golden.blocks) {
+    let lines = 1;
+    for (const run of block.runs) {
+      const breaks = run.text.split("\n").length - 1;
+      if (breaks > 0) recordsLayout = true;
+      lines += breaks;
+    }
+    if (block.origin === null || block.origin.pageFrom !== block.origin.pageTo) return null;
+    const page = block.origin.pageFrom;
+    perPage.set(page, (perPage.get(page) ?? 0) + lines);
+  }
+  return recordsLayout ? perPage : null;
+}
+
+/**
  * Canonical serialisation of a golden: 2-space indent, LF, trailing newline
  * and `coverage` omitted (not `null`) when the golden covers the whole
  * document — `parseGolden(serializeGolden(g)) === g`.

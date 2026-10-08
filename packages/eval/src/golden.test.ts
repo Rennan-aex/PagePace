@@ -5,6 +5,7 @@ import {
   GOLDEN_KINDS,
   GOLDEN_SOURCES,
   GoldenError,
+  goldenLinesPerPage,
   goldenText,
   hasGolden,
   parseGolden,
@@ -172,6 +173,69 @@ describe("parseGolden", () => {
 describe("goldenText", () => {
   it("joins runs inside a block and blocks with a line break", () => {
     expect(goldenText(parse(VALID))).toBe("First block.\nSecond block.");
+  });
+});
+
+describe("goldenLinesPerPage", () => {
+  const withLayout = (blocks: unknown[]) => parse({ ...VALID, blocks });
+
+  it("adds the line breaks of every block on its page", () => {
+    const perPage = goldenLinesPerPage(
+      withLayout([
+        {
+          kind: "paragraph",
+          runs: [{ text: "one\ntwo\nthree" }],
+          origin: { pageFrom: 1, pageTo: 1 },
+        },
+        { kind: "paragraph", runs: [{ text: "four\nfive" }], origin: { pageFrom: 1, pageTo: 1 } },
+        { kind: "heading", level: 2, runs: [{ text: "six" }], origin: { pageFrom: 2, pageTo: 2 } },
+      ]),
+    );
+    expect(perPage).toEqual(
+      new Map([
+        [1, 5],
+        [2, 1],
+      ]),
+    );
+  });
+
+  it("counts a break that sits in any run of the block", () => {
+    const perPage = goldenLinesPerPage(
+      withLayout([
+        {
+          kind: "paragraph",
+          runs: [{ text: "plain " }, { text: "bold\ncut", bold: true }],
+          origin: { pageFrom: 1, pageTo: 1 },
+        },
+        { kind: "heading", level: 1, runs: [{ text: "Head" }], origin: { pageFrom: 2, pageTo: 2 } },
+      ]),
+    );
+    expect(perPage?.get(1)).toBe(2);
+    expect(perPage?.get(2)).toBe(1);
+  });
+
+  it("returns null when no run records a line break", () => {
+    expect(goldenLinesPerPage(parse(VALID))).toBeNull();
+  });
+
+  it("returns null for a block without origin", () => {
+    const { coverage: _coverage, ...withoutCoverage } = VALID;
+    const golden = parse({
+      ...withoutCoverage,
+      blocks: [
+        { kind: "paragraph", runs: [{ text: "one\ntwo" }], origin: { pageFrom: 1, pageTo: 1 } },
+        { kind: "paragraph", runs: [{ text: "no origin\nhere" }] },
+      ],
+    });
+    expect(goldenLinesPerPage(golden)).toBeNull();
+  });
+
+  it("returns null for a block spanning more than one page", () => {
+    const golden = withLayout([
+      { kind: "paragraph", runs: [{ text: "one\ntwo" }], origin: { pageFrom: 1, pageTo: 1 } },
+      { kind: "paragraph", runs: [{ text: "spans\npages" }], origin: { pageFrom: 1, pageTo: 2 } },
+    ]);
+    expect(goldenLinesPerPage(golden)).toBeNull();
   });
 });
 

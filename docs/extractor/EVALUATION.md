@@ -62,6 +62,11 @@
 - **Gerador:** `pnpm corpus:synthetic` deriva **PDF + golden** da mesma especificação (`packages/eval/src/specs.ts`) — determinístico, sem dependência nova. O `pnpm corpus:fetch` gera o PDF sintético que faltar e confere o SHA-256.
 - **5 sintéticos** (`syn-*`) cobrem N1 pt/en (parágrafos, acentos), N2 pt/en (duas colunas, negrito/itálico) e N3 en (notas de rodapé, golden parcial `coverage.pages: [2]`). Eles são **cassos controlados** (heurística nova deve dar 0 neles) e **não contam na cobertura por nível do `CORPUS.md`** — a cobertura continua sendo dos PDFs reais.
 
+## Contagem de linhas por página (E2-T02, ADR-039)
+- **Aceite da E2-T02:** em N1, o número de linhas por página deve ficar dentro de **±2% do gabarito**, conferido pelo teste `packages/eval/src/lines.test.ts` (não é métrica: não entra no `baseline.json` nem muda o `text_cer`).
+- **O golden só responde quando registra o layout:** `\n` dentro de uma run = fim de linha visual (`goldenLinesPerPage` em `golden.ts`). Os 5 sintéticos registram; um golden sem nenhuma quebra é **pulado com motivo visível**, nunca adivinhado — e um teste guardião falha se nenhum documento N1 puder ser conferido.
+- **Prova na sessão:** `syn-n1-en-paragraphs` 12/13 e `syn-n1-pt-acentos` 12/14 linhas nas p. 1/2 → desvio **0,00%** (limite ±2%). Em N1 reais (sem golden) a contagem foi comparada só como **evidência**, contra a referência `hasEOL+1` do pdf.js: 0,000% em `n1-en-sofia`/`n1-en-curinga`/`n1-pt-curinga`, +0,006% em `n1-pt-sofia`, −0,170% em `n1-en-rebus` — nas páginas divergentes a referência é que erra (sumário e número de página).
+
 ## Testes golden de página
 Para depurar, além do corpus: pares `fixture de itens brutos (JSON) → blocos esperados (JSON)` por camada, em `packages/extractor/test/fixtures/`. Eles não contêm texto com copyright (texto sintético ou domínio público).
 

@@ -63,6 +63,7 @@ export {
   GoldenError,
   type GoldenOrigin,
   type GoldenRun,
+  goldenLinesPerPage,
   goldenText,
   hasGolden,
   parseGolden,
