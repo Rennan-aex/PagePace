@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { SCANNED_PDF_MESSAGE } from "@pagepace/extractor";
+import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
 import { EXIT_ERROR, EXIT_OK, EXIT_SCANNED, EXIT_USAGE, HELP, run } from "./index";
@@ -58,6 +59,7 @@ describe("help and usage", () => {
     expect(code).toBe(EXIT_OK);
     expect(streams.out()).toBe(HELP);
     expect(streams.out()).toContain("dump-raw");
+    expect(streams.out()).toContain("extract");
     expect(streams.err()).toBe("");
   });
 
@@ -218,6 +220,81 @@ describe("inspect", () => {
     const file = await writePdf("scan-inspect.pdf", buildPdf([""]));
     const streams = capture();
     const code = await run(["inspect", file], streams.io);
+
+    expect(code).toBe(EXIT_SCANNED);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+  });
+});
+
+describe("extract", () => {
+  it("writes a valid Book as JSON", async () => {
+    const file = await writePdf(
+      "extract.pdf",
+      buildPdf([
+        [
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+          textStream("line three", { x: 72, y: 360, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const streams = capture();
+    const code = await run(["extract", file], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).toBe("");
+    const book = parseBook(JSON.parse(streams.out()));
+    expect(book.schemaVersion).toBe("1.1.0");
+    expect(book.source).toEqual({ fileName: "extract.pdf", pageCount: 1 });
+    expect(book.blocks.length).toBeGreaterThan(0);
+    expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);
+    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(book.blocks[0]?.runs[0]?.text).toBe("line one line two line three");
+  });
+
+  it("is deterministic: two runs produce the same ids and the same JSON", async () => {
+    const file = await writePdf(
+      "stable.pdf",
+      buildPdf([
+        [
+          textStream("stable block", { x: 72, y: 400, size: 12 }),
+          textStream("second line", { x: 72, y: 370, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const first = capture();
+    expect(await run(["extract", file], first.io)).toBe(EXIT_OK);
+    const second = capture();
+    expect(await run(["extract", file], second.io)).toBe(EXIT_OK);
+
+    const one = JSON.parse(first.out()) as { blocks: { id: string }[] };
+    const two = JSON.parse(second.out()) as { blocks: { id: string }[] };
+    expect(two.blocks.map((block) => block.id)).toEqual(one.blocks.map((block) => block.id));
+    expect(second.out()).toBe(first.out());
+  });
+
+  it("reports usage errors without printing a book", async () => {
+    const missing = capture();
+    expect(await run(["extract"], missing.io)).toBe(EXIT_USAGE);
+    expect(missing.err()).toContain("Falta o arquivo PDF.");
+
+    const unknown = capture();
+    expect(await run(["extract", "a.pdf", "--force"], unknown.io)).toBe(EXIT_USAGE);
+    expect(unknown.err()).toContain("Opção desconhecida: --force");
+
+    const absent = capture();
+    expect(await run(["extract", path.join(dir, "nope.pdf")], absent.io)).toBe(EXIT_ERROR);
+    expect(absent.err()).toContain("Arquivo não encontrado:");
+    expect(absent.out()).toBe("");
+  });
+
+  it("reports a scanned PDF with the ADR-018 message and no JSON", async () => {
+    const file = await writePdf("scan-extract.pdf", buildPdf([""]));
+    const streams = capture();
+    const code = await run(["extract", file], streams.io);
 
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");

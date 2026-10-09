@@ -32,6 +32,9 @@ importers:
       '@pagepace/extractor':
         specifier: workspace:*
         version: link:../extractor
+      '@pagepace/schema':
+        specifier: workspace:*
+        version: link:../schema
 
   packages/eval:
     dependencies:

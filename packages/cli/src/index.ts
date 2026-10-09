@@ -1,12 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import {
+  BookError,
+  buildBook,
   documentStats,
   ingestPdfjs,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
   StatsError,
 } from "@pagepace/extractor";
+import { SchemaValidationError } from "@pagepace/schema";
 
 export const PACKAGE_NAME = "@pagepace/cli";
 
@@ -25,6 +28,7 @@ type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
   pnpm pagepace inspect <arquivo.pdf>
+  pnpm pagepace extract <arquivo.pdf>
   pnpm pagepace --help`;
 
 export const HELP = `pagepace — extrator de PDF do PagePace
@@ -32,12 +36,14 @@ export const HELP = `pagepace — extrator de PDF do PagePace
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
   pnpm pagepace inspect <arquivo.pdf>
+  pnpm pagepace extract <arquivo.pdf>
   pnpm pagepace --help
 
 Comandos:
   dump-raw <arquivo.pdf>   Lê o PDF e escreve o RawDocument (JSON) no console
   inspect <arquivo.pdf>    Mostra as estatísticas do documento (corpo, entrelinha,
                            margens e largura de coluna)
+  extract <arquivo.pdf>    Gera o Book (JSON) e escreve no console
 
 Opções:
   --pages 1-5              Só as páginas de 1 a 5 (1-based, inclusivo)
@@ -226,6 +232,48 @@ async function inspect(args: readonly string[], io: CliIo): Promise<number> {
   }
 }
 
+async function extract(args: readonly string[], io: CliIo): Promise<number> {
+  let file: string | undefined;
+
+  for (const arg of args) {
+    if (arg === "-h" || arg === "--help") {
+      io.out(HELP);
+      return EXIT_OK;
+    }
+    if (arg.startsWith("-")) {
+      io.err(`Opção desconhecida: ${arg}\n\n${USAGE}\n`);
+      return EXIT_USAGE;
+    }
+    if (file !== undefined) {
+      io.err(`Só é possível ler um arquivo por vez: ${file} e ${arg}\n`);
+      return EXIT_USAGE;
+    }
+    file = arg;
+  }
+
+  if (file === undefined) {
+    io.err(`Falta o arquivo PDF.\n\n${USAGE}\n`);
+    return EXIT_USAGE;
+  }
+
+  const loaded = await loadDocument(file);
+  if ("error" in loaded) {
+    io.err(loaded.error);
+    return loaded.code;
+  }
+
+  try {
+    io.out(`${JSON.stringify(buildBook(loaded.document), null, 2)}\n`);
+    return EXIT_OK;
+  } catch (error) {
+    if (error instanceof BookError || error instanceof SchemaValidationError) {
+      io.err(`Não foi possível gerar o Book de ${file}: ${messageOf(error)}\n`);
+      return EXIT_ERROR;
+    }
+    throw error;
+  }
+}
+
 /**
  * Runs the CLI and returns the process exit code.
  *
@@ -244,6 +292,7 @@ export async function run(argv: readonly string[], io: CliIo): Promise<number> {
   }
   if (command === "dump-raw") return dumpRaw(args, io);
   if (command === "inspect") return inspect(args, io);
+  if (command === "extract") return extract(args, io);
   io.err(`Comando desconhecido: ${command}\n\n${USAGE}\n`);
   return EXIT_USAGE;
 }

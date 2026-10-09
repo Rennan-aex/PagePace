@@ -1,3 +1,14 @@
+export {
+  BLOCK_ID_HASH_CHARS,
+  BLOCK_ID_HASH_LENGTH,
+  BOOK_BLOCK_CONFIDENCE,
+  BookError,
+  blockId,
+  buildBook,
+  EXTRACTOR_TOOL,
+  EXTRACTOR_VERSION,
+  OCR_TEXT_LAYER_CONFIDENCE,
+} from "./book";
 export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export { ingestPdfjs, PDFJS_DIST_VERSION, stripSubsetPrefix } from "./ingest/pdfjs";
 export { sha256Hex } from "./ingest/sha256";
