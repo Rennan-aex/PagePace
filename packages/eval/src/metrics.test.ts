@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CER_CELLS, normalizeText, textCer } from "./metrics";
+import {
+  MAX_CER_CELLS,
+  normalizeText,
+  PARA_BOUNDARY_WINDOW,
+  paraBoundaryF1,
+  textCer,
+} from "./metrics";
 
 describe("normalizeText", () => {
   it("collapses every whitespace run into one space and trims", () => {
@@ -86,5 +92,99 @@ describe("textCer", () => {
       /coverage\.pages/,
     );
     expect(MAX_CER_CELLS).toBeGreaterThan(0);
+  });
+});
+
+describe("paraBoundaryF1", () => {
+  it("scores 1 when both sides split at the same places", () => {
+    const result = paraBoundaryF1(
+      ["first paragraph", "second one"],
+      ["first paragraph", "second one"],
+    );
+    expect(result).toEqual({
+      f1: 1,
+      precision: 1,
+      recall: 1,
+      truePositives: 1,
+      falseCuts: 0,
+      falseMerges: 0,
+    });
+  });
+
+  it("scores 1 when neither side splits", () => {
+    expect(paraBoundaryF1(["one single block"], ["one single block"]).f1).toBe(1);
+    expect(paraBoundaryF1(["one single block"], ["one single block"]).falseCuts).toBe(0);
+  });
+
+  it("counts a split the golden does not have as a false cut", () => {
+    const result = paraBoundaryF1(["ab", "cd"], ["a", "b", "cd"]);
+    expect(result.truePositives).toBe(1);
+    expect(result.falseCuts).toBe(1);
+    expect(result.falseMerges).toBe(0);
+    expect(result.precision).toBeCloseTo(0.5, 10);
+    expect(result.recall).toBe(1);
+    expect(result.f1).toBeCloseTo(2 / 3, 10);
+  });
+
+  it("counts a golden boundary the extraction skipped as a false merge", () => {
+    const result = paraBoundaryF1(["ab", "cd"], ["abcd"]);
+    expect(result.truePositives).toBe(0);
+    expect(result.falseCuts).toBe(0);
+    expect(result.falseMerges).toBe(1);
+    expect(result.f1).toBe(0);
+  });
+
+  it("places boundaries on normalized text, so spacing never moves them", () => {
+    const result = paraBoundaryF1(
+      ["line one\nline two", "second paragraph"],
+      ["line  one   line two", "second\nparagraph"],
+    );
+    expect(result.f1).toBe(1);
+  });
+
+  it("forgives a boundary shifted by up to PARA_BOUNDARY_WINDOW characters", () => {
+    expect(paraBoundaryF1(["0123456789", "x"], ["0123456789!!", "x"]).f1).toBe(1);
+    const far = paraBoundaryF1(["0123456789", "x"], ["0123456789abcdefghij", "x"]);
+    expect(far.f1).toBe(0);
+    expect(far.falseCuts).toBe(1);
+    expect(far.falseMerges).toBe(1);
+    expect(PARA_BOUNDARY_WINDOW).toBe(5);
+  });
+
+  it("leaves a page break out of the comparison on both sides", () => {
+    // A golden block that runs over the page break has no boundary there,
+    // while the extraction always has one between two pages: skipping only
+    // the extraction side would turn it into a lost golden boundary.
+    const oneSided = paraBoundaryF1(
+      ["page one block", "page two block"],
+      ["page one block", "page two block"],
+      { hypothesisPageBreaks: [1] },
+    );
+    expect(oneSided.falseMerges).toBe(1);
+    expect(oneSided.falseCuts).toBe(0);
+    expect(oneSided.f1).toBe(0);
+
+    const both = paraBoundaryF1(
+      ["page one block", "page two block"],
+      ["page one block", "page two block"],
+      { referencePageBreaks: [1], hypothesisPageBreaks: [1] },
+    );
+    expect(both).toEqual({
+      f1: 1,
+      precision: 1,
+      recall: 1,
+      truePositives: 0,
+      falseCuts: 0,
+      falseMerges: 0,
+    });
+  });
+
+  it("keeps counting the boundaries inside a page", () => {
+    const result = paraBoundaryF1(["first", "second", "third"], ["first", "second", "third"], {
+      referencePageBreaks: [2],
+      hypothesisPageBreaks: [2],
+    });
+    expect(result.truePositives).toBe(1);
+    expect(result.f1).toBe(1);
   });
 });

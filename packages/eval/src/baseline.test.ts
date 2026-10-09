@@ -130,6 +130,25 @@ describe("compareBaseline", () => {
     expect(comparison.changes[0]?.worsening).toBeCloseTo(-0.01, 10);
   });
 
+  it("flags a drop of a higher-is-better metric beyond the tolerance", () => {
+    const comparison = compareBaseline(
+      baselineOf({
+        a: { para_boundary_f1: 1 },
+        b: { para_boundary_f1: 0.99 },
+        c: { para_boundary_f1: 0.9 },
+      }),
+      {
+        a: { para_boundary_f1: 0.995 },
+        b: { para_boundary_f1: 0.989 },
+        c: { para_boundary_f1: 1 },
+      },
+    );
+    expect(comparison.regressions.map((change) => change.id)).toEqual(["a"]);
+    expect(comparison.regressions[0]?.worsening).toBeCloseTo(0.005, 10);
+    expect(comparison.changes.find((change) => change.id === "b")?.status).toBe("ok");
+    expect(comparison.changes.find((change) => change.id === "c")?.status).toBe("better");
+  });
+
   it("reports documents missing from the run and documents missing from the baseline", () => {
     const comparison = compareBaseline(baselineOf({ gone: { text_cer: 0 } }), {
       fresh: { text_cer: 0 },
@@ -155,7 +174,8 @@ describe("compareBaseline", () => {
 });
 
 describe("METRIC_DIRECTIONS", () => {
-  it("defines text_cer as lower-is-better", () => {
+  it("defines the direction of every metric", () => {
     expect(METRIC_DIRECTIONS.text_cer).toBe("lower");
+    expect(METRIC_DIRECTIONS.para_boundary_f1).toBe("higher");
   });
 });

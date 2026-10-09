@@ -18,6 +18,15 @@ export {
   LINE_BASELINE_TOLERANCE_FACTOR,
   LINE_OVERLAP_MIN_FACTOR,
 } from "./lines";
+export {
+  documentParagraphs,
+  groupParagraphs,
+  PARAGRAPH_EXTRA_SPACE_FACTOR,
+  PARAGRAPH_INDENT_FACTOR,
+  PARAGRAPH_JUSTIFIED_MIN_SHARE,
+  PARAGRAPH_MEASURE_TOLERANCE,
+  paragraphText,
+} from "./paragraphs";
 export { itemsText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {

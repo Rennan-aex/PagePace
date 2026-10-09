@@ -3,18 +3,23 @@
   "tolerance": 0.002,
   "documents": {
     "syn-n1-en-paragraphs": {
+      "para_boundary_f1": 1,
       "text_cer": 0
     },
     "syn-n1-pt-acentos": {
+      "para_boundary_f1": 1,
       "text_cer": 0
     },
     "syn-n2-en-columns": {
+      "para_boundary_f1": 0,
       "text_cer": 0
     },
     "syn-n2-pt-estilos": {
+      "para_boundary_f1": 1,
       "text_cer": 0
     },
     "syn-n3-en-footnotes": {
+      "para_boundary_f1": 1,
       "text_cer": 0
     }
   }

@@ -437,7 +437,7 @@ describe("baseline and CI gate", () => {
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
-      documents: { "n1-en-sample": { text_cer: 0 } },
+      documents: { "n1-en-sample": { para_boundary_f1: 1, text_cer: 0 } },
     });
 
     await runEval({

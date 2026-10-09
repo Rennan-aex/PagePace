@@ -9,7 +9,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ingestPdfjs, ScannedPdfError } from "@pagepace/extractor";
+import {
+  documentParagraphs,
+  ingestPdfjs,
+  paragraphText,
+  ScannedPdfError,
+} from "@pagepace/extractor";
 import type { RawDocument } from "@pagepace/schema";
 import {
   BASELINE_FORMAT_VERSION,
@@ -24,7 +29,7 @@ import {
 } from "./baseline";
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
-import { textCer } from "./metrics";
+import { type ParaBoundaryResult, paraBoundaryF1, textCer } from "./metrics";
 import { documentText } from "./text";
 
 export const EXIT_OK = 0;
@@ -38,10 +43,13 @@ export const HELP = `Usage:
   pnpm eval --update-baseline
   pnpm eval --help
 
-Runs the extraction pipeline over the corpus and measures text_cer (character
-error rate) for every document that declares a golden in its manifest entry
-(goldens live in corpus/golden/ and, for private documents, in
-$CORPUS_PRIVATE_DIR/golden/).
+Runs the extraction pipeline over the corpus and measures two metrics for
+every document that declares a golden in its manifest entry (goldens live in
+corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
+
+  text_cer          character error rate (the extracted text vs the golden)
+  para_boundary_f1  F1 of the paragraph boundaries (E2-T04), with the false
+                    cuts and false merges reported per document
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -100,6 +108,8 @@ export interface DocumentResult {
   edits: number | null;
   refChars: number | null;
   hypChars: number | null;
+  /** Paragraph boundary F1 of the extraction (E2-T04), `null` when not measured. */
+  boundaries: ParaBoundaryResult | null;
   error: string | null;
 }
 
@@ -141,6 +151,10 @@ function formatCer(value: number | null): string {
 
 function formatNumber(value: number | null): string {
   return value === null ? "-" : String(value);
+}
+
+function formatBoundary(value: ParaBoundaryResult | null): string {
+  return value === null ? "-" : value.f1.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -232,8 +246,60 @@ async function measure(
     edits: result.edits,
     refChars: result.refChars,
     hypChars: result.hypChars,
+    boundaries: paragraphBoundaries(golden, document, coverage),
     error: null,
   };
+}
+
+/**
+ * `para_boundary_f1` of one document (E2-T04): the golden blocks against the
+ * paragraphs the extractor builds, with page breaks left out of both sides.
+ * The acceptance test calls the very function the runner measures with.
+ */
+export function paragraphBoundaries(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): ParaBoundaryResult {
+  const reference = referenceParagraphs(golden);
+  const hypothesis = extractedParagraphs(document, coverage);
+  return paraBoundaryF1(reference.texts, hypothesis.texts, {
+    referencePageBreaks: reference.pageBreaks,
+    hypothesisPageBreaks: hypothesis.pageBreaks,
+  });
+}
+
+interface ParagraphSegments {
+  /** One string per paragraph, in reading order. */
+  texts: string[];
+  /** Indexes whose preceding boundary is a page break (out of the metric). */
+  pageBreaks: number[];
+}
+
+/** Golden blocks, one string per block: the paragraph boundaries to look for. */
+function referenceParagraphs(golden: Golden): ParagraphSegments {
+  const texts = golden.blocks.map((block) => block.runs.map((run) => run.text).join(""));
+  const pageBreaks: number[] = [];
+  golden.blocks.forEach((block, index) => {
+    const previous = golden.blocks[index - 1];
+    if (index === 0 || previous === undefined || block.origin === null) return;
+    if (previous.origin !== null && block.origin.pageFrom > previous.origin.pageTo) {
+      pageBreaks.push(index);
+    }
+  });
+  return { texts, pageBreaks };
+}
+
+/** Extracted paragraphs of the covered pages (1-based), one string per paragraph. */
+function extractedParagraphs(document: RawDocument, coverage: number[] | null): ParagraphSegments {
+  const texts: string[] = [];
+  const pageBreaks: number[] = [];
+  documentParagraphs(document).forEach((page, index) => {
+    if (coverage !== null && !coverage.includes(index + 1)) return;
+    if (texts.length > 0) pageBreaks.push(texts.length);
+    for (const paragraph of page) texts.push(paragraphText(paragraph));
+  });
+  return { texts, pageBreaks };
 }
 
 /** Runs the evaluation and returns the exit code plus every per-document result. */
@@ -297,6 +363,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         edits: null,
         refChars: null,
         hypChars: null,
+        boundaries: null,
         error: messageOf(error),
       });
       errors++;
@@ -311,6 +378,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         edits: null,
         refChars: null,
         hypChars: null,
+        boundaries: null,
         error: null,
       });
       continue;
@@ -345,6 +413,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         edits: null,
         refChars: null,
         hypChars: null,
+        boundaries: null,
         error: messageOf(error),
       });
       errors++;
@@ -422,8 +491,9 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
 function metricsOf(documents: DocumentResult[]): BaselineDocuments {
   const metrics: BaselineDocuments = {};
   for (const document of documents) {
-    if (document.status !== "measured" || document.cer === null) continue;
-    metrics[document.id] = { text_cer: document.cer };
+    const boundaries = document.boundaries;
+    if (document.status !== "measured" || document.cer === null || boundaries === null) continue;
+    metrics[document.id] = { para_boundary_f1: boundaries.f1, text_cer: document.cer };
   }
   return metrics;
 }
@@ -448,7 +518,10 @@ async function applyUpdateBaseline(
     documents: metrics,
   };
   await writeBaseline(repoRoot, baseline);
-  io.out(`\nbaseline updated: ${BASELINE_RELATIVE_PATH} (${count} document(s), text_cer)\n`);
+  const names = [...new Set(Object.values(metrics).flatMap((entry) => Object.keys(entry)))].sort();
+  io.out(
+    `\nbaseline updated: ${BASELINE_RELATIVE_PATH} (${count} document(s), ${names.join(", ")})\n`,
+  );
   return EXIT_OK;
 }
 
@@ -601,6 +674,7 @@ function renderReport(
     document.pages === null ? "-" : String(document.pages),
     statusLabel(document),
     formatCer(document.cer),
+    formatBoundary(document.boundaries),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -611,6 +685,7 @@ function renderReport(
       { name: "pages", align: "right" },
       { name: "status", align: "left" },
       { name: "text_cer", align: "right" },
+      { name: "para_boundary_f1", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -641,7 +716,31 @@ function renderReport(
           .map((document) => `  ${document.id}: ${document.error ?? "unknown error"}`)
           .join("\n")}`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}\n`;
+  // The acceptance of E2-T04 asks for the boundary errors by document: how
+  // many paragraphs the extraction cut in the middle of a golden one and how
+  // many golden boundaries it skipped.
+  const boundaryErrors = documents.filter(
+    (document): document is DocumentResult & { boundaries: ParaBoundaryResult } =>
+      document.boundaries !== null &&
+      (document.boundaries.falseCuts > 0 || document.boundaries.falseMerges > 0),
+  );
+  const boundarySection =
+    totals.measured === 0
+      ? ""
+      : `\n\nParagraph boundary errors (false cuts / false merges):\n${
+          boundaryErrors.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : boundaryErrors
+                .map(
+                  (document) =>
+                    `  ${document.id}: ${document.boundaries.falseCuts} false cut(s), ` +
+                    `${document.boundaries.falseMerges} false merge(s) ` +
+                    `(para_boundary_f1 ${document.boundaries.f1.toFixed(4)})`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}\n`;
 }
 
 /** CLI entry: `--help`, the baseline flags and usage errors live here. */

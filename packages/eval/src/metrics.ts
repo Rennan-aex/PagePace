@@ -101,3 +101,120 @@ export function textCer(
   const edits = editDistance(golden, extracted);
   return { cer: edits / refChars, edits, refChars, hypChars };
 }
+
+/**
+ * Two boundaries closer than this many characters count as the same one
+ * (E2-T04). The comparison happens on normalized text, so a correct split
+ * lands exactly on the golden boundary; the window only forgives the handful
+ * of characters a small text error shifts it by.
+ */
+export const PARA_BOUNDARY_WINDOW = 5;
+
+export interface ParaBoundaryResult {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side splits. */
+  f1: number;
+  /** Boundaries found ÷ boundaries the extraction made. */
+  precision: number;
+  /** Boundaries found ÷ boundaries the golden declares. */
+  recall: number;
+  /** Boundaries of the golden the extraction also made (inside the window). */
+  truePositives: number;
+  /** Boundaries the extraction made that the golden does not have (over-splitting). */
+  falseCuts: number;
+  /** Boundaries the golden has that the extraction did not make (under-splitting). */
+  falseMerges: number;
+}
+
+/**
+ * Position of every boundary between segments, measured on the concatenated
+ * normalized text: segment 0 starts at 0, segment `i` starts after the text
+ * of segments 0..i-1. Both sides are measured this way, so a golden split
+ * into 7 blocks and an extraction split into 7 paragraphs are compared on the
+ * same character stream (inter-segment spaces are dropped on both sides).
+ */
+function boundaryOffsets(segments: readonly string[]): number[] {
+  const offsets: number[] = [];
+  let total = 0;
+  segments.forEach((segment, index) => {
+    if (index > 0) offsets.push(total);
+    total += normalizeText(segment).length;
+  });
+  return offsets;
+}
+
+export interface ParaBoundaryOptions {
+  /**
+   * Indexes of the golden blocks that start a new page. The boundary right
+   * before such a block is a page break and is left out of the reference.
+   * Blocks without `origin` are never skipped (nothing is known about them).
+   */
+  referencePageBreaks?: readonly number[];
+  /**
+   * Indexes of the extracted paragraphs that start a new page. The boundary
+   * right before such a paragraph is left out of the extraction too.
+   *
+   * Page breaks are out of scope on **both** sides on purpose: at the foot of
+   * a page there is no spacing signal left to tell a paragraph that continues
+   * from one that ended, so counting those boundaries would only measure a
+   * guess. The join between pages belongs to the block builder (E2-T05) and
+   * gets its own test there (ADR-041).
+   */
+  hypothesisPageBreaks?: readonly number[];
+}
+
+function pageBreakBoundaries(
+  offsets: readonly number[],
+  pageBreaks: readonly number[] | undefined,
+): number[] {
+  if (pageBreaks === undefined) return [...offsets];
+  const skipped = new Set(pageBreaks);
+  return offsets.filter((_, boundary) => !skipped.has(boundary + 1));
+}
+
+/**
+ * F1 of the paragraph boundaries of an extraction against the golden (E2-T04,
+ * `para_boundary_f1`): a boundary is *found* when a golden boundary and an
+ * extracted one sit at most `PARA_BOUNDARY_WINDOW` characters apart. A
+ * boundary the extraction invented is a false cut, a golden boundary it
+ * skipped is a false merge — the two counts are the report of the acceptance.
+ *
+ * Only the boundaries are compared, never the characters: `text_cer` already
+ * owns the text, this metric owns the segmentation. Both sides are normalized
+ * (`normalizeText`), so line breaks, spacing and Unicode form never move a
+ * boundary. Deterministic: same segments, same numbers.
+ */
+export function paraBoundaryF1(
+  reference: readonly string[],
+  hypothesis: readonly string[],
+  options: ParaBoundaryOptions = {},
+): ParaBoundaryResult {
+  const golden = pageBreakBoundaries(boundaryOffsets(reference), options.referencePageBreaks);
+  const extracted = pageBreakBoundaries(boundaryOffsets(hypothesis), options.hypothesisPageBreaks);
+
+  let left = 0;
+  let right = 0;
+  let match = 0;
+  while (left < golden.length && right < extracted.length) {
+    // Both lists are sorted by position: whoever is further behind has no
+    // partner left within the window, so it is counted as an error.
+    const goldenOffset = golden[left] as number;
+    const extractedOffset = extracted[right] as number;
+    const distance = goldenOffset - extractedOffset;
+    if (Math.abs(distance) <= PARA_BOUNDARY_WINDOW) {
+      match++;
+      left++;
+      right++;
+    } else if (distance < 0) {
+      left++;
+    } else {
+      right++;
+    }
+  }
+
+  const falseCuts = extracted.length - match;
+  const falseMerges = golden.length - match;
+  const precision = extracted.length === 0 ? 1 : match / extracted.length;
+  const recall = golden.length === 0 ? 1 : match / golden.length;
+  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  return { f1, precision, recall, truePositives: match, falseCuts, falseMerges };
+}

@@ -50,6 +50,7 @@ export {
   HELP as EVAL_HELP,
   type IngestFn,
   type LevelSummary,
+  paragraphBoundaries,
   runEval,
   runEvalCli,
 } from "./eval";
@@ -71,7 +72,17 @@ export {
   serializeGolden,
 } from "./golden";
 
-export { type CerOptions, type CerResult, MAX_CER_CELLS, normalizeText, textCer } from "./metrics";
+export {
+  type CerOptions,
+  type CerResult,
+  MAX_CER_CELLS,
+  normalizeText,
+  PARA_BOUNDARY_WINDOW,
+  type ParaBoundaryOptions,
+  type ParaBoundaryResult,
+  paraBoundaryF1,
+  textCer,
+} from "./metrics";
 export { SYNTHETIC_SPECS, syntheticSpecOf } from "./specs";
 export {
   buildSynthetic,
