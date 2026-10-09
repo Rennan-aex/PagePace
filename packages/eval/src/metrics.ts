@@ -218,3 +218,64 @@ export function paraBoundaryF1(
   const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return { f1, precision, recall, truePositives: match, falseCuts, falseMerges };
 }
+
+export interface ReadingOrderResult {
+  /** `1 - edits / max(reference, hypothesis)`, 1 when neither side has blocks. */
+  score: number;
+  /** Block edits the alignment needed (substitutions, insertions, deletions). */
+  edits: number;
+  /** Number of golden blocks compared. */
+  referenceBlocks: number;
+  /** Number of extracted blocks compared. */
+  hypothesisBlocks: number;
+}
+
+export interface ReadingOrderOptions {
+  /** Cell ceiling of the edit-distance table. Defaults to `MAX_CER_CELLS`. */
+  maxCells?: number;
+}
+
+/**
+ * Reading order (E2-T06, `reading_order`): how far the sequence of blocks the
+ * extraction delivers is from the sequence the golden declares, as a
+ * normalized edit distance turned into a score where 1 is perfect.
+ *
+ * Every block becomes one token — its normalized text — and the two token
+ * sequences are aligned with the same Levenshtein table `textCer` uses, so a
+ * block moved out of place, a block the extraction invented or a golden block
+ * it skipped all cost one edit each. The score is
+ * `1 - edits / max(reference, hypothesis)`: the normalizer is the longer of
+ * the two sequences, which keeps the result inside `[0, 1]` no matter how
+ * many blocks one side has more than the other.
+ *
+ * Text quality belongs to `text_cer` and segmentation to `para_boundary_f1`;
+ * this metric answers the REQ-EXT-02 question — *in which order would the
+ * reader see the blocks*. Deterministic: same sequences, same number.
+ */
+export function readingOrder(
+  reference: readonly string[],
+  hypothesis: readonly string[],
+  options: ReadingOrderOptions = {},
+): ReadingOrderResult {
+  const golden = reference.map((block) => normalizeText(block));
+  const extracted = hypothesis.map((block) => normalizeText(block));
+  const referenceBlocks = golden.length;
+  const hypothesisBlocks = extracted.length;
+  const span = Math.max(referenceBlocks, hypothesisBlocks);
+
+  if (span === 0) {
+    return { score: 1, edits: 0, referenceBlocks, hypothesisBlocks };
+  }
+
+  const maxCells = options.maxCells ?? MAX_CER_CELLS;
+  if (referenceBlocks * hypothesisBlocks > maxCells) {
+    throw new Error(
+      `readingOrder: comparison too large (${referenceBlocks} x ${hypothesisBlocks} blocks, ` +
+        `limit ${maxCells} cells). Limit the golden with "coverage.pages" ` +
+        `or split it into smaller documents.`,
+    );
+  }
+
+  const edits = editDistance(golden, extracted);
+  return { score: 1 - edits / span, edits, referenceBlocks, hypothesisBlocks };
+}

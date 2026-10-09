@@ -17,6 +17,13 @@ import { documentParagraphs, paragraphText } from "./paragraphs";
  * value for digital text, a reduced one plus the `ocr-text-layer` warning
  * for embedded OCR layers (ADR-019). Runs carry no styles yet — that is E4.
  *
+ * Reading order (E2-T06): blocks come out **page by page and, inside a page,
+ * top to bottom** — the trivial single-column order of REQ-EXT-02. Pages
+ * follow the document order and a page's paragraphs follow their first line,
+ * both already sorted by the layers below; the `reading_order` metric of
+ * `@pagepace/eval` measures the claim against a golden, and this module only
+ * has to keep the order stable. Columns and repeated regions belong to E6.
+ *
  * Known limits: no cross-page join, no hyphen joining, no table of contents
  * or metadata detection, and the single column rule of the paragraph layer.
  */

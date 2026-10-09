@@ -434,10 +434,13 @@ describe("baseline and CI gate", () => {
     expect(result.code).toBe(0);
     expect(logs.out.join("")).toMatch(/baseline updated: packages\/eval\/baseline\.json/);
     const first = await readFile(baselineFile(repoRoot), "utf8");
+    // `reading_order` is 0 here on purpose: the golden is a single block for the
+    // whole 20-page document while the extraction emits one block per page, so the
+    // two sequences never align. This fixture exercises the gate, not the metric.
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
-      documents: { "n1-en-sample": { para_boundary_f1: 1, text_cer: 0 } },
+      documents: { "n1-en-sample": { para_boundary_f1: 1, reading_order: 0, text_cer: 0 } },
     });
 
     await runEval({

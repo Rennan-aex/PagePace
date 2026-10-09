@@ -39,6 +39,7 @@ export {
 } from "./corpus";
 
 export {
+  blockReadingOrder,
   type DocumentResult,
   type DocumentStatus,
   type EvalIo,
@@ -81,6 +82,9 @@ export {
   type ParaBoundaryOptions,
   type ParaBoundaryResult,
   paraBoundaryF1,
+  type ReadingOrderOptions,
+  type ReadingOrderResult,
+  readingOrder,
   textCer,
 } from "./metrics";
 export { SYNTHETIC_SPECS, syntheticSpecOf } from "./specs";

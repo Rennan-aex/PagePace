@@ -98,6 +98,18 @@ describe("buildBook", () => {
     expect(book.blocks.every((block) => block.origin.pageTo === block.origin.pageFrom)).toBe(true);
   });
 
+  it("emits blocks in reading order: page by page, top to bottom, whatever the item order", () => {
+    const first = page([...twoParagraphs.items].reverse(), 0);
+    const second = page([item("Later", MARGIN, 150, BODY), item("Earlier", MARGIN, 100, BODY)], 1);
+    const book = buildBook(doc([first, second]));
+    expect(book.blocks.map((block) => [block.origin.pageFrom, block.runs[0]?.text])).toEqual([
+      [0, "Alpha Beta gamma delta Epsilon"],
+      [0, "Alone"],
+      [1, "Earlier"],
+      [1, "Later"],
+    ]);
+  });
+
   it("gives digital documents the provisional constant confidence", () => {
     const book = buildBook(doc([twoParagraphs]));
     expect(book.blocks.every((block) => block.confidence === BOOK_BLOCK_CONFIDENCE)).toBe(true);

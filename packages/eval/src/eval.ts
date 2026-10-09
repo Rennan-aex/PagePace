@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildBook,
   documentParagraphs,
   ingestPdfjs,
   paragraphText,
@@ -29,7 +30,13 @@ import {
 } from "./baseline";
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
-import { type ParaBoundaryResult, paraBoundaryF1, textCer } from "./metrics";
+import {
+  type ParaBoundaryResult,
+  paraBoundaryF1,
+  type ReadingOrderResult,
+  readingOrder,
+  textCer,
+} from "./metrics";
 import { documentText } from "./text";
 
 export const EXIT_OK = 0;
@@ -50,6 +57,8 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
   text_cer          character error rate (the extracted text vs the golden)
   para_boundary_f1  F1 of the paragraph boundaries (E2-T04), with the false
                     cuts and false merges reported per document
+  reading_order     normalized edit distance between the block order of the
+                    extraction and of the golden (E2-T06), 1 = same order
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -110,6 +119,8 @@ export interface DocumentResult {
   hypChars: number | null;
   /** Paragraph boundary F1 of the extraction (E2-T04), `null` when not measured. */
   boundaries: ParaBoundaryResult | null;
+  /** Reading order score of the block sequence (E2-T06), `null` when not measured. */
+  order: ReadingOrderResult | null;
   error: string | null;
 }
 
@@ -155,6 +166,10 @@ function formatNumber(value: number | null): string {
 
 function formatBoundary(value: ParaBoundaryResult | null): string {
   return value === null ? "-" : value.f1.toFixed(4);
+}
+
+function formatOrder(value: ReadingOrderResult | null): string {
+  return value === null ? "-" : value.score.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -247,6 +262,7 @@ async function measure(
     refChars: result.refChars,
     hypChars: result.hypChars,
     boundaries: paragraphBoundaries(golden, document, coverage),
+    order: blockReadingOrder(golden, document, coverage),
     error: null,
   };
 }
@@ -300,6 +316,31 @@ function extractedParagraphs(document: RawDocument, coverage: number[] | null): 
     for (const paragraph of page) texts.push(paragraphText(paragraph));
   });
   return { texts, pageBreaks };
+}
+
+/**
+ * `reading_order` of one document (E2-T06): the golden block sequence against
+ * the blocks the `Book` builder emits for the covered pages, in the order the
+ * reader would meet them. The acceptance test calls the very function the
+ * runner measures with.
+ *
+ * The golden side needs no crop: `parseGolden` already refuses a block whose
+ * `origin` falls outside `coverage.pages`. `Book` origins are 0-based while
+ * `coverage.pages` is 1-based (the golden convention), hence the `+ 1`.
+ */
+export function blockReadingOrder(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): ReadingOrderResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const extracted = buildBook(document)
+    .blocks.filter((block) => wanted === null || wanted.has(block.origin.pageFrom + 1))
+    .map((block) => block.runs.map((run) => run.text).join(""));
+  return readingOrder(
+    golden.blocks.map((block) => block.runs.map((run) => run.text).join("")),
+    extracted,
+  );
 }
 
 /** Runs the evaluation and returns the exit code plus every per-document result. */
@@ -364,6 +405,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         refChars: null,
         hypChars: null,
         boundaries: null,
+        order: null,
         error: messageOf(error),
       });
       errors++;
@@ -379,6 +421,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         refChars: null,
         hypChars: null,
         boundaries: null,
+        order: null,
         error: null,
       });
       continue;
@@ -414,6 +457,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         refChars: null,
         hypChars: null,
         boundaries: null,
+        order: null,
         error: messageOf(error),
       });
       errors++;
@@ -492,8 +536,20 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
   const metrics: BaselineDocuments = {};
   for (const document of documents) {
     const boundaries = document.boundaries;
-    if (document.status !== "measured" || document.cer === null || boundaries === null) continue;
-    metrics[document.id] = { para_boundary_f1: boundaries.f1, text_cer: document.cer };
+    const order = document.order;
+    if (
+      document.status !== "measured" ||
+      document.cer === null ||
+      boundaries === null ||
+      order === null
+    ) {
+      continue;
+    }
+    metrics[document.id] = {
+      para_boundary_f1: boundaries.f1,
+      reading_order: order.score,
+      text_cer: document.cer,
+    };
   }
   return metrics;
 }
@@ -675,6 +731,7 @@ function renderReport(
     statusLabel(document),
     formatCer(document.cer),
     formatBoundary(document.boundaries),
+    formatOrder(document.order),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -686,6 +743,7 @@ function renderReport(
       { name: "status", align: "left" },
       { name: "text_cer", align: "right" },
       { name: "para_boundary_f1", align: "right" },
+      { name: "reading_order", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],

@@ -4,6 +4,7 @@ import {
   normalizeText,
   PARA_BOUNDARY_WINDOW,
   paraBoundaryF1,
+  readingOrder,
   textCer,
 } from "./metrics";
 
@@ -186,5 +187,69 @@ describe("paraBoundaryF1", () => {
     });
     expect(result.truePositives).toBe(1);
     expect(result.f1).toBe(1);
+  });
+});
+
+describe("readingOrder", () => {
+  const golden = ["first block", "second block", "third block"];
+
+  it("scores 1 when the extraction delivers the same order", () => {
+    const result = readingOrder(golden, golden);
+    expect(result).toEqual({ score: 1, edits: 0, referenceBlocks: 3, hypothesisBlocks: 3 });
+  });
+
+  it("compares normalized text, so spacing and Unicode form never move a block", () => {
+    expect(readingOrder(["line one\nline two"], ["  line   one  line two "]).score).toBe(1);
+    expect(readingOrder(["e\u0301lan"], ["\u00e9lan"]).score).toBe(1);
+  });
+
+  it("loses one edit per block moved out of place", () => {
+    const swapped = readingOrder(["A", "B"], ["B", "A"]);
+    expect(swapped.edits).toBe(2);
+    expect(swapped.score).toBe(0);
+
+    const reversed = readingOrder(golden, ["third block", "first block", "second block"]);
+    expect(reversed.edits).toBe(2);
+    expect(reversed.score).toBeCloseTo(1 - 2 / 3, 10);
+  });
+
+  it("drops when the two columns interleave (the case E6 has to fix)", () => {
+    const reference = ["L1", "L2", "L3", "R1", "R2", "R3"];
+    const interleaved = ["L1", "R1", "L2", "R2", "L3", "R3"];
+    const result = readingOrder(reference, interleaved);
+    expect(result.score).toBeLessThan(0.5);
+    expect(result.score).toBeGreaterThan(0);
+  });
+
+  it("costs an extra block one edit, normalized by the longer side", () => {
+    const split = readingOrder(["ab", "cd"], ["a", "b", "cd"]);
+    expect(split.edits).toBe(2);
+    expect(split.referenceBlocks).toBe(2);
+    expect(split.hypothesisBlocks).toBe(3);
+    expect(split.score).toBeCloseTo(1 - 2 / 3, 10);
+
+    expect(readingOrder(["a", "b"], ["c", "d", "e", "f"]).score).toBe(0);
+  });
+
+  it("scores 1 for two empty sequences and 0 when only one side has blocks", () => {
+    expect(readingOrder([], [])).toEqual({
+      score: 1,
+      edits: 0,
+      referenceBlocks: 0,
+      hypothesisBlocks: 0,
+    });
+    expect(readingOrder([], ["invented"]).score).toBe(0);
+    expect(readingOrder(["gone"], []).score).toBe(0);
+  });
+
+  it("is deterministic: the same sequences always give the same number", () => {
+    expect(readingOrder(golden, ["first block", "third block", "second block"]).score).toBe(
+      readingOrder(golden, ["first block", "third block", "second block"]).score,
+    );
+  });
+
+  it("refuses a comparison above the cell ceiling instead of hanging", () => {
+    expect(() => readingOrder(["a", "b"], ["c", "d"], { maxCells: 3 })).toThrow(/coverage\.pages/);
+    expect(MAX_CER_CELLS).toBeGreaterThan(0);
   });
 });
