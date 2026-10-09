@@ -74,4 +74,4 @@
   - **Fora do escopo (com tarefa própria):** split/junção de parágrafos entre páginas (E3-T04), hifenização (E3-T03), duas colunas/regiões (E6).
 
 ## Checklist manual do PO
-- [ ] Abri `pagepace inspect` em 2 livros N1 e os parágrafos parecem certos nas páginas que conferi.
+- [ ] Rodei `pnpm -s pagepace extract <caminho\do\livro.pdf>` em 2 livros N1 e os parágrafos parecem certos nas páginas que conferi (texto corrido em blocos, com os espaços no lugar).

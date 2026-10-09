@@ -4,17 +4,21 @@
 // counts real character errors and never whitespace/Unicode artefacts of the
 // PDF text layer. The metric is deterministic: same strings, same number.
 
+import { normalizeForReader } from "@pagepace/extractor";
+
 /** Invisible hyphen used to break words; never part of what the reader sees. */
 export const SOFT_HYPHEN = String.fromCharCode(0x00ad);
 
 /**
- * Brings both texts to the same shape before comparing (ADR-035):
- * NFC, soft hyphens removed, every whitespace run (space, tab, NBSP, newline)
- * collapsed to one space, trimmed. Case and punctuation are kept: they are
- * real content and a wrong case is a real error.
+ * Brings both texts to the same shape before comparing (ADR-035, E3-T01):
+ * the extractor's `normalizeForReader` (NFC, ligatures, soft hyphens,
+ * control characters, non-breaking spaces, typographic quotes) plus
+ * collapsing every whitespace run (space, tab, NBSP, newline) to one space
+ * and trimming. Case and punctuation are kept: they are real content and a
+ * wrong case is a real error.
  */
 export function normalizeText(text: string): string {
-  return text.normalize("NFC").split(SOFT_HYPHEN).join("").replace(/\s+/g, " ").trim();
+  return normalizeForReader(text).replace(/\s+/g, " ").trim();
 }
 
 /**

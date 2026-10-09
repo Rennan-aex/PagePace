@@ -7,9 +7,15 @@
 
 ## Tarefas
 
-### E3-T01 · Normalização unicode
+### E3-T01 · Normalização unicode · `done`
 - NFC, ligaduras (ﬁ ﬂ ﬀ ﬃ ﬄ), soft hyphen (U+00AD), aspas/apóstrofos consistentes, espaços não separáveis, caracteres de controle.
 - **Aceite:** tabela de casos testada; gregos e latinos acentuados preservados; sem alteração de letras de pt (ç, ã, õ, etc.).
+- **Resultado (2026-10-08):** **`done` — `pnpm verify` verde com 366 testes (+16) e `pnpm eval --ci` exit 0 (nenhuma métrica mudou: regra de ouro cumprida).**
+  - **(1) `packages/extractor/src/unicode.ts`** — duas funções puras no núcleo (exportadas por `@pagepace/extractor`): **`normalizeUnicode(text)`** aplica NFC → expande as 5 ligaduras `ﬀ ﬁ ﬂ ﬃ ﬄ` → remove soft hyphen (U+00AD) → converte tab em espaço (newline fica, marcadores de linha) → remove caracteres de controle C0/C1/DEL por comparação de code point (o Biome proíbe regex com caracteres de controle — `isControlCode`/`stripControls`). **`normalizeForReader(text)`** = o anterior + espaços não separáveis (NBSP U+00A0, figure space U+2007, narrow NBSP U+202F) viram espaço regular + aspas tipográficas (`‘’‚‛` → `'` · `“”„‟` → `"`) dobram para ASCII. **Acentos de espaçamento (`´ \` ˜ ˆ` isolados) não são tocados** — são caracteres reais e o caso LaTeX é a E3-T01b. Função **idempotente** e **determinística**.
+  - **(2) Aplicação:** `buildBook` passa o texto de cada run por `normalizeForReader` (e o `normalizeForHash` reutiliza a mesma função, então o ID continua estável); `normalizeText` do `@pagepace/eval` (usado por `text_cer`, `para_boundary_f1` e `reading_order`) delega para `normalizeForReader` + colapso de espaços — **os dois lados da comparação têm a mesma forma**, então aspas curly do golden × retas do `Book` nunca contam como erro.
+  - **(3) Testes +16:** `unicode.test.ts` (**14** — tabela completa: NFC, soft hyphen, 5 ligaduras, 3 variantes de NBSP, 2 classes de aspas, remoção de controles, tab→espaço, newline preservado, grego `αβγΩ`, português `coração não`, acento de espaçamento intocado, idempotência, determinismo) + **1** em `book.test.ts` (run com ligadura+soft hyphen+NBSP+aspas → `effected a b 'hi'`) + **1** em `metrics.test.ts` (`normalizeText` espelha o extrator).
+  - **(4) Regra de ouro:** `pnpm eval` "antes" e "depois" **idênticos** — `text_cer` 0,0000 nos 5 medidos, `para_boundary_f1` e `reading_order` intocados; `pnpm eval --ci` **exit 0** com `baseline.json` intocado. Os goldens sintéticos não contêm ligaduras nem aspas curly, então a mudança não move nenhum número.
+  - **(5) Docs:** **ADR-044 `accepted`** (duas funções no núcleo, aspas → ASCII, eval espelha o extrator, limite: colapso de whitespace fica fora), fase, STATE.
 
 ### E3-T01b · Recomposição de acento destacado (LaTeX) · prioridade P1
 - PDFs gerados por LaTeX emitem o acento (´ ` ¸ ˜ ˆ) como **item separado sobrepondo a letra** (spike S1: 9.013 ocorrências em `n4-pt-astrofisica`, 92% dos solapamentos do arquivo; NFC não resolve porque é caractere espaçado, não combining). Compor o item de acento com o primeiro caractere do item seguinte quando as caixas se sobrepõem (`EXERC´ICIOS` → `EXERCÍCIOS`, `Solu¸c˜ao` → `Solução`).

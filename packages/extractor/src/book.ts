@@ -2,6 +2,7 @@ import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { sha256Hex } from "./ingest/sha256";
 import { documentParagraphs, paragraphText } from "./paragraphs";
+import { normalizeForReader } from "./unicode";
 
 /**
  * Minimal `Book` builder (E2-T05 — layer 7, "saída").
@@ -23,6 +24,10 @@ import { documentParagraphs, paragraphText } from "./paragraphs";
  * both already sorted by the layers below; the `reading_order` metric of
  * `@pagepace/eval` measures the claim against a golden, and this module only
  * has to keep the order stable. Columns and repeated regions belong to E6.
+ *
+ * Unicode (E3-T01): every run text goes through `normalizeForReader` before
+ * it reaches the `Book`, so ligatures, soft hyphens, non-breaking spaces,
+ * typographic quotes and control characters are folded to one stable form.
  *
  * Known limits: no cross-page join, no hyphen joining, no table of contents
  * or metadata detection, and the single column rule of the paragraph layer.
@@ -52,7 +57,7 @@ export class BookError extends Error {
 const encoder = new TextEncoder();
 
 function normalizeForHash(text: string): string {
-  return text.normalize("NFC").replace(/\s+/g, " ").trim();
+  return normalizeForReader(text).replace(/\s+/g, " ").trim();
 }
 
 /** Stable id: origin page, ordinal on the page, hash of the start of the text. */
@@ -76,7 +81,7 @@ export function buildBook(document: RawDocument): Book {
   for (const [page, paragraphs] of pages.entries()) {
     let ordinal = 0;
     for (const paragraph of paragraphs) {
-      const text = paragraphText(paragraph);
+      const text = normalizeForReader(paragraphText(paragraph));
       if (text.trim() === "") continue;
       blocks.push({
         id: blockId(page, ordinal, text),

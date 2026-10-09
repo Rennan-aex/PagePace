@@ -128,6 +128,19 @@ describe("buildBook", () => {
   it("throws BookError when the document produces no block", () => {
     expect(() => buildBook(doc([page([])]))).toThrow(BookError);
   });
+
+  it("folds ligatures, soft hyphens, NBSP and quotes in the run text (E3-T01)", () => {
+    const ff = String.fromCharCode(0xfb00);
+    const softHyphen = String.fromCharCode(0x00ad);
+    const nbsp = String.fromCharCode(0x00a0);
+    const lsquo = String.fromCharCode(0x2018);
+    const rsquo = String.fromCharCode(0x2019);
+    const noisy = page([
+      item(`e${ff}ect${softHyphen}ed a${nbsp}b ${lsquo}hi${rsquo}`, MARGIN, 100, BODY),
+    ]);
+    const book = buildBook(doc([noisy]));
+    expect(book.blocks[0]?.runs[0]?.text).toBe(`effected a b 'hi'`);
+  });
 });
 
 describe("block ids", () => {

@@ -47,4 +47,5 @@ export {
   LINE_HEIGHT_MIN_FACTOR,
   StatsError,
 } from "./stats";
+export { normalizeForReader, normalizeUnicode, SOFT_HYPHEN } from "./unicode";
 export const PACKAGE_NAME = "@pagepace/extractor";

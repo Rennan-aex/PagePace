@@ -29,6 +29,13 @@ describe("normalizeText", () => {
     expect(normalizeText("Hello, World.")).toBe("Hello, World.");
     expect(normalizeText("Hello")).not.toBe(normalizeText("hello"));
   });
+
+  it("expands ligatures and folds quotes the same way the extractor does (E3-T01)", () => {
+    expect(normalizeText(String.fromCharCode(0xfb00))).toBe("ff");
+    expect(normalizeText(`${String.fromCharCode(0x201c)}hi${String.fromCharCode(0x201d)}`)).toBe(
+      '"hi"',
+    );
+  });
 });
 
 describe("textCer", () => {
