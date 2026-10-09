@@ -1,3 +1,4 @@
+export { composeAccentItems } from "./accents";
 export {
   BLOCK_ID_HASH_CHARS,
   BLOCK_ID_HASH_LENGTH,

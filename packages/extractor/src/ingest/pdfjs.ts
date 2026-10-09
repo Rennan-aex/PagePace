@@ -2,6 +2,7 @@ import type { BBox, RawDocument, RawOutlineItem, RawPage, RawTextItem } from "@p
 import { parseRawDocument, SCHEMA_VERSION } from "@pagepace/schema";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { composeAccentItems } from "../accents";
 import { sha256Hex } from "./sha256";
 import type { PageTagInput } from "./tag-hints";
 import { buildTagHints } from "./tag-hints";
@@ -330,6 +331,9 @@ async function documentHasText(pdf: PDFDocumentProxy): Promise<boolean> {
 /**
  * Reads a PDF from memory and returns a `RawDocument` that passes the
  * `@pagepace/schema` validator (throws `SchemaValidationError` otherwise).
+ * Every page first goes through `composeAccentItems` (E3-T01b): the LaTeX
+ * spacing-accent items are recomposed here so the CLI, the evaluation and the
+ * tests all see the same text.
  *
  * Throws `ScannedPdfError` when the file has no text layer (ADR-018), and
  * flags `source.ocrTextLayer` when most characters come from an invisible
@@ -388,7 +392,7 @@ export async function ingestPdfjs(
     const renderChars: RenderModeChars[] = [];
     for (let pageNumber = from; pageNumber <= lastPage; pageNumber++) {
       const { page, tagInput, chars } = await readPage(pdf, pageNumber);
-      pages.push(page);
+      pages.push(composeAccentItems(page));
       tagPages.push(tagInput);
       if (chars) renderChars.push(chars);
     }
