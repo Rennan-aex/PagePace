@@ -61,8 +61,8 @@ function doc(pages: RawPage[], extra: Partial<RawDocument["source"]> = {}): RawD
 const twoParagraphs = page([
   item("Alpha", MARGIN, 100, BODY),
   item("Beta gamma delta", MARGIN, 115, BODY),
-  item("Epsilon", MARGIN, 130, BODY),
-  item("Alone", MARGIN, 155, BODY),
+  item("Epsilon.", MARGIN, 130, BODY),
+  item("Alone.", MARGIN, 155, BODY),
 ]);
 
 describe("buildBook", () => {
@@ -83,8 +83,8 @@ describe("buildBook", () => {
     expect(book.blocks).toHaveLength(2);
     expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);
     expect(book.blocks.map((block) => block.runs.map((run) => run.text))).toEqual([
-      ["Alpha Beta gamma delta Epsilon"],
-      ["Alone"],
+      ["Alpha Beta gamma delta Epsilon."],
+      ["Alone."],
     ]);
     expect(book.blocks.map((block) => block.origin)).toEqual([
       { pageFrom: 0, pageTo: 0 },
@@ -93,22 +93,83 @@ describe("buildBook", () => {
     expect(book.blocks.every((block) => block.flags.length === 0)).toBe(true);
   });
 
-  it("keeps every block on its own page (paragraphs never cross pages)", () => {
-    const pages = [twoParagraphs, page([item("Next page", MARGIN, 100, BODY)], 1)];
+  it("joins a paragraph that continues on the next page into one block (E3-T04)", () => {
+    // The last line of page 0 ends without a sentence stop and the first
+    // line of page 1 is flush left: the paragraph continues.
+    const pages = [
+      page([
+        item("Alpha beta gamma.", MARGIN, 100, BODY),
+        item("The paragraph that runs", MARGIN, 115, BODY),
+      ]),
+      page([item("out of room resumes here.", MARGIN, 100, BODY)], 1),
+    ];
     const book = buildBook(doc(pages));
-    expect(book.blocks.map((block) => block.origin.pageFrom)).toEqual([0, 0, 1]);
-    expect(book.blocks.every((block) => block.origin.pageTo === block.origin.pageFrom)).toBe(true);
+    expect(book.blocks).toHaveLength(2);
+    expect(book.blocks[0]?.runs[0]?.text).toBe("Alpha beta gamma.");
+    expect(book.blocks[1]?.runs[0]?.text).toBe("The paragraph that runs out of room resumes here.");
+    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 0, pageTo: 1 });
+  });
+
+  it("does not join across pages when the foot ends a sentence (E3-T04)", () => {
+    const pages = [
+      page([item("A sentence that ends.", MARGIN, 100, BODY)]),
+      page([item("A new paragraph starts.", MARGIN, 100, BODY)], 1),
+    ];
+    const book = buildBook(doc(pages));
+    expect(book.blocks).toHaveLength(2);
+    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+  });
+
+  it("does not join when the next page starts indented (E3-T04)", () => {
+    const pages = [
+      page([item("The paragraph that runs", MARGIN, 100, BODY)]),
+      page([item("out of room resumes here.", MARGIN + 20, 100, BODY)], 1),
+    ];
+    const book = buildBook(doc(pages));
+    expect(book.blocks).toHaveLength(2);
+    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+  });
+
+  it("does not join a paragraph with a heading on the next page (E3-T04)", () => {
+    const title = 18;
+    const pages = [
+      page([item("The paragraph that runs", MARGIN, 100, BODY)]),
+      page(
+        [item("Chapter Two", MARGIN, 100, title), item("Its first body line.", MARGIN, 120, BODY)],
+        1,
+      ),
+    ];
+    const book = buildBook(doc(pages));
+    expect(book.blocks).toHaveLength(3);
+    expect(book.blocks[1]?.runs[0]?.text).toBe("Chapter Two");
+    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+  });
+
+  it("glues a word broken by a hyphen at the page foot (E3-T04)", () => {
+    const pages = [
+      page([item("The longest pala-", MARGIN, 100, BODY)]),
+      page([item("vra in the book continues.", MARGIN, 100, BODY)], 1),
+    ];
+    const book = buildBook(doc(pages));
+    expect(book.blocks).toHaveLength(1);
+    expect(book.blocks[0]?.runs[0]?.text).toBe("The longest palavra in the book continues.");
+    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 1 });
   });
 
   it("emits blocks in reading order: page by page, top to bottom, whatever the item order", () => {
     const first = page([...twoParagraphs.items].reverse(), 0);
-    const second = page([item("Later", MARGIN, 150, BODY), item("Earlier", MARGIN, 100, BODY)], 1);
+    const second = page(
+      [item("Later.", MARGIN, 150, BODY), item("Earlier.", MARGIN, 100, BODY)],
+      1,
+    );
     const book = buildBook(doc([first, second]));
     expect(book.blocks.map((block) => [block.origin.pageFrom, block.runs[0]?.text])).toEqual([
-      [0, "Alpha Beta gamma delta Epsilon"],
-      [0, "Alone"],
-      [1, "Earlier"],
-      [1, "Later"],
+      [0, "Alpha Beta gamma delta Epsilon."],
+      [0, "Alone."],
+      [1, "Earlier."],
+      [1, "Later."],
     ]);
   });
 

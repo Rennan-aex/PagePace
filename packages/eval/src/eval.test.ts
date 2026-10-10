@@ -372,9 +372,9 @@ describe("runEval", () => {
   });
 });
 
-const LONG_LINE = "a".repeat(79);
+const LONG_LINE = `${"a".repeat(78)}.`;
 
-/** A 20-line page: long enough that one corrupted character stays under 0,002. */
+/** A 20-page document: long enough that one corrupted character stays under 0,002. */
 function longPdf(): Uint8Array {
   return buildPdf(
     Array.from({ length: 20 }, (_, index) =>

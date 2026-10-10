@@ -2,8 +2,10 @@ import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
+import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
+import { documentStats } from "./stats";
 import { normalizeForReader } from "./unicode";
 
 /**
@@ -42,8 +44,18 @@ import { normalizeForReader } from "./unicode";
  * make confidently gets `flags: ["uncertain-hyphen"]` and the reduced
  * `HYPHEN_UNCERTAIN_CONFIDENCE` (ARCHITECTURE decision 6).
  *
- * Known limits: no cross-page join, no table of contents or metadata
- * detection, and the single column rule of the paragraph layer.
+ * Cross-page join (E3-T04): a paragraph that runs out of room at the foot
+ * of a page and resumes at the head of the next one becomes a single block
+ * with `origin.pageFrom` and `origin.pageTo` pointing at both pages. The
+ * signals (no sentence stop at the foot, no indent at the head, no heading
+ * at the boundary) and the heading guard live in `joinCrossPageParagraphs`.
+ * A word broken by a hyphen at the page foot joins automatically, because
+ * the lines of both pages enter the same paragraph and `paragraphHyphenText`
+ * sees the site.
+ *
+ * Known limits: a table of contents or metadata is not detected, the single
+ * column rule of the paragraph layer stands, and the eval's `hyphen_join_acc`
+ * still scores only intra-page sites (it walks the per-page paragraphs).
  */
 
 /** Value written to `extraction.tool`. */
@@ -87,36 +99,36 @@ export function blockId(page: number, ordinal: number, text: string): string {
  */
 export function buildBook(document: RawDocument): Book {
   const stripped = stripRepeatedRegions(document);
-  const pages = groupDocumentParagraphs(stripped.document);
+  const hasText = stripped.document.pages.some((page) => page.items.length > 0);
+  const bodyFontSize = hasText ? documentStats(stripped.document).bodyFontSize : 0;
+  const paragraphs = joinCrossPageParagraphs(
+    groupDocumentParagraphs(stripped.document),
+    bodyFontSize,
+  );
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
-  for (const [page, paragraphs] of pages.entries()) {
-    let ordinal = 0;
-    const pageLabel = stripped.pageLabels[page];
-    for (const paragraph of paragraphs) {
-      const hyphen = paragraphHyphenText(paragraph);
-      const text = normalizeForReader(hyphen.text);
-      if (text.trim() === "") continue;
-      blocks.push({
-        id: blockId(page, ordinal, text),
-        kind: "paragraph",
-        runs: [{ text }],
-        origin: {
-          pageFrom: page,
-          pageTo: page,
-          ...(pageLabel === null || pageLabel === undefined
-            ? {}
-            : { originalPageLabel: pageLabel }),
-        },
-        confidence: hyphen.uncertain
-          ? Math.min(confidence, HYPHEN_UNCERTAIN_CONFIDENCE)
-          : confidence,
-        flags: hyphen.uncertain ? [UNCERTAIN_HYPHEN_FLAG] : [],
-      });
-      ordinal++;
-    }
+  const ordinals = new Map<number, number>();
+  for (const paragraph of paragraphs) {
+    const hyphen = paragraphHyphenText(paragraph.lines);
+    const text = normalizeForReader(hyphen.text);
+    if (text.trim() === "") continue;
+    const ordinal = ordinals.get(paragraph.pageFrom) ?? 0;
+    ordinals.set(paragraph.pageFrom, ordinal + 1);
+    const pageLabel = stripped.pageLabels[paragraph.pageFrom];
+    blocks.push({
+      id: blockId(paragraph.pageFrom, ordinal, text),
+      kind: "paragraph",
+      runs: [{ text }],
+      origin: {
+        pageFrom: paragraph.pageFrom,
+        pageTo: paragraph.pageTo,
+        ...(pageLabel === null || pageLabel === undefined ? {} : { originalPageLabel: pageLabel }),
+      },
+      confidence: hyphen.uncertain ? Math.min(confidence, HYPHEN_UNCERTAIN_CONFIDENCE) : confidence,
+      flags: hyphen.uncertain ? [UNCERTAIN_HYPHEN_FLAG] : [],
+    });
   }
 
   if (blocks.length === 0) {

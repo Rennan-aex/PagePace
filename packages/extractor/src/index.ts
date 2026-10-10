@@ -44,6 +44,8 @@ export {
   LINE_BASELINE_TOLERANCE_FACTOR,
   LINE_OVERLAP_MIN_FACTOR,
 } from "./lines";
+export type { JoinedParagraph } from "./pagejoin";
+export { endsSentence, joinCrossPageParagraphs, PAGE_JOIN_TITLE_FONT_FACTOR } from "./pagejoin";
 export {
   documentParagraphs,
   groupParagraphs,
