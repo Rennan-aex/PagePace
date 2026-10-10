@@ -28,6 +28,11 @@ export const FONT_SIZE = 11;
 export const LEADING = 15;
 /** Extra gap added after each block (visual only, never part of the text). */
 export const BLOCK_GAP = 10;
+/**
+ * Soft hyphen (E3-T03): in a spec's run text it marks a typesetting break —
+ * the printed line ends with `-` and the reader must get one word back.
+ */
+export const SOFT_HYPHEN = "\u00AD";
 
 /** Resource name → standard-14 `BaseFont`, non-embedded (ADR-020). */
 export const SYNTHETIC_FONTS: Record<string, string> = {
@@ -111,15 +116,43 @@ function columnsOf(spec: SyntheticSpec): { x: number; width: number }[] {
   ];
 }
 
-/** Splits the runs of a block into visual lines of styled segments. */
+/**
+ * Splits the runs of a block into visual lines of styled segments.
+ *
+ * Hyphenation (E3-T03): a soft hyphen (U+00AD) in the spec text is a
+ * typesetting break — the line ends there with an printed `-`, unless the
+ * text already ends with one (`disse-` + U+00AD + `lhe` prints `disse-` and
+ * breaks). The marker itself never reaches the PDF and never reaches the
+ * golden (`goldenOf` strips it), so the spec writes both the broken PDF and
+ * the reader's text in one string.
+ */
 function toLines(runs: readonly SyntheticRunSpec[]): LineRun[][] {
   const lines: LineRun[][] = [[]];
+  let currentFont = "F1";
+  const pushText = (text: string): void => {
+    if (text === "") return;
+    (lines[lines.length - 1] as LineRun[]).push({ text, font: currentFont });
+  };
+  const closeAtBreak = (): void => {
+    const closed = lines[lines.length - 1] as LineRun[];
+    const last = closed[closed.length - 1];
+    if (last === undefined) {
+      closed.push({ text: "-", font: currentFont });
+    } else if (!last.text.endsWith("-")) {
+      last.text = `${last.text}-`;
+    }
+    // An explicit `-` before the marker already is the printed hyphen.
+    lines.push([]);
+  };
   for (const run of runs) {
-    const font = run.style ? STYLE_FONT[run.style] : "F1";
+    currentFont = run.style ? STYLE_FONT[run.style] : "F1";
     const pieces = run.text.split("\n");
     pieces.forEach((piece, index) => {
       if (index > 0) lines.push([]);
-      if (piece !== "") (lines[lines.length - 1] as LineRun[]).push({ text: piece, font });
+      piece.split(SOFT_HYPHEN).forEach((segment, segmentIndex) => {
+        if (segmentIndex > 0) closeAtBreak();
+        pushText(segment);
+      });
     });
   }
   return lines;
@@ -288,7 +321,10 @@ export function goldenOf(spec: SyntheticSpec): Golden {
       kind: block.kind,
       ...(block.level !== undefined ? { level: block.level } : {}),
       runs: block.runs.map((run) => ({
-        text: run.text,
+        // Hyphenation (E3-T03): the soft-hyphen marker is layout, not text —
+        // the PDF prints the break (with its `-`) and the golden holds the
+        // word the reader must get (`disse-`+U+00AD+`lhe` → `disse-lhe`).
+        text: run.text.split(SOFT_HYPHEN).join(""),
         ...(run.style === "bold" ? { bold: true } : {}),
         ...(run.style === "italic" ? { italic: true } : {}),
       })),

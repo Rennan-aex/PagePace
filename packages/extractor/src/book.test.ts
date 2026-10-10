@@ -12,6 +12,7 @@ import {
   EXTRACTOR_VERSION,
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
+import { HYPHEN_UNCERTAIN_CONFIDENCE, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 
 const BODY = 11;
 const HEADER = 9;
@@ -165,6 +166,50 @@ describe("buildBook", () => {
     ]);
     const book = buildBook(doc([noisy]));
     expect(book.blocks[0]?.runs[0]?.text).toBe(`effected a b 'hi'`);
+  });
+
+  it("glues words broken by a line-end hyphen into the block text (E3-T03)", () => {
+    const broken = page([
+      item("A pala-", MARGIN, 100, BODY),
+      item("vra que con-", MARGIN, 115, BODY),
+      item("tinua aqui.", MARGIN, 130, BODY),
+    ]);
+    const book = buildBook(doc([broken]));
+    expect(book.blocks).toHaveLength(1);
+    expect(book.blocks[0]?.runs[0]?.text).toBe("A palavra que continua aqui.");
+    expect(book.blocks[0]?.flags).toEqual([]);
+    expect(book.blocks[0]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
+  });
+
+  it("keeps legitimate hyphens in the block text (E3-T03)", () => {
+    const kept = page([
+      item("A guarda-", MARGIN, 100, BODY),
+      item("chuva abria e ele disse-", MARGIN, 115, BODY),
+      item("lhe a verdade sobre 1998-", MARGIN, 130, BODY),
+      item("2004 em seguida.", MARGIN, 145, BODY),
+    ]);
+    const book = buildBook(doc([kept]));
+    expect(book.blocks[0]?.runs[0]?.text).toBe(
+      "A guarda-chuva abria e ele disse-lhe a verdade sobre 1998-2004 em seguida.",
+    );
+    expect(book.blocks[0]?.flags).toEqual([]);
+  });
+
+  it("flags an uncertain hyphen and lowers the block confidence (E3-T03)", () => {
+    const uncertain = page([
+      item("O Ex-", MARGIN, 100, BODY),
+      item("Ministro saiu", MARGIN, 115, BODY),
+      item("cedo hoje.", MARGIN, 130, BODY),
+    ]);
+    const book = buildBook(doc([uncertain]));
+    expect(book.blocks).toHaveLength(1);
+    expect(book.blocks[0]?.runs[0]?.text).toBe("O Ex-Ministro saiu cedo hoje.");
+    expect(book.blocks[0]?.flags).toEqual([UNCERTAIN_HYPHEN_FLAG]);
+    expect(book.blocks[0]?.confidence).toBe(HYPHEN_UNCERTAIN_CONFIDENCE);
+    // An OCR document keeps the lower of the two confidences.
+    const fromOcr = buildBook(doc([uncertain], { ocrTextLayer: true }));
+    expect(fromOcr.blocks[0]?.flags).toEqual([UNCERTAIN_HYPHEN_FLAG]);
+    expect(fromOcr.blocks[0]?.confidence).toBe(OCR_TEXT_LAYER_CONFIDENCE);
   });
 });
 

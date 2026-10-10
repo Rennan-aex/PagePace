@@ -142,6 +142,19 @@ documents:
     golden: syn-n1-pt-cabecalhos.golden.json
     visibility: public
 
+  - id: syn-n1-pt-hifenizacao
+    level: N1
+    lang: pt
+    title: "Hifenização (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-09"
+    generated: true
+    pages: 2
+    sha256: "6b0dc5285f7198fb665b3f3a69dbad5e58fdb17816595d126f996ff33fd09097"
+    features: [synthetic, hyphenation]
+    golden: syn-n1-pt-hifenizacao.golden.json
+    visibility: public
+
   - id: syn-n2-en-columns
     level: N2
     lang: en

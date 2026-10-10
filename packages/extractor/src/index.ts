@@ -10,6 +10,20 @@ export {
   EXTRACTOR_VERSION,
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
+export type { HyphenJoinDecision, HyphenJoinResult, HyphenSite } from "./hyphen";
+export {
+  HYPHEN_CLITICS_EN,
+  HYPHEN_CLITICS_PT,
+  HYPHEN_LEXICON_EN,
+  HYPHEN_LEXICON_PT,
+  HYPHEN_UNCERTAIN_CONFIDENCE,
+  hyphenJoinDecision,
+  hyphenSiteBetween,
+  joinHyphenatedLines,
+  joinHyphenatedText,
+  paragraphHyphenText,
+  UNCERTAIN_HYPHEN_FLAG,
+} from "./hyphen";
 export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export { ingestPdfjs, PDFJS_DIST_VERSION, stripSubsetPrefix } from "./ingest/pdfjs";
 export { sha256Hex } from "./ingest/sha256";

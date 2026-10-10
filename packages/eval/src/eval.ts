@@ -15,6 +15,7 @@ import {
   documentParagraphs,
   ingestPdfjs,
   itemsText,
+  paragraphHyphenText,
   paragraphText,
   ScannedPdfError,
   stripRepeatedRegions,
@@ -35,7 +36,9 @@ import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import {
   type HeaderFooterResult,
+  type HyphenJoinAccResult,
   headerFooterF1,
+  hyphenJoinAcc,
   normalizeText,
   type ParaBoundaryResult,
   paraBoundaryF1,
@@ -56,7 +59,7 @@ export const HELP = `Usage:
   pnpm eval --update-baseline
   pnpm eval --help
 
-Runs the extraction pipeline over the corpus and measures two metrics for
+Runs the extraction pipeline over the corpus and measures these metrics for
 every document that declares a golden in its manifest entry (goldens live in
 corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
 
@@ -68,6 +71,9 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
   header_footer_f1  precision and recall of the repeated-region removal
                     (E3-T02), 1 = every head, foot and page number left the
                     reading flow and nothing else did
+  hyphen_join_acc   share of line-end hyphen sites the join decided the way
+                    the golden writes the word (E3-T03), 1 = every break
+                    hyphen joined and every legitimate hyphen kept
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -132,6 +138,8 @@ export interface DocumentResult {
   order: ReadingOrderResult | null;
   /** Repeated-region removal (E3-T02), `null` when not measured. */
   headerFooter: HeaderFooterResult | null;
+  /** Hyphenation join accuracy (E3-T03), `null` when not measured. */
+  hyphens: HyphenJoinAccResult | null;
   error: string | null;
 }
 
@@ -185,6 +193,10 @@ function formatOrder(value: ReadingOrderResult | null): string {
 
 function formatHeaderFooter(value: HeaderFooterResult | null): string {
   return value === null ? "-" : value.f1.toFixed(4);
+}
+
+function formatHyphen(value: HyphenJoinAccResult | null): string {
+  return value === null ? "-" : value.acc.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -279,6 +291,7 @@ async function measure(
     boundaries: paragraphBoundaries(golden, document, coverage),
     order: blockReadingOrder(golden, document, coverage),
     headerFooter: headerFooterRemoval(golden, document, coverage),
+    hyphens: hyphenJoinAccuracy(golden, document, coverage),
     error: null,
   };
 }
@@ -452,6 +465,37 @@ export function headerFooterRemoval(
   return headerFooterF1(reference, hypothesis);
 }
 
+/**
+ * `hyphen_join_acc` of one document (E3-T03): every line-end hyphen site of
+ * the covered pages, decided by the extractor's own rules, against the words
+ * the golden holds. The acceptance test calls the very function the runner
+ * measures with.
+ *
+ * Sites come from `documentParagraphs` (the same paragraphs the `Book`
+ * builder turns into blocks), so the scored decisions are exactly the ones
+ * the reader gets. Each site contributes the word the join produced; the
+ * metric counts it correct when that word is a word of the golden. A page
+ * without a hyphen site contributes nothing — `hyphenJoinAcc` scores an
+ * empty hypothesis as 1.
+ */
+export function hyphenJoinAccuracy(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): HyphenJoinAccResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const sites: { word: string; uncertain: boolean }[] = [];
+  documentParagraphs(document).forEach((page, index) => {
+    if (wanted !== null && !wanted.has(index + 1)) return;
+    for (const paragraph of page) {
+      for (const site of paragraphHyphenText(paragraph).sites) {
+        sites.push({ word: site.word, uncertain: site.decision === "uncertain" });
+      }
+    }
+  });
+  return hyphenJoinAcc(goldenText(golden), sites);
+}
+
 /** Runs the evaluation and returns the exit code plus every per-document result. */
 export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
@@ -516,6 +560,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         boundaries: null,
         order: null,
         headerFooter: null,
+        hyphens: null,
         error: messageOf(error),
       });
       errors++;
@@ -533,6 +578,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         boundaries: null,
         order: null,
         headerFooter: null,
+        hyphens: null,
         error: null,
       });
       continue;
@@ -570,6 +616,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         boundaries: null,
         order: null,
         headerFooter: null,
+        hyphens: null,
         error: messageOf(error),
       });
       errors++;
@@ -650,17 +697,20 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const boundaries = document.boundaries;
     const order = document.order;
     const headerFooter = document.headerFooter;
+    const hyphens = document.hyphens;
     if (
       document.status !== "measured" ||
       document.cer === null ||
       boundaries === null ||
       order === null ||
-      headerFooter === null
+      headerFooter === null ||
+      hyphens === null
     ) {
       continue;
     }
     metrics[document.id] = {
       header_footer_f1: headerFooter.f1,
+      hyphen_join_acc: hyphens.acc,
       para_boundary_f1: boundaries.f1,
       reading_order: order.score,
       text_cer: document.cer,
@@ -848,6 +898,7 @@ function renderReport(
     formatBoundary(document.boundaries),
     formatOrder(document.order),
     formatHeaderFooter(document.headerFooter),
+    formatHyphen(document.hyphens),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -861,6 +912,7 @@ function renderReport(
       { name: "para_boundary_f1", align: "right" },
       { name: "reading_order", align: "right" },
       { name: "header_footer_f1", align: "right" },
+      { name: "hyphen_join_acc", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -939,7 +991,29 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}\n`;
+  // The acceptance of E3-T03 asks for the hyphen decisions by document: how
+  // many sites the join got wrong and how many it had to flag as uncertain.
+  const hyphenDecisions = documents.filter(
+    (document): document is DocumentResult & { hyphens: HyphenJoinAccResult } =>
+      document.hyphens !== null && document.hyphens.total > 0,
+  );
+  const hyphenSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nHyphen joins (wrong / uncertain):\n${
+          hyphenDecisions.length === 0
+            ? `  no hyphen site in ${totals.measured} measured document(s)`
+            : hyphenDecisions
+                .map(
+                  (document) =>
+                    `  ${document.id}: ${document.hyphens.total - document.hyphens.correct} wrong, ` +
+                    `${document.hyphens.uncertain} uncertain of ${document.hyphens.total} site(s) ` +
+                    `(hyphen_join_acc ${document.hyphens.acc.toFixed(4)})`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}\n`;
 }
 
 /** CLI entry: `--help`, the baseline flags and usage errors live here. */

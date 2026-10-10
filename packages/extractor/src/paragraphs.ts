@@ -1,7 +1,7 @@
 import type { RawDocument } from "@pagepace/schema";
+import { paragraphHyphenText } from "./hyphen";
 import { documentLines, type TextLine } from "./lines";
 import { stripRepeatedRegions } from "./repeated";
-import { itemsText } from "./spaces";
 import { documentStats } from "./stats";
 
 /**
@@ -142,7 +142,13 @@ export function documentParagraphs(document: RawDocument): TextLine[][][] {
   return groupDocumentParagraphs(stripRepeatedRegions(document).document);
 }
 
-/** Text of a paragraph: each line through the space rule, lines joined by a space. */
+/**
+ * Text of a paragraph as the reader gets it: each line through the space
+ * rule, then the hyphenation join of E3-T03 (a line ending in `-` glues to
+ * the next one, dropping or keeping the hyphen per `hyphenJoinDecision`).
+ * Callers that need the sites or the doubt flag use `paragraphHyphenText`
+ * directly (one implementation behind both).
+ */
 export function paragraphText(paragraph: readonly TextLine[]): string {
-  return paragraph.map((line) => itemsText(line.items)).join(" ");
+  return paragraphHyphenText(paragraph).text;
 }

@@ -1,7 +1,8 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
+import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
-import { groupDocumentParagraphs, paragraphText } from "./paragraphs";
+import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
 import { normalizeForReader } from "./unicode";
 
@@ -35,8 +36,14 @@ import { normalizeForReader } from "./unicode";
  * foot that carried the printed number of the page keeps it as
  * `origin.originalPageLabel` on every block of that page (REQ-EXT-06).
  *
- * Known limits: no cross-page join, no hyphen joining, no table of contents
- * or metadata detection, and the single column rule of the paragraph layer.
+ * Hyphenation (E3-T03): paragraph text glues words the typesetter broke with
+ * a line-end hyphen (`pala-` + `vra` → `palavra`) while legitimate hyphens
+ * keep theirs. A paragraph with at least one decision the rules could not
+ * make confidently gets `flags: ["uncertain-hyphen"]` and the reduced
+ * `HYPHEN_UNCERTAIN_CONFIDENCE` (ARCHITECTURE decision 6).
+ *
+ * Known limits: no cross-page join, no table of contents or metadata
+ * detection, and the single column rule of the paragraph layer.
  */
 
 /** Value written to `extraction.tool`. */
@@ -89,7 +96,8 @@ export function buildBook(document: RawDocument): Book {
     let ordinal = 0;
     const pageLabel = stripped.pageLabels[page];
     for (const paragraph of paragraphs) {
-      const text = normalizeForReader(paragraphText(paragraph));
+      const hyphen = paragraphHyphenText(paragraph);
+      const text = normalizeForReader(hyphen.text);
       if (text.trim() === "") continue;
       blocks.push({
         id: blockId(page, ordinal, text),
@@ -102,8 +110,10 @@ export function buildBook(document: RawDocument): Book {
             ? {}
             : { originalPageLabel: pageLabel }),
         },
-        confidence,
-        flags: [],
+        confidence: hyphen.uncertain
+          ? Math.min(confidence, HYPHEN_UNCERTAIN_CONFIDENCE)
+          : confidence,
+        flags: hyphen.uncertain ? [UNCERTAIN_HYPHEN_FLAG] : [],
       });
       ordinal++;
     }

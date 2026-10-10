@@ -439,13 +439,16 @@ describe("baseline and CI gate", () => {
     // two sequences never align. This fixture exercises the gate, not the metric.
     // `header_footer_f1` is 1 because nothing repeats in the same place across
     // enough pages (one line per page at a different height), so the extraction
-    // removes nothing and the golden leaves nothing out (E3-T02).
+    // removes nothing and the golden leaves nothing out (E3-T02). And
+    // `hyphen_join_acc` is 1 because no line ends in a hyphen, so the join
+    // decides nothing and an empty hypothesis scores 1 (E3-T03).
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
       documents: {
         "n1-en-sample": {
           header_footer_f1: 1,
+          hyphen_join_acc: 1,
           para_boundary_f1: 1,
           reading_order: 0,
           text_cer: 0,

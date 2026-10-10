@@ -650,6 +650,97 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
       },
     ],
   },
+  {
+    // E3-T03: every line break below is a soft hyphen (U+00AD) — the PDF
+    // prints the break with its `-`, and the golden holds the word the reader
+    // must get. An explicit `-` before the marker is a hyphen the reader keeps
+    // (`guarda-` + U+00AD + `chuva` → `guarda-chuva`); a bare marker is a
+    // typesetting break to glue back (`pala` + U+00AD + `vra` → `palavra`).
+    // Covers the four decisions of hyphenJoinDecision: join (palavra,
+    // transporte), lexicon (guarda-chuva, segunda-feira, bem-estar), enclisis
+    // (disse-lhe), digits (1998-2004) and the uncertain proper noun
+    // (Ex-Ministro, which keeps its hyphen and carries the block flag). No
+    // "\n" anywhere on purpose: the golden records no layout (ADR-039), so
+    // the line-count test steps aside and the hyphen metric scores the rest.
+    id: "syn-n1-pt-hifenizacao",
+    level: "N1",
+    lang: "pt",
+    title: "Hifenização (synthetic)",
+    features: ["synthetic", "hyphenation"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        runs: [{ text: "Hifenização" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A pala\u00ADvra que con\u00ADtinua na linha seguinte " +
+              "deve voltar inteira ao leitor, sem hífen e sem espaço.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A guarda-\u00ADchuva abria quando ele disse-\u00ADlhe " +
+              "a verdade sobre o dia inteiro.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "O trans\u00ADporte chegou e ficou de 1998-\u00AD2004 " +
+              "sem parar na estrada de terra.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text: "O Ex-\u00ADMinistro saiu antes do almoço, sem anunciar a visita.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "Na segunda-\u00ADfeira o bem-\u00ADestar voltou à casa " +
+              "e nada mais parecia urgente.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "O desenvolvi\u00ADmento do projeto seguiu de\u00ADpois " +
+              "com o mesmo cuidado de sempre.",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Looks one specification up by document id. */

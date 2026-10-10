@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hyphenJoinAcc,
   MAX_CER_CELLS,
   normalizeText,
   PARA_BOUNDARY_WINDOW,
@@ -258,5 +259,59 @@ describe("readingOrder", () => {
   it("refuses a comparison above the cell ceiling instead of hanging", () => {
     expect(() => readingOrder(["a", "b"], ["c", "d"], { maxCells: 3 })).toThrow(/coverage\.pages/);
     expect(MAX_CER_CELLS).toBeGreaterThan(0);
+  });
+});
+
+describe("hyphenJoinAcc", () => {
+  const golden = "A palavra que a guarda-chuva levou de 1998-2004.";
+
+  it("scores 1 when the extraction made no hyphen decision", () => {
+    expect(hyphenJoinAcc(golden, [])).toEqual({ acc: 1, correct: 0, total: 0, uncertain: 0 });
+  });
+
+  it("scores 1 when every produced word is a word of the golden", () => {
+    const result = hyphenJoinAcc(golden, [
+      { word: "palavra" }, // join
+      { word: "guarda-chuva" }, // keep
+      { word: "1998-2004" }, // keep (digits)
+    ]);
+    expect(result).toEqual({ acc: 1, correct: 3, total: 3, uncertain: 0 });
+  });
+
+  it("counts a wrong join and a wrong keep as errors", () => {
+    const wrongJoin = hyphenJoinAcc(golden, [{ word: "guardachuva" }]);
+    expect(wrongJoin.acc).toBe(0);
+
+    const wrongKeep = hyphenJoinAcc("A palavra voltou.", [{ word: "pala-vra" }]);
+    expect(wrongKeep.acc).toBe(0);
+
+    const mixed = hyphenJoinAcc(golden, [{ word: "palavra" }, { word: "pala-vra" }]);
+    expect(mixed.acc).toBe(0.5);
+    expect(mixed.correct).toBe(1);
+    expect(mixed.total).toBe(2);
+  });
+
+  it("strips edge punctuation from the golden words (a comma never hides a join)", () => {
+    expect(hyphenJoinAcc("A palavra, hoje.", [{ word: "palavra" }]).acc).toBe(1);
+    expect(hyphenJoinAcc("(guarda-chuva)", [{ word: "guarda-chuva" }]).acc).toBe(1);
+  });
+
+  it("keeps case and the middle of a word (only the edges are punctuation)", () => {
+    expect(hyphenJoinAcc("A Palavra", [{ word: "palavra" }]).acc).toBe(0);
+    expect(hyphenJoinAcc("A bem-estar", [{ word: "bem-estar" }]).acc).toBe(1);
+  });
+
+  it("reports how many sites were flagged uncertain", () => {
+    const result = hyphenJoinAcc(golden, [
+      { word: "palavra" },
+      { word: "guarda-chuva", uncertain: true },
+    ]);
+    expect(result.uncertain).toBe(1);
+    expect(result.acc).toBe(1);
+  });
+
+  it("is deterministic: the same sites always give the same number", () => {
+    const sites = [{ word: "palavra" }, { word: "guarda-chuva" }];
+    expect(hyphenJoinAcc(golden, sites).acc).toBe(hyphenJoinAcc(golden, sites).acc);
   });
 });

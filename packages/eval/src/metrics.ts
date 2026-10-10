@@ -328,3 +328,48 @@ export function headerFooterF1(
   const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return { f1, precision, recall, truePositives: match, missed, overRemoved };
 }
+
+export interface HyphenJoinAccResult {
+  /** `correct / total`, 1 when the extraction made no hyphen decision. */
+  acc: number;
+  /** Sites whose produced word the golden also holds. */
+  correct: number;
+  /** Hyphen sites the extraction decided. */
+  total: number;
+  /** Sites the extraction flagged `uncertain` (kept, but doubted). */
+  uncertain: number;
+}
+
+/** Punctuation at the edges of a golden token never belongs to the word. */
+const EDGE_PUNCTUATION = /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu;
+
+/**
+ * Hyphenation join accuracy (E3-T03, `hyphen_join_acc`): the share of hyphen
+ * sites where the word the extraction produced is a word the golden holds.
+ *
+ * A wrong join (`guardachuva`) and a wrong keep (`pala-vra`) both fail the
+ * membership test, and a correct join (`palavra`) or keep (`guarda-chuva`)
+ * both pass — one rule scores both directions. The golden side is the bag of
+ * its tokens with edge punctuation stripped (`palavra,` → `palavra`), so a
+ * comma after the word never hides a correct join. Deterministic: same site
+ * words, same number.
+ */
+export function hyphenJoinAcc(
+  golden: string,
+  hypothesis: readonly { word: string; uncertain?: boolean }[],
+): HyphenJoinAccResult {
+  const words = new Set(
+    normalizeText(golden)
+      .split(" ")
+      .filter((token) => token !== "")
+      .map((token) => token.replace(EDGE_PUNCTUATION, "")),
+  );
+  let correct = 0;
+  let uncertain = 0;
+  for (const site of hypothesis) {
+    if (site.uncertain === true) uncertain++;
+    if (words.has(normalizeText(site.word))) correct++;
+  }
+  const total = hypothesis.length;
+  return { acc: total === 0 ? 1 : correct / total, correct, total, uncertain };
+}
