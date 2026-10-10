@@ -57,6 +57,12 @@ export interface SyntheticBlockSpec {
   indent?: number;
   /** Font size of the block (footnotes use a smaller one). */
   size?: number;
+  /**
+   * A repeated region (E3-T02): printed in the PDF, never in the golden.
+   * `header` opens its page (and cannot be a bottom block); `footer` needs
+   * `position: "bottom"`.
+   */
+  region?: "header" | "footer";
   runs: SyntheticRunSpec[];
 }
 
@@ -192,6 +198,27 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
       fail(spec, `${where}.indent must be inside the column`);
     }
 
+    if (block.region !== undefined) {
+      if (block.region !== "header" && block.region !== "footer") {
+        fail(spec, `${where}.region must be "header" or "footer"`);
+      }
+      if (block.region === "header") {
+        if (block.position === "bottom") {
+          fail(spec, `${where}: a header cannot also be a bottom block`);
+        }
+        if (cursors.has(key)) {
+          fail(
+            spec,
+            `${where} is a header of page ${block.page} after another block of that page ` +
+              "(headers open their page)",
+          );
+        }
+      }
+      if (block.region === "footer" && block.position !== "bottom") {
+        fail(spec, `${where}: a footer needs position "bottom"`);
+      }
+    }
+
     let start: number;
     if (block.position === "bottom") {
       if (bottomUsed.has(key)) {
@@ -253,6 +280,9 @@ export function goldenOf(spec: SyntheticSpec): Golden {
     }
   }
   const blocks = spec.blocks
+    // Repeated regions (E3-T02) are printed but never reading content: the
+    // golden holds the flow the reader keeps.
+    .filter((block) => block.region === undefined)
     .filter((block) => coverage === null || coverage.includes(block.page))
     .map((block) => ({
       kind: block.kind,

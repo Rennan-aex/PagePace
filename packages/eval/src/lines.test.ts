@@ -3,9 +3,13 @@
 // when it records the layout line breaks (`\n` inside runs — ADR-039): the
 // synthetic generator always writes them, hand-annotated goldens may not, and
 // a golden that does not record them is skipped, never guessed.
+//
+// E3-T02: the count is taken **after** the repeated regions leave — a running
+// head, a foot or a page number is not a line the reader meets, and the
+// golden's line breaks never contain one.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { groupLines, ingestPdfjs } from "@pagepace/extractor";
+import { documentLines, ingestPdfjs, stripRepeatedRegions } from "@pagepace/extractor";
 import { describe, expect, it } from "vitest";
 import { type CorpusEntry, loadCorpus, REPO_ROOT } from "./corpus";
 import {
@@ -67,12 +71,13 @@ describe("E2-T02: N1 lines per page against the golden", () => {
         const raw = await ingestPdfjs(new Uint8Array(readFileSync(entry.path)), {
           fileName: path.basename(entry.path),
         });
+        const pages = documentLines(stripRepeatedRegions(raw).document);
         for (const [page, want] of expected) {
-          const rawPage = raw.pages.find((candidate) => candidate.index === page - 1);
-          if (rawPage === undefined) {
+          const lines = pages[page - 1];
+          if (lines === undefined) {
             throw new Error(`${entry.id}: page ${page} of the golden is not in the PDF`);
           }
-          const got = groupLines(rawPage).length;
+          const got = lines.length;
           expect(
             Math.abs(got - want) / want,
             `${entry.id} page ${page}: ${got} lines extracted, ${want} lines in the golden`,

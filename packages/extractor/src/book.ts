@@ -1,7 +1,8 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { sha256Hex } from "./ingest/sha256";
-import { documentParagraphs, paragraphText } from "./paragraphs";
+import { groupDocumentParagraphs, paragraphText } from "./paragraphs";
+import { stripRepeatedRegions } from "./repeated";
 import { normalizeForReader } from "./unicode";
 
 /**
@@ -28,6 +29,11 @@ import { normalizeForReader } from "./unicode";
  * Unicode (E3-T01): every run text goes through `normalizeForReader` before
  * it reaches the `Book`, so ligatures, soft hyphens, non-breaking spaces,
  * typographic quotes and control characters are folded to one stable form.
+ *
+ * Repeated regions (E3-T02): running heads, feet and page numbers leave the
+ * flow before the paragraphs are built (one `stripRepeatedRegions` pass). A
+ * foot that carried the printed number of the page keeps it as
+ * `origin.originalPageLabel` on every block of that page (REQ-EXT-06).
  *
  * Known limits: no cross-page join, no hyphen joining, no table of contents
  * or metadata detection, and the single column rule of the paragraph layer.
@@ -73,13 +79,15 @@ export function blockId(page: number, ordinal: number, text: string): string {
  * `BookError` when there is no text at all).
  */
 export function buildBook(document: RawDocument): Book {
-  const pages = documentParagraphs(document);
+  const stripped = stripRepeatedRegions(document);
+  const pages = groupDocumentParagraphs(stripped.document);
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
   for (const [page, paragraphs] of pages.entries()) {
     let ordinal = 0;
+    const pageLabel = stripped.pageLabels[page];
     for (const paragraph of paragraphs) {
       const text = normalizeForReader(paragraphText(paragraph));
       if (text.trim() === "") continue;
@@ -87,7 +95,13 @@ export function buildBook(document: RawDocument): Book {
         id: blockId(page, ordinal, text),
         kind: "paragraph",
         runs: [{ text }],
-        origin: { pageFrom: page, pageTo: page },
+        origin: {
+          pageFrom: page,
+          pageTo: page,
+          ...(pageLabel === null || pageLabel === undefined
+            ? {}
+            : { originalPageLabel: pageLabel }),
+        },
         confidence,
         flags: [],
       });

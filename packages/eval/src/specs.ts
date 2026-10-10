@@ -1,6 +1,7 @@
-// The five synthetic documents of E1-T07: the specifications are the
-// versioned source of truth — `buildSynthetic(spec)` regenerates both the
-// PDF (corpus/public/synthetic/) and the golden (corpus/golden/) from here.
+// The synthetic documents of E1-T07 (and the region spec of E3-T02): the
+// specifications are the versioned source of truth — `buildSynthetic(spec)`
+// regenerates both the PDF (corpus/public/synthetic/) and the golden
+// (corpus/golden/) from here.
 //
 // Every text is written for this repository (no third-party content), line
 // breaks are explicit ("\n" inside a run) so the layout needs no width table,
@@ -462,6 +463,190 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
               "without correction, which is the point of the footnote.",
           },
         ],
+      },
+    ],
+  },
+  {
+    // E3-T02: a running head on the last three pages, a numbered foot on
+    // every page, and a chapter title bigger than the body that must survive
+    // all of it. The regions are printed in the PDF and never in the golden.
+    id: "syn-n1-pt-cabecalhos",
+    level: "N1",
+    lang: "pt",
+    title: "Uma estação do ano (synthetic)",
+    features: ["synthetic", "headers"],
+    pages: 4,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        size: 18,
+        runs: [{ text: "Uma estação do ano" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A manhã chegou devagar às colinas baixas e a vila\n" +
+              "acordou com o som de um único sino. As portas se\n" +
+              "abriram, as panelas foram ao fogo e o cheiro de pão\n" +
+              "subiu pela rua estreita que descia até o rio.\n" +
+              "Dava para atravessar a rua antes que o sol limpasse\n" +
+              "a cumprida do moinho velho.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "Além da ponte o caminho virava cascalho e depois capim.\n" +
+              "Marta contava as curvas aprendidas na infância: o\n" +
+              "salgueiro torto, a pedra de topo chato e o lugar onde\n" +
+              "o riacho cruzava a trilha. Ainda contava por hábito,\n" +
+              "e porque contar mantinha o passo igual.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        region: "footer",
+        position: "bottom",
+        size: 9,
+        runs: [{ text: "1" }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        region: "header",
+        size: 9,
+        runs: [{ text: "EXEMPLAR" }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "O sol já alto aquecia os muros de pedra e as folhas\n" +
+              "ficavam quietas. Sentava-se então à sombra da figueira\n" +
+              "a olhar o campo, sem pressa de voltar, e o dia parecia\n" +
+              "feito para aquilo só: esperar, respirar e deixar que o\n" +
+              "calor subisse devagar pelas paredes.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "A tarde inteira coube ali, entre o riacho e a estrada\n" +
+              "de terra. Quando o vento virava, trazia o cheiro das\n" +
+              "folhas molhadas e o som distante do trator, que nem\n" +
+              "sequer parecia pertencer àquele lugar.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        region: "footer",
+        position: "bottom",
+        size: 9,
+        runs: [{ text: "2" }],
+      },
+      {
+        kind: "paragraph",
+        page: 3,
+        region: "header",
+        size: 9,
+        runs: [{ text: "EXEMPLAR" }],
+      },
+      {
+        kind: "paragraph",
+        page: 3,
+        runs: [
+          {
+            text:
+              "A casa tinha uma porta azul e um jardim que nunca\n" +
+              "ficava dentro dos canteiros. Hortelã crescia entre os\n" +
+              "tijolos, os tomates se apoiavam na cerca e as folhas\n" +
+              "de limão cobriam o muro nas razões do verão.\n" +
+              "Havia uma saída estreita para os fundos.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 3,
+        runs: [
+          {
+            text:
+              "A avó plantou a pereira no primeiro ano em que moraram\n" +
+              "ali. Ela ainda era pequena e dava sombra só à quina\n" +
+              "da parede, mas no outono dava quatro ou cinco frutos\n" +
+              "que bastavam para a mesa de todos os dias.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 3,
+        region: "footer",
+        position: "bottom",
+        size: 9,
+        runs: [{ text: "3" }],
+      },
+      {
+        kind: "paragraph",
+        page: 4,
+        region: "header",
+        size: 9,
+        runs: [{ text: "EXEMPLAR" }],
+      },
+      {
+        kind: "paragraph",
+        page: 4,
+        runs: [
+          {
+            text:
+              "O fim do dia terminava como sempre: cadeiras levadas\n" +
+              "para a calçada e os vizinhos discutindo aos poucos\n" +
+              "sobre o tempo e as estações do ano, até acender a\n" +
+              "primeira luz e chamar os meninos para dentro.\n" +
+              "A rua ficava então em silêncio, medida pelos passos\n" +
+              "de quem voltava devagar.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 4,
+        runs: [
+          {
+            text:
+              "No dia seguinte tudo recomeçava do mesmo jeito, com\n" +
+              "o sino tocando cedo e o pão saindo quente. Nada\n" +
+              "ganhava com pressa, e a vila seguia do tamanho\n" +
+              "do seu caminho.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 4,
+        region: "footer",
+        position: "bottom",
+        size: 9,
+        runs: [{ text: "4" }],
       },
     ],
   },

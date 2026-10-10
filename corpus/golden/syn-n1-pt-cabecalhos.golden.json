@@ -1,0 +1,116 @@
+{
+  "id": "syn-n1-pt-cabecalhos",
+  "schemaVersion": "1.0.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "Uma estação do ano"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A manhã chegou devagar às colinas baixas e a vila\nacordou com o som de um único sino. As portas se\nabriram, as panelas foram ao fogo e o cheiro de pão\nsubiu pela rua estreita que descia até o rio.\nDava para atravessar a rua antes que o sol limpasse\na cumprida do moinho velho."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Além da ponte o caminho virava cascalho e depois capim.\nMarta contava as curvas aprendidas na infância: o\nsalgueiro torto, a pedra de topo chato e o lugar onde\no riacho cruzava a trilha. Ainda contava por hábito,\ne porque contar mantinha o passo igual."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "O sol já alto aquecia os muros de pedra e as folhas\nficavam quietas. Sentava-se então à sombra da figueira\na olhar o campo, sem pressa de voltar, e o dia parecia\nfeito para aquilo só: esperar, respirar e deixar que o\ncalor subisse devagar pelas paredes."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A tarde inteira coube ali, entre o riacho e a estrada\nde terra. Quando o vento virava, trazia o cheiro das\nfolhas molhadas e o som distante do trator, que nem\nsequer parecia pertencer àquele lugar."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A casa tinha uma porta azul e um jardim que nunca\nficava dentro dos canteiros. Hortelã crescia entre os\ntijolos, os tomates se apoiavam na cerca e as folhas\nde limão cobriam o muro nas razões do verão.\nHavia uma saída estreita para os fundos."
+        }
+      ],
+      "origin": {
+        "pageFrom": 3,
+        "pageTo": 3
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A avó plantou a pereira no primeiro ano em que moraram\nali. Ela ainda era pequena e dava sombra só à quina\nda parede, mas no outono dava quatro ou cinco frutos\nque bastavam para a mesa de todos os dias."
+        }
+      ],
+      "origin": {
+        "pageFrom": 3,
+        "pageTo": 3
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "O fim do dia terminava como sempre: cadeiras levadas\npara a calçada e os vizinhos discutindo aos poucos\nsobre o tempo e as estações do ano, até acender a\nprimeira luz e chamar os meninos para dentro.\nA rua ficava então em silêncio, medida pelos passos\nde quem voltava devagar."
+        }
+      ],
+      "origin": {
+        "pageFrom": 4,
+        "pageTo": 4
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "No dia seguinte tudo recomeçava do mesmo jeito, com\no sino tocando cedo e o pão saindo quente. Nada\nganhava com pressa, e a vila seguia do tamanho\ndo seu caminho."
+        }
+      ],
+      "origin": {
+        "pageFrom": 4,
+        "pageTo": 4
+      }
+    }
+  ]
+}

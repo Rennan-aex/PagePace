@@ -437,10 +437,20 @@ describe("baseline and CI gate", () => {
     // `reading_order` is 0 here on purpose: the golden is a single block for the
     // whole 20-page document while the extraction emits one block per page, so the
     // two sequences never align. This fixture exercises the gate, not the metric.
+    // `header_footer_f1` is 1 because nothing repeats in the same place across
+    // enough pages (one line per page at a different height), so the extraction
+    // removes nothing and the golden leaves nothing out (E3-T02).
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
-      documents: { "n1-en-sample": { para_boundary_f1: 1, reading_order: 0, text_cer: 0 } },
+      documents: {
+        "n1-en-sample": {
+          header_footer_f1: 1,
+          para_boundary_f1: 1,
+          reading_order: 0,
+          text_cer: 0,
+        },
+      },
     });
 
     await runEval({

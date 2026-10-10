@@ -49,6 +49,7 @@ export {
   EXIT_OK as EVAL_EXIT_OK,
   EXIT_USAGE as EVAL_EXIT_USAGE,
   HELP as EVAL_HELP,
+  headerFooterRemoval,
   type IngestFn,
   type LevelSummary,
   paragraphBoundaries,
@@ -76,6 +77,8 @@ export {
 export {
   type CerOptions,
   type CerResult,
+  type HeaderFooterResult,
+  headerFooterF1,
   MAX_CER_CELLS,
   normalizeText,
   PARA_BOUNDARY_WINDOW,

@@ -39,6 +39,21 @@ export {
   PARAGRAPH_MEASURE_TOLERANCE,
   paragraphText,
 } from "./paragraphs";
+export type {
+  RepeatedBand,
+  RepeatedOccurrence,
+  RepeatedRegion,
+  StrippedDocument,
+} from "./repeated";
+export {
+  detectRepeatedRegions,
+  PAGE_LABEL_DECORATION_MAX,
+  REPEATED_BASELINE_TOLERANCE_FACTOR,
+  REPEATED_FONT_MAX_FACTOR,
+  REPEATED_MIN_PAGE_SHARE,
+  REPEATED_MIN_PAGES,
+  stripRepeatedRegions,
+} from "./repeated";
 export { itemsText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {

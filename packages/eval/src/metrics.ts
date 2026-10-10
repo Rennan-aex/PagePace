@@ -283,3 +283,48 @@ export function readingOrder(
   const edits = editDistance(golden, extracted);
   return { score: 1 - edits / span, edits, referenceBlocks, hypothesisBlocks };
 }
+
+export interface HeaderFooterResult {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side has lines. */
+  f1: number;
+  /** Removed lines that the golden also leaves out ÷ removed lines. */
+  precision: number;
+  /** Removed lines ÷ lines the golden leaves out. */
+  recall: number;
+  /** Lines the golden leaves out that the extraction also removed. */
+  truePositives: number;
+  /** Lines the golden leaves out that the extraction kept (missed removals). */
+  missed: number;
+  /** Lines the extraction removed although the golden has them (content lost). */
+  overRemoved: number;
+}
+
+/**
+ * Header/footer removal (E3-T02, `header_footer_f1`): precision and recall of
+ * the lines the extractor takes out of the reading flow.
+ *
+ * Both sides are **keys** the runner composes as `"<page>:<normalized line
+ * text>"`, so the same line on two pages counts twice (a region is judged per
+ * page) and a line on the wrong page is an error. Two empty sides score 1 —
+ * a document without repeated regions has nothing to remove and nothing that
+ * was wrongly removed. Deterministic: same keys, same numbers.
+ */
+export function headerFooterF1(
+  reference: readonly string[],
+  hypothesis: readonly string[],
+): HeaderFooterResult {
+  const golden = new Set(reference.map((key) => normalizeText(key)));
+  const extracted = new Set(hypothesis.map((key) => normalizeText(key)));
+
+  let match = 0;
+  for (const key of extracted) {
+    if (golden.has(key)) match++;
+  }
+
+  const missed = golden.size - match;
+  const overRemoved = extracted.size - match;
+  const precision = extracted.size === 0 ? 1 : match / extracted.size;
+  const recall = golden.size === 0 ? 1 : match / golden.size;
+  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  return { f1, precision, recall, truePositives: match, missed, overRemoved };
+}

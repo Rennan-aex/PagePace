@@ -11,10 +11,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildBook,
+  documentLines,
   documentParagraphs,
   ingestPdfjs,
+  itemsText,
   paragraphText,
   ScannedPdfError,
+  stripRepeatedRegions,
 } from "@pagepace/extractor";
 import type { RawDocument } from "@pagepace/schema";
 import {
@@ -31,6 +34,9 @@ import {
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import {
+  type HeaderFooterResult,
+  headerFooterF1,
+  normalizeText,
   type ParaBoundaryResult,
   paraBoundaryF1,
   type ReadingOrderResult,
@@ -59,6 +65,9 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
                     cuts and false merges reported per document
   reading_order     normalized edit distance between the block order of the
                     extraction and of the golden (E2-T06), 1 = same order
+  header_footer_f1  precision and recall of the repeated-region removal
+                    (E3-T02), 1 = every head, foot and page number left the
+                    reading flow and nothing else did
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -121,6 +130,8 @@ export interface DocumentResult {
   boundaries: ParaBoundaryResult | null;
   /** Reading order score of the block sequence (E2-T06), `null` when not measured. */
   order: ReadingOrderResult | null;
+  /** Repeated-region removal (E3-T02), `null` when not measured. */
+  headerFooter: HeaderFooterResult | null;
   error: string | null;
 }
 
@@ -170,6 +181,10 @@ function formatBoundary(value: ParaBoundaryResult | null): string {
 
 function formatOrder(value: ReadingOrderResult | null): string {
   return value === null ? "-" : value.score.toFixed(4);
+}
+
+function formatHeaderFooter(value: HeaderFooterResult | null): string {
+  return value === null ? "-" : value.f1.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -263,6 +278,7 @@ async function measure(
     hypChars: result.hypChars,
     boundaries: paragraphBoundaries(golden, document, coverage),
     order: blockReadingOrder(golden, document, coverage),
+    headerFooter: headerFooterRemoval(golden, document, coverage),
     error: null,
   };
 }
@@ -343,6 +359,99 @@ export function blockReadingOrder(
   );
 }
 
+/**
+ * Smallest fraction of a line's trigrams that must also appear in the golden
+ * text for the line to count as golden content (E3-T02). A body line with a
+ * character error keeps almost every trigram; a real head or foot shares
+ * almost none.
+ */
+export const HEADER_FOOTER_TRIGRAM_HOLD = 0.7;
+
+/** Every trigram of a text, built once per page of golden content. */
+function trigramsOf(text: string): Set<string> {
+  const trigrams = new Set<string>();
+  for (let i = 0; i + 3 <= text.length; i++) trigrams.add(text.slice(i, i + 3));
+  return trigrams;
+}
+
+/**
+ * Typo-tolerant containment: enough trigrams of the line sit in the golden
+ * (`HEADER_FOOTER_TRIGRAM_HOLD`). Lines shorter than four characters never
+ * take this path — they would match by chance — so they need the exact match.
+ */
+function holdsByTrigrams(line: string, goldenTrigrams: ReadonlySet<string>): boolean {
+  if (line.length < 4) return false;
+  const total = line.length - 2;
+  let hits = 0;
+  for (let i = 0; i + 3 <= line.length; i++) {
+    if (goldenTrigrams.has(line.slice(i, i + 3))) hits++;
+  }
+  return hits >= Math.floor(total * HEADER_FOOTER_TRIGRAM_HOLD);
+}
+
+/**
+ * `header_footer_f1` of one document (E3-T02): what the extractor removes as a
+ * repeated region against what the golden leaves out of the reading flow.
+ *
+ * Reference: the lines of the covered pages the golden does not hold — a
+ * running head, a foot or a page number never enters the golden blocks. The
+ * golden text is read **per page** when its blocks carry `origin`s, and falls
+ * back to the whole-document text for a page the golden does not describe
+ * (the only view a golden anchored entirely on page 1 can offer). Matching is
+ * exact on tokens first, then trigram-tolerant, so a body line with a
+ * character error still counts as golden content and `text_cer` noise never
+ * becomes a fake "missed removal". Hypothesis: the lines
+ * `stripRepeatedRegions` actually removed. Keys are `"<1-based page>:<text>"`,
+ * so a region is judged page by page and a removal on the wrong page counts as
+ * an error.
+ *
+ * Limits: a header whose text nearly matches a body line of the same page is
+ * not counted (containment can only be conservative), and line boundaries are
+ * the PDF's, not the reader's paragraph breaks. The acceptance test calls the
+ * very function the runner measures with.
+ */
+export function headerFooterRemoval(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): HeaderFooterResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+
+  const global = ` ${normalizeText(goldenText(golden))} `;
+  const globalTrigrams = trigramsOf(global);
+  const pageText = new Map<number, string>();
+  for (const block of golden.blocks) {
+    if (block.origin === null) continue;
+    const text = normalizeText(block.runs.map((run) => run.text).join(""));
+    if (text === "") continue;
+    for (let page = block.origin.pageFrom; page <= block.origin.pageTo; page++) {
+      pageText.set(page, `${pageText.get(page) ?? ""}${text} `);
+    }
+  }
+  const pageTrigrams = new Map<number, ReadonlySet<string>>();
+  for (const [page, text] of pageText) pageTrigrams.set(page, trigramsOf(text));
+
+  const reference: string[] = [];
+  documentLines(document).forEach((lines, index) => {
+    const page = index + 1;
+    if (wanted !== null && !wanted.has(page)) return;
+    const haystack = pageText.get(page) ?? global;
+    const trigrams = pageTrigrams.get(page) ?? globalTrigrams;
+    for (const line of lines) {
+      const text = normalizeText(itemsText(line.items));
+      if (text === "") continue;
+      if (haystack.includes(` ${text} `) || holdsByTrigrams(text, trigrams)) continue;
+      reference.push(`${page}:${text}`);
+    }
+  });
+
+  const hypothesis = stripRepeatedRegions(document)
+    .removed.filter((occurrence) => wanted === null || wanted.has(occurrence.page + 1))
+    .map((occurrence) => `${occurrence.page + 1}:${normalizeText(occurrence.text)}`);
+
+  return headerFooterF1(reference, hypothesis);
+}
+
 /** Runs the evaluation and returns the exit code plus every per-document result. */
 export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
@@ -406,6 +515,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hypChars: null,
         boundaries: null,
         order: null,
+        headerFooter: null,
         error: messageOf(error),
       });
       errors++;
@@ -422,6 +532,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hypChars: null,
         boundaries: null,
         order: null,
+        headerFooter: null,
         error: null,
       });
       continue;
@@ -458,6 +569,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hypChars: null,
         boundaries: null,
         order: null,
+        headerFooter: null,
         error: messageOf(error),
       });
       errors++;
@@ -537,15 +649,18 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
   for (const document of documents) {
     const boundaries = document.boundaries;
     const order = document.order;
+    const headerFooter = document.headerFooter;
     if (
       document.status !== "measured" ||
       document.cer === null ||
       boundaries === null ||
-      order === null
+      order === null ||
+      headerFooter === null
     ) {
       continue;
     }
     metrics[document.id] = {
+      header_footer_f1: headerFooter.f1,
       para_boundary_f1: boundaries.f1,
       reading_order: order.score,
       text_cer: document.cer,
@@ -732,6 +847,7 @@ function renderReport(
     formatCer(document.cer),
     formatBoundary(document.boundaries),
     formatOrder(document.order),
+    formatHeaderFooter(document.headerFooter),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -744,6 +860,7 @@ function renderReport(
       { name: "text_cer", align: "right" },
       { name: "para_boundary_f1", align: "right" },
       { name: "reading_order", align: "right" },
+      { name: "header_footer_f1", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -798,7 +915,31 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}\n`;
+  // The acceptance of E3-T02 asks for the removal errors by document: how many
+  // lines the reader still sees (missed) and how many content lines the
+  // extraction took out (over-removed).
+  const removalErrors = documents.filter(
+    (document): document is DocumentResult & { headerFooter: HeaderFooterResult } =>
+      document.headerFooter !== null &&
+      (document.headerFooter.missed > 0 || document.headerFooter.overRemoved > 0),
+  );
+  const removalSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nRepeated region removal (missed / over-removed):\n${
+          removalErrors.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : removalErrors
+                .map(
+                  (document) =>
+                    `  ${document.id}: ${document.headerFooter.missed} missed, ` +
+                    `${document.headerFooter.overRemoved} over-removed ` +
+                    `(header_footer_f1 ${document.headerFooter.f1.toFixed(4)})`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}\n`;
 }
 
 /** CLI entry: `--help`, the baseline flags and usage errors live here. */

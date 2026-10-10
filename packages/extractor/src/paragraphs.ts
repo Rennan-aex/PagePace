@@ -1,10 +1,16 @@
 import type { RawDocument } from "@pagepace/schema";
 import { documentLines, type TextLine } from "./lines";
+import { stripRepeatedRegions } from "./repeated";
 import { itemsText } from "./spaces";
 import { documentStats } from "./stats";
 
 /**
  * Lines → paragraphs (E2-T04).
+ *
+ * Repeated regions (E3-T02) leave the flow first: `documentParagraphs` strips
+ * the running heads, feet and page numbers before grouping, so a header never
+ * becomes a paragraph of its own. The signals below therefore only see body
+ * lines.
  *
  * A paragraph is a run of consecutive lines; a new one starts when one of
  * three signals fires, in this order:
@@ -113,16 +119,27 @@ export function groupParagraphs(lines: readonly TextLine[], typicalLeading: numb
 }
 
 /**
- * Groups every page of a document, in page order. The typical line spacing
- * comes from the document statistics (the median of the whole book), so a
- * page whose own gaps are unusual still breaks at the book's rhythm.
+ * Groups every page of a **clean** document (no repeated regions), in page
+ * order. The typical line spacing comes from the document statistics (the
+ * median of the whole book), so a page whose own gaps are unusual still breaks
+ * at the book's rhythm. `documentParagraphs` and `buildBook` reach this
+ * through `stripRepeatedRegions`; never call it with a raw document.
  */
-export function documentParagraphs(document: RawDocument): TextLine[][][] {
+export function groupDocumentParagraphs(document: RawDocument): TextLine[][][] {
   const pages = documentLines(document);
   const hasText = document.pages.some((page) => page.items.length > 0);
   if (!hasText) return pages.map(() => []);
   const typicalLeading = documentStats(document).lineHeight;
   return pages.map((lines) => groupParagraphs(lines, typicalLeading));
+}
+
+/**
+ * Groups every page of a raw document, in page order: repeated regions are
+ * stripped once here, and the remaining lines become paragraphs (a paragraph
+ * never crosses a page).
+ */
+export function documentParagraphs(document: RawDocument): TextLine[][][] {
+  return groupDocumentParagraphs(stripRepeatedRegions(document).document);
 }
 
 /** Text of a paragraph: each line through the space rule, lines joined by a space. */

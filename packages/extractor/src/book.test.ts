@@ -14,6 +14,7 @@ import {
 } from "./book";
 
 const BODY = 11;
+const HEADER = 9;
 const MARGIN = 72;
 
 /** One item sitting on `baseline`, the way the ingestion delivers it. */
@@ -127,6 +128,30 @@ describe("buildBook", () => {
 
   it("throws BookError when the document produces no block", () => {
     expect(() => buildBook(doc([page([])]))).toThrow(BookError);
+  });
+
+  it("keeps the printed page label of a removed foot as origin.originalPageLabel (E3-T02)", () => {
+    const pages = [0, 1, 2].map((index) =>
+      page(
+        [
+          item("MY BOOK", MARGIN, 72, HEADER),
+          item(`Body line ${index + 1} of the page.`, MARGIN, 670, BODY),
+          item(String(index + 1), MARGIN, 740, HEADER),
+        ],
+        index,
+      ),
+    );
+    const book = buildBook(doc(pages));
+    expect(book.blocks.map((block) => block.runs.map((run) => run.text))).toEqual([
+      ["Body line 1 of the page."],
+      ["Body line 2 of the page."],
+      ["Body line 3 of the page."],
+    ]);
+    expect(book.blocks.map((block) => block.origin)).toEqual([
+      { pageFrom: 0, pageTo: 0, originalPageLabel: "1" },
+      { pageFrom: 1, pageTo: 1, originalPageLabel: "2" },
+      { pageFrom: 2, pageTo: 2, originalPageLabel: "3" },
+    ]);
   });
 
   it("folds ligatures, soft hyphens, NBSP and quotes in the run text (E3-T01)", () => {

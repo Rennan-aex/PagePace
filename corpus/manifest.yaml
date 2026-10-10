@@ -129,6 +129,19 @@ documents:
     golden: syn-n1-pt-acentos.golden.json
     visibility: public
 
+  - id: syn-n1-pt-cabecalhos
+    level: N1
+    lang: pt
+    title: "Uma estação do ano (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-09"
+    generated: true
+    pages: 4
+    sha256: "599239e717054a2769e67488b74c843caa0d4276413fdcab45b3aaac7b26d0b6"
+    features: [synthetic, headers]
+    golden: syn-n1-pt-cabecalhos.golden.json
+    visibility: public
+
   - id: syn-n2-en-columns
     level: N2
     lang: en

@@ -8,7 +8,11 @@
 // itself lives in the extractor core (`itemsText`/`spaceBetween`,
 // `SPACE_GAP_FACTOR`), so the metric measures the same spaces the extraction
 // will ship in the `Book`.
-import { itemsText } from "@pagepace/extractor";
+//
+// Repeated regions (E3-T02) follow the same principle: the running heads,
+// feet and page numbers leave the text here, through the extractor's own
+// `stripRepeatedRegions`, so `text_cer` measures the flow the reader gets.
+import { itemsText, stripRepeatedRegions } from "@pagepace/extractor";
 import type { RawDocument, RawPage } from "@pagepace/schema";
 
 /** Concatenates the items of one page (line ends become `\n`, gaps become spaces). */
@@ -18,12 +22,14 @@ export function pageText(page: RawPage): string {
 
 /**
  * Text of the whole document (or of the given pages, 1-based — the unit used
- * by `coverage.pages` in a golden). Pages are joined with `\n`.
+ * by `coverage.pages` in a golden). Pages are joined with `\n`. Repeated
+ * regions are stripped first (once), exactly as the `Book` builder does.
  */
 export function documentText(document: RawDocument, pages?: readonly number[] | null): string {
+  const clean = stripRepeatedRegions(document).document;
   const wanted = pages ? new Set(pages) : null;
   const parts: string[] = [];
-  for (const page of document.pages) {
+  for (const page of clean.pages) {
     if (wanted && !wanted.has(page.index + 1)) continue;
     parts.push(pageText(page));
   }
