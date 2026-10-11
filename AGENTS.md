@@ -13,7 +13,15 @@ O PO é iniciante, está sozinho no projeto e usa **Windows com PowerShell**. El
 - Nunca diga só "veja o arquivo X" ou "item 4 do OPEN-QUESTIONS": escreva a pergunta ou o passo completo na própria mensagem.
 - Nunca peça ao PO algo que você mesmo pode fazer. Se precisar da ajuda dele, dê o passo a passo com comandos de **PowerShell**, como saber que deu certo e o que fazer se der erro.
 - Toda mensagem final termina com o texto exato do prompt da próxima sessão.
-- Cada item que você escrever em "Bloqueios / ações do humano" (STATE.md) deve ser executável sozinho: comandos incluídos.
+- Itens de Bloqueios têm 1 a 2 linhas; o passo a passo completo vai na mensagem final (report-to-po).
+
+## Leitura econômica (obrigatório)
+- QUENTE (leia no início): AGENTS.md e STATE.md (que já traz a tarefa atual). Não abra o arquivo da fase inteiro.
+- FRIO (não leia a menos que a tarefa mande): docs/**/archive/**, spikes, DECISIONS.md (só o índice no topo; para um ADR específico busque "ADR-NNN" e leia só esse trecho), REQUIREMENTS.md (só os IDs citados), ROADMAP, ARCHITECTURE, BACKLOG, GLOSSARY, EVALUATION, fases concluídas.
+- Nunca imprima arquivos grandes no chat: use busca e faixas de linhas.
+- Mostre só as últimas ~20 linhas da saída de comandos.
+- O histórico detalhado mora no git (commits e PRs), não nos .md. Registro de sessão: 3 a 4 linhas.
+- Orçamentos verificados por `pnpm check:docs`: STATE.md ≤ 8 KB; Handoff ≤ 15 linhas; log com as 2 últimas sessões; AGENTS.md ≤ 10 KB; ADR novo ≤ 12 linhas.
 
 ## Protocolo de INÍCIO de sessão (obrigatório, nesta ordem)
 1. Leia `docs/extractor/STATE.md` (ou `docs/app/STATE.md` se o trabalho for do app). Ele diz a tarefa atual, o que está pela metade e o próximo comando.

@@ -2,6 +2,61 @@
 
 Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data`. Contexto → decisão → consequências. Use a skill `record-decision`.
 
+<!-- INDEX:START -->
+| ID | Título | Status |
+|---|---|---|
+| ADR-001 | Monorepo único | accepted |
+| ADR-002 | TypeScript em tudo, núcleo portável | accepted |
+| ADR-003 | Reflow em todas as telas, PDF nunca exibido | accepted |
+| ADR-004 | Correções do usuário em overlay separado | accepted |
+| ADR-005 | PDF.js como base da ingestão | accepted |
+| ADR-006 | Licenças: sem AGPL/GPL como dependência | accepted |
+| ADR-007 | Política de corpus | accepted |
+| ADR-008 | Regra de ouro das métricas | accepted |
+| ADR-009 | Ferramental provisório: pnpm + Vitest + TypeScript estrito | accepted |
+| ADR-010 | Fluxo para uma IA por vez (OpenCode) | accepted |
+| ADR-011 | Idiomas | accepted |
+| ADR-012 | Palavras fora do modelo | accepted |
+| ADR-013 | Gabaritos sintéticos programáticos | accepted |
+| ADR-014 | Campo `file` no manifest privado do corpus | accepted |
+| ADR-015 | Dependências do spike S1: pdfjs-dist e @napi-rs/canvas | accepted |
+| ADR-016 | Recorte de figuras/tabelas/equações no modo normal (exceção à ADR-003) | accepted |
+| ADR-017 | Lint/format: Biome | accepted |
+| ADR-018 | PDF escaneado: detectar e marcar "aguardando OCR" | accepted |
+| ADR-019 | Texto de OCR embutido (`Tr 3`): extrair com aviso `ocr-text-layer` | accepted |
+| ADR-020 | Assets de fonte padrão no app: só os `.pfb` Foxit, sem os `.ttf` Liberation (opção A) | accepted |
+| ADR-021 | PDF.js roda sempre em Web Worker no app | accepted |
+| ADR-022 | Versão do Node: uma só, a 24 | accepted |
+| ADR-023 | Fim de linha: LF no repositório inteiro | accepted |
+| ADR-024 | Validação de runtime: `zod` | accepted |
+| ADR-025 | Árvore de tags crua fora do modelo; só `tagHints` | accepted |
+| ADR-026 | SHA-256 em TypeScript puro no núcleo da ingestão | accepted |
+| ADR-027 | Adaptador de ingestão: `ingestPdfjs(bytes)` devolve `RawDocument` já validado | accepted |
+| ADR-028 | Regra de `reliable` (S3 §4.3): estrutura de bloco ≥ 50% (provisória) | accepted |
+| ADR-029 | `source.ocrTextLayer` no `RawDocument` (esquema 1.1.0) | accepted |
+| ADR-030 | `tsx` para rodar a CLI em TypeScript | accepted |
+| ADR-031 | `corpus:fetch` em TypeScript dentro de `@pagepace/eval` | accepted |
+| ADR-032 | CI: cache do corpus com restore/save separados e download antes dos testes | accepted |
+| ADR-033 | Download resiliente do corpus: cabeçalhos de navegador, cookie do CDN, 403 repetível e `fallback_urls` | accepted |
+| ADR-034 | Espelho dos PDFs bloqueados na entrega (Release) do repositório + token do CI escopado | accepted |
+| ADR-035 | Runner do `pnpm eval`: normalização, `text_cer` e regra de junção provisória | accepted |
+| ADR-036 | Formato do golden fechado em `1.0.0` (e validação no `@pagepace/eval`) | accepted |
+| ADR-037 | Campo `generated` no manifest público do corpus | accepted |
+| ADR-038 | Baseline versionado do eval e gate `--ci` (regra de ouro operacional) | accepted |
+| ADR-039 | Agrupamento de itens em linhas e o "gabarito" do aceite da E2-T02 | accepted |
+| ADR-040 | Inferência de espaços no núcleo (`SPACE_GAP_FACTOR = 0,12`) | accepted |
+| ADR-041 | Parágrafos a partir de linhas (3 sinais) e `para_boundary_f1` sem contar a virada de página | accepted |
+| ADR-042 | `Book` mínimo: IDs `página-ordinal-hash`, confiança constante provisória e sem juntar páginas | accepted |
+| ADR-043 | `reading_order`: distância de edição entre sequências de blocos, com o texto normalizado como identidade do bloco | accepted |
+| ADR-044 | Normalização unicode no núcleo: `normalizeUnicode` + `normalizeForReader`, ligaduras/aspas/NBSP no `Book` e no eval | accepted |
+| ADR-045 | Recomposição de acento de espaçamento (LaTeX) na fronteira de ingestão | accepted |
+| ADR-046 | Regiões repetidas (cabeçalho/rodapé/números de página) fora do fluxo de leitura | accepted |
+| ADR-047 | Hifenização de fim de linha: decisão por sítio no núcleo, dúvida marcada e `hyphen_join_acc` por pertinência | accepted |
+| ADR-048 | Junção de parágrafos entre páginas: sinais de fronteira no núcleo, `buildBook` consolida | accepted |
+| ADR-049 | Fonte com mapeamento quebrado: sinal por bloco, texto preservado, aviso no documento | accepted |
+| ADR-050 | Dieta de contexto: arquivos quentes enxutos e orçamento de docs | accepted |
+<!-- INDEX:END -->
+
 ---
 ### ADR-001 · Monorepo único · accepted
 **Contexto:** extrator e app compartilham o esquema; mudanças de contrato precisam ser atômicas.
@@ -376,3 +431,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Decisão:** **(a1) + (b1) + (c1) + (d1) + (e1).** `brokenFontSignal(text)` puro em `brokenfont.ts` devolve `{suspectChars, readableChars, share, broken}` com as constantes nomeadas; o `buildBook` roda o sinal por bloco **já normalizado** (`normalizeForReader`), acumula flag + teto de confiança, conta `brokenBlocks` e acrescenta `"broken-font-mapping"` a `extraction.warnings` quando ≥ 1 bloco quebrado; `averageConfidence` passa a ser a média das confianças dos blocos, arredondada em 2 casas.
 **Consequências:** o leitor vê o texto (nada é descartado) com aviso e confiança baixa; um capítulo corrompido derruba a `avgConfidence` do documento — é o comportamento pedido (números que refletem a leitura). **Limites conhecidos:** (1) o sinal só enxerga U+FFFD e PUA — fonte que mapeia glifos para **letras erradas** passa batido; (2) `KNOWN_WARNING_CODES` do esquema **não** inclui o código novo (pendência de BACKLOG, decisão d1); (3) nenhuma métrica do eval mede avisos; (4) detecção é por bloco: parágrafo legítimo com ≥ 3 símbolos privados e share ≥ 5% é marcado — medido no corpus: 2 blocos em `n4-pt-astrofisica` p.315 (9 glifos PUA U+F8F1–U+F8F4 no início de parágrafo, texto legível depois) e **0** nos outros 25 livros.
 **Evidência (2026-10-11):** `pnpm verify` verde com **481 testes** (+16: **13** em `brokenfont.test.ts` — U+FFFD, PUA nas três áreas (BMP e planos suplementares), bordas das áreas, letras/dígitos/pontuação/ligaduras/gregos/emoji nunca marcados, piso de 3 caracteres, share de 5% em bloco diluído, espaço fora do share, texto vazio limpo, constantes nomeadas, pureza/determinismo; **3** em `book.test.ts` — bloco corrompido ganha flag + confiança 0,3 + aviso do documento com **texto preservado**, glifo PUA isolado não dispara, OCR + corrompido fica com `["ocr-text-layer", "broken-font-mapping"]` e confiança 0,3). **Sonda no corpus inteiro** (26 livros, `.pagepace-cache/tmp/probe-brokenfont.ts`, só contagens): **2 blocos marcados** em `n4-pt-astrofisica` (19 caracteres suspeitos no livro todo) e **0 nos outros 25**; 3 near-misses protegidos pelo piso de 3 caracteres (piores shares 0,09 e 0,045, com 1 caractere suspeito cada). **`pnpm eval --ci` exit 0** — 7 medidos, `text_cer` 0,0000 nos 7 e demais métricas idênticas ao baseline (regra de ouro cumprida, baseline intocado).
+
+### ADR-050 · Dieta de contexto: arquivos quentes enxutos e orçamento de docs · accepted · 2026-10-11
+**Contexto:** STATE.md (145 KB) e DECISIONS.md (127 KB) são lidos e reenviados a cada sessão e estouram o limite de contexto; nada pode ser apagado.
+**Alternativas:** A · manter tudo nos arquivos quentes (custo de contexto recorrente) · B · histórico para `docs/extractor/archive/` e arquivos quentes dentro de um orçamento verificado por script.
+**Decisão:** B — STATE.md enxuto (≤ 8 KB, ≤ 90 linhas, Handoff ≤ 15 linhas, Log = 2 sessões), índice `ID | título | status` no topo de DECISIONS.md, respondidas do OPEN-QUESTIONS arquivadas e `pnpm check:docs` no `verify` e no CI.
+**Consequências:** o detalhe vive em `docs/extractor/archive/` e no git; ADR novo ≤ 12 linhas; violar o orçamento falha o CI com a instrução de mover para o archive. Revisar os limites se um dia apertarem.

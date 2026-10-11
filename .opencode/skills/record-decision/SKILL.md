@@ -5,7 +5,14 @@ description: Use sempre que escolher entre alternativas técnicas ou de produto,
 
 # Registrar decisão
 
-Abra `docs/extractor/DECISIONS.md` (ou `docs/app/DECISIONS.md`) e acrescente no fim, com o próximo número:
+Acrescente o ADR **no fim** de `docs/extractor/DECISIONS.md` (ou `docs/app/DECISIONS.md`) **sem abrir o arquivo inteiro** (ele é FRIO — ver "Leitura econômica" no AGENTS.md):
+
+1. **Próximo número:** `Select-String -Path docs\extractor\DECISIONS.md -Pattern '^### ADR-' | Select-Object -Last 1` — o próximo número é o maior + 1.
+2. **Acrescente com `Add-Content`** (nunca reescreva o arquivo): monte o ADR num here-string simples (`$adr = @' ... '@`, que começa ao fim da linha) e rode `Add-Content -Path docs\extractor\DECISIONS.md -Encoding utf8 -Value $adr`.
+3. **Atualize o índice do topo:** `pnpm decisions:index` (o script só reescreve a tabela entre `<!-- INDEX:START -->` e `<!-- INDEX:END -->`; os ADRs não são tocados).
+4. **Confira o orçamento:** `pnpm check:docs` — o ADR mais recente pode ter **no máximo 12 linhas**; se precisar de mais, mova o detalhe para `docs/extractor/archive/` e deixe o resumo.
+
+Formato (máximo 12 linhas):
 
 ```
 ### ADR-0NN · <título> · <accepted|provisional> · <AAAA-MM-DD>

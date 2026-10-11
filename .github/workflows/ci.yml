@@ -50,6 +50,12 @@ jobs:
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
       - run: pnpm test
       - run: pnpm check:no-pdf
+      # Docs context budget (DOCS-T01): STATE.md <= 8 KB / 90 lines,
+      # Handoff <= 15 lines, log = 2 sessions, AGENTS.md <= 10 KB and the
+      # newest ADR <= 12 lines. Everything trimmed must go to
+      # docs/extractor/archive/, never be deleted.
+      - name: Docs budget
+        run: pnpm check:docs
       # Corpus evaluation gate (the "golden rule", ADR-008): `pnpm eval --ci`
       # exits 1 when any metric is worse than packages/eval/baseline.json by
       # more than 0.002 absolute. The step only runs while the baseline exists,
