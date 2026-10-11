@@ -12,6 +12,7 @@ import {
   EXTRACTOR_VERSION,
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
+import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING } from "./brokenfont";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 
 const BODY = 11;
@@ -271,6 +272,50 @@ describe("buildBook", () => {
     const fromOcr = buildBook(doc([uncertain], { ocrTextLayer: true }));
     expect(fromOcr.blocks[0]?.flags).toEqual([UNCERTAIN_HYPHEN_FLAG]);
     expect(fromOcr.blocks[0]?.confidence).toBe(OCR_TEXT_LAYER_CONFIDENCE);
+  });
+
+  it("flags a block scrambled by a broken font mapping and warns the document (E3-T05)", () => {
+    const pua = (codePoint: number): string => String.fromCodePoint(codePoint);
+    const scrambled = `${pua(0xe001)}${pua(0xe002)}${pua(0xe003)}${pua(0xe004)} ABCD`;
+    const pages = [
+      page([item(scrambled, MARGIN, 100, BODY), item("A clean paragraph.", MARGIN, 140, BODY)]),
+    ];
+    const book = buildBook(doc(pages));
+    expect(book.blocks).toHaveLength(2);
+    // The text is kept — nothing is silently dropped — but it is marked.
+    expect(book.blocks[0]?.runs[0]?.text).toBe(scrambled);
+    expect(book.blocks[0]?.flags).toEqual([BROKEN_FONT_MAPPING]);
+    expect(book.blocks[0]?.confidence).toBe(BROKEN_FONT_CONFIDENCE);
+    expect(book.blocks[1]?.flags).toEqual([]);
+    expect(book.blocks[1]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
+    expect(book.extraction.warnings).toEqual([BROKEN_FONT_MAPPING]);
+    expect(book.extraction.avgConfidence).toBe(0.6);
+  });
+
+  it("keeps a stray private use glyph without flagging the block (E3-T05)", () => {
+    const stray = page([
+      item(
+        `An ordinary paragraph with a ${String.fromCodePoint(0xe022)} glyph inside.`,
+        MARGIN,
+        100,
+        BODY,
+      ),
+    ]);
+    const book = buildBook(doc([stray]));
+    expect(book.blocks[0]?.flags).toEqual([]);
+    expect(book.blocks[0]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
+    expect(book.extraction.warnings).toEqual([]);
+    expect(book.extraction.avgConfidence).toBe(BOOK_BLOCK_CONFIDENCE);
+  });
+
+  it("caps the confidence at the broken-font value for an OCR document (E3-T05)", () => {
+    const pua = String.fromCodePoint(0xe011);
+    const broken = page([item(`${pua}${pua}${pua}${pua} ABCD`, MARGIN, 100, BODY)]);
+    const book = buildBook(doc([broken], { ocrTextLayer: true }));
+    expect(book.extraction.warnings).toEqual(["ocr-text-layer", BROKEN_FONT_MAPPING]);
+    expect(book.blocks[0]?.flags).toEqual([BROKEN_FONT_MAPPING]);
+    expect(book.blocks[0]?.confidence).toBe(BROKEN_FONT_CONFIDENCE);
+    expect(book.extraction.avgConfidence).toBeLessThan(OCR_TEXT_LAYER_CONFIDENCE);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
+import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import { joinCrossPageParagraphs } from "./pagejoin";
@@ -53,6 +54,14 @@ import { normalizeForReader } from "./unicode";
  * the lines of both pages enter the same paragraph and `paragraphHyphenText`
  * sees the site.
  *
+ * Broken font mapping (E3-T05): a block whose text is full of U+FFFD or
+ * private use characters (a font without a usable `ToUnicode`) keeps its
+ * text but carries `flags: ["broken-font-mapping"]`, the reduced
+ * `BROKEN_FONT_CONFIDENCE` and the document-level warning of the same name —
+ * the reader is told instead of being handed silent garbage. The detection
+ * and its thresholds live in `brokenFontSignal`. `extraction.avgConfidence`
+ * is the mean of the block confidences, so one broken chapter moves it.
+ *
  * Known limits: a table of contents or metadata is not detected, the single
  * column rule of the paragraph layer stands, and the eval's `hyphen_join_acc`
  * still scores only intra-page sites (it walks the per-page paragraphs).
@@ -70,6 +79,8 @@ export const OCR_TEXT_LAYER_CONFIDENCE = 0.5;
 export const BLOCK_ID_HASH_CHARS = 32;
 /** Hex characters of the hash kept in the block id. */
 export const BLOCK_ID_HASH_LENGTH = 8;
+/** Decimal places kept in `extraction.avgConfidence` (deterministic rounding). */
+export const AVG_CONFIDENCE_DECIMALS = 2;
 
 /** Raised when the document produces no block the schema would accept. */
 export class BookError extends Error {
@@ -83,6 +94,14 @@ const encoder = new TextEncoder();
 
 function normalizeForHash(text: string): string {
   return normalizeForReader(text).replace(/\s+/g, " ").trim();
+}
+
+/** Mean of the block confidences, rounded so the same book always reports the same number. */
+export function averageConfidence(confidences: readonly number[]): number {
+  if (confidences.length === 0) return BOOK_BLOCK_CONFIDENCE;
+  const total = confidences.reduce((sum, value) => sum + value, 0);
+  const factor = 10 ** AVG_CONFIDENCE_DECIMALS;
+  return Math.round((total / confidences.length) * factor) / factor;
 }
 
 /** Stable id: origin page, ordinal on the page, hash of the start of the text. */
@@ -109,6 +128,8 @@ export function buildBook(document: RawDocument): Book {
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
+  const confidences: number[] = [];
+  let brokenBlocks = 0;
   const ordinals = new Map<number, number>();
   for (const paragraph of paragraphs) {
     const hyphen = paragraphHyphenText(paragraph.lines);
@@ -117,6 +138,18 @@ export function buildBook(document: RawDocument): Book {
     const ordinal = ordinals.get(paragraph.pageFrom) ?? 0;
     ordinals.set(paragraph.pageFrom, ordinal + 1);
     const pageLabel = stripped.pageLabels[paragraph.pageFrom];
+    const flags: string[] = [];
+    let blockConfidence = confidence;
+    if (hyphen.uncertain) {
+      flags.push(UNCERTAIN_HYPHEN_FLAG);
+      blockConfidence = Math.min(blockConfidence, HYPHEN_UNCERTAIN_CONFIDENCE);
+    }
+    if (brokenFontSignal(text).broken) {
+      flags.push(BROKEN_FONT_MAPPING);
+      blockConfidence = Math.min(blockConfidence, BROKEN_FONT_CONFIDENCE);
+      brokenBlocks += 1;
+    }
+    confidences.push(blockConfidence);
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: "paragraph",
@@ -126,14 +159,17 @@ export function buildBook(document: RawDocument): Book {
         pageTo: paragraph.pageTo,
         ...(pageLabel === null || pageLabel === undefined ? {} : { originalPageLabel: pageLabel }),
       },
-      confidence: hyphen.uncertain ? Math.min(confidence, HYPHEN_UNCERTAIN_CONFIDENCE) : confidence,
-      flags: hyphen.uncertain ? [UNCERTAIN_HYPHEN_FLAG] : [],
+      confidence: blockConfidence,
+      flags,
     });
   }
 
   if (blocks.length === 0) {
     throw new BookError("documento sem texto: nenhum bloco para gerar o Book");
   }
+
+  const warnings: string[] = fromOcr ? ["ocr-text-layer"] : [];
+  if (brokenBlocks > 0) warnings.push(BROKEN_FONT_MAPPING);
 
   return parseBook({
     schemaVersion: SCHEMA_VERSION,
@@ -145,8 +181,8 @@ export function buildBook(document: RawDocument): Book {
     extraction: {
       tool: EXTRACTOR_TOOL,
       version: EXTRACTOR_VERSION,
-      avgConfidence: confidence,
-      warnings: fromOcr ? ["ocr-text-layer"] : [],
+      avgConfidence: averageConfidence(confidences),
+      warnings,
     },
   });
 }

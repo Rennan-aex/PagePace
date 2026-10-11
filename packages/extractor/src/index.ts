@@ -1,5 +1,6 @@
 export { composeAccentItems } from "./accents";
 export {
+  AVG_CONFIDENCE_DECIMALS,
   BLOCK_ID_HASH_CHARS,
   BLOCK_ID_HASH_LENGTH,
   BOOK_BLOCK_CONFIDENCE,
@@ -10,6 +11,16 @@ export {
   EXTRACTOR_VERSION,
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
+export type { BrokenFontSignal } from "./brokenfont";
+export {
+  BROKEN_FONT_CONFIDENCE,
+  BROKEN_FONT_MAPPING,
+  BROKEN_FONT_MIN_SUSPECT_CHARS,
+  BROKEN_FONT_MIN_SUSPECT_SHARE,
+  brokenFontSignal,
+  isSuspectCodePoint,
+  REPLACEMENT_CHARACTER,
+} from "./brokenfont";
 export type { HyphenJoinDecision, HyphenJoinResult, HyphenSite } from "./hyphen";
 export {
   HYPHEN_CLITICS_EN,
