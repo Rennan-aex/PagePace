@@ -75,5 +75,5 @@
   - **(7) Docs:** **ADR-049 `accepted`** (sinal/limiares × texto preservado × esquema intocado × `avgConfidence`; limites conhecidos), fase, BACKLOG (pendência do `KNOWN_WARNING_CODES`), STATE.
 
 ## Checklist manual do PO
-- [ ] Conferi cabeçalhos/rodapés removidos em 2 livros e nenhum conteúdo foi perdido.
-- [ ] Conferi hifenização em 3 páginas de livro pt.
+- [x] Conferi cabeçalhos/rodapés removidos em 2 livros e nenhum conteúdo foi perdido. **Resultado (2026-10-11):** `n1-en-sofia` aprovado — repetições = só texto da história (2 blocos só-número apenas nas p. 1/2) e conferência visual da p. 41 completa: o trecho que parecia faltar estava no bloco `p39-b7` (`pageFrom 39 → pageTo 40`), parágrafo que **cruza a página** (E3-T04) — só o filtro `pageFrom` da conferência não o mostrava; nada foi removido a mais. **`n1-pt-curinga` reprovou:** 297 números de página viraram blocos (folio no meio do fluxo → **BACKLOG 2026-10-11**, P1).
+- [x] Conferi hifenização em 3 páginas de livro pt. **Resultado (2026-10-11):** só hífens legítimos, testado em várias páginas de `n1-pt-sofia` — aprovado.

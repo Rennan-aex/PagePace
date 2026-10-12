@@ -23,3 +23,71 @@ Data: ____ · Fase: ____ · Commit: ____ · Quem: ____
 
 ## Liberação
 - [ ] Libero a próxima fase em `docs/extractor/STATE.md`
+
+## Como rodar (PowerShell, testado em 2026-10-11)
+
+Pasta dos comandos: `C:\caminho\para\PagePace`.
+Os PDFs privados estão em `<CORPUS_PRIVATE_DIR>` (nunca entram no git).
+
+**(1) Gerar o JSON de um livro** — uma vez por livro, leva ~5 s:
+
+```powershell
+pnpm -s pagepace extract <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf > $env:TEMP\sofia.json
+```
+
+Deve terminar sem mensagem de erro e criar o arquivo em `C:\Users\<voce>\AppData\Local\Temp`.
+Se der erro: cole a mensagem inteira. Livros usados nos checklists:
+`n1-pt-sofia`, `n1-en-curinga` (E2) · `n1-pt-curinga`, `n1-en-sofia` (E3).
+
+**(2) Ver os parágrafos de uma página** — troque o número em `$pag`
+(é a página **menos 1**: `$pag = 11` mostra a página 12 do leitor):
+
+```powershell
+$b = Get-Content "$env:TEMP\sofia.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$pag = 11
+$b.blocks | Where-Object { $_.origin.pageFrom -eq $pag } | ForEach-Object {
+  $t = ($_.runs | ForEach-Object { $_.text }) -join ''
+  "--- pagina {0} [{1}] confianca {2}" -f ($_.origin.pageFrom + 1), $_.kind, $_.confidence
+  $t
+}
+```
+
+Deve aparecer o texto da página em blocos separados, com acentos certos.
+O que conferir (E2): texto corrido em blocos, espaços no lugar, sem linha cortada no meio.
+
+**(3) Achar cabeçalho/rodapé esquecido** — repete o texto em 4 ou mais páginas:
+
+```powershell
+$map = @{}
+foreach ($blk in $b.blocks) {
+  $t = (($blk.runs | ForEach-Object { $_.text }) -join '').Trim()
+  if ($t.Length -gt 2) { if ($map.ContainsKey($t)) { $map[$t]++ } else { $map[$t] = 1 } }
+}
+$map.GetEnumerator() | Where-Object { $_.Value -ge 4 } | Sort-Object Value -Descending | Format-Table -AutoSize
+```
+
+Deve aparecer **só texto que faz parte da história** (ex.: uma saudação de carta que
+repete no livro, ou `* * *` de cena). **Errado:** título do capítulo repetido em toda página.
+
+**(4) Achar número de página esquecido** — deve dar `0`:
+
+```powershell
+@($b.blocks | Where-Object { ((($_.runs | ForEach-Object { $_.text }) -join '') -match '^\s*(p\.?\s*)?\d{1,4}\s*$') }).Count
+```
+
+**(5) Conferir hifenização (E3)** — lista as palavras com hífen da página;
+hífen legítimo (guarda-chuva, well-known) fica; palavra cortada na quebra de linha
+(exem-plo) não pode aparecer:
+
+```powershell
+$pag = 11
+$b.blocks | Where-Object { $_.origin.pageFrom -eq $pag } | ForEach-Object {
+  $t = ($_.runs | ForEach-Object { $_.text }) -join ''
+  [regex]::Matches($t, '\S{0,20}-\S{0,20}') | ForEach-Object { $_.Value }
+}
+```
+
+Para a E3, repita (2) e (5) em **3 páginas** de `n1-pt-sofia` (comece por
+`$pag = 11`, `$pag = 100`, `$pag = 250`) e faça (3) e (4) em `n1-pt-curinga`
+e `n1-en-sofia`.
+

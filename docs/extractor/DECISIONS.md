@@ -55,6 +55,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-048 | Junção de parágrafos entre páginas: sinais de fronteira no núcleo, `buildBook` consolida | accepted |
 | ADR-049 | Fonte com mapeamento quebrado: sinal por bloco, texto preservado, aviso no documento | accepted |
 | ADR-050 | Dieta de contexto: arquivos quentes enxutos e orçamento de docs | accepted |
+| ADR-051 | Consertos dos achados dos checklists manuais numa rodada só | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -437,3 +438,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A · manter tudo nos arquivos quentes (custo de contexto recorrente) · B · histórico para `docs/extractor/archive/` e arquivos quentes dentro de um orçamento verificado por script.
 **Decisão:** B — STATE.md enxuto (≤ 8 KB, ≤ 90 linhas, Handoff ≤ 15 linhas, Log = 2 sessões), índice `ID | título | status` no topo de DECISIONS.md, respondidas do OPEN-QUESTIONS arquivadas e `pnpm check:docs` no `verify` e no CI.
 **Consequências:** o detalhe vive em `docs/extractor/archive/` e no git; ADR novo ≤ 12 linhas; violar o orçamento falha o CI com a instrução de mover para o archive. Revisar os limites se um dia apertarem.
+
+### ADR-051 · Consertos dos achados dos checklists manuais numa rodada só · accepted · 2026-10-11
+**Contexto:** os checklists manuais E2/E3 acharam 2 defeitos P1: (1) `\n` no meio de palavra dentro do bloco (marcador `hasEOL` caindo entre dois itens da mesma linha geométrica; ~3,6 mil ocorrências em 13 livros digitais, piores `n4-pt-astrofisica` 1.829 e `n1-en-curinga` 1.303) e (2) folio do `n1-pt-curinga` virando bloco (297 em 278 páginas — `detectRepeatedRegions` acha 0 regiões porque o número está **no meio** do fluxo, fora da 1ª/última linha da ADR-046). Pergunta do PO: consertar a cada achado ou depois de tudo testar?
+**Alternativas:** A · consertar no meio da rodada de testes (a cada achado a IA para, corrige, e o PO refaz trechos já aprovados) · B · fechar todos os checklists primeiro e fazer **uma tarefa só** com os dois consertos, no formato da skill `add-heuristic` (teste que falha antes, constantes nomeadas, `pnpm eval` sem regressão).
+**Decisão:** B (escolha 1A do PO) — os dois defeitos viram tarefa própria imediatamente após o fim dos checklists, na mesma rodada, avaliados juntos pelo gate de métricas.
+**Consequências:** os achados ficam no BACKLOG (P1) durante os testes, sem conserto de emergência, e o histórico de validação só contém testes; preço: tempo entre achado e conserto, aceito pelo PO.

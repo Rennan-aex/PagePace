@@ -74,4 +74,4 @@
   - **Fora do escopo (com tarefa própria):** split/junção de parágrafos entre páginas (E3-T04), hifenização (E3-T03), duas colunas/regiões (E6).
 
 ## Checklist manual do PO
-- [ ] Rodei `pnpm -s pagepace extract <caminho\do\livro.pdf>` em 2 livros N1 e os parágrafos parecem certos nas páginas que conferi (texto corrido em blocos, com os espaços no lugar).
+- [x] Rodei `pnpm -s pagepace extract <caminho\do\livro.pdf>` em 2 livros N1 e os parágrafos parecem certos nas páginas que conferi (texto corrido em blocos, com os espaços no lugar). **Resultado do PO (2026-10-11):** correto em `n1-pt-sofia` e `n1-en-curinga`; um defeito à parte — quebras no meio da palavra/palavra partida em `n1-en-curinga` → **BACKLOG 2026-10-11** (marcador `hasEOL` dentro da linha; 1.303 ocorrências), fora do escopo desta fase.
