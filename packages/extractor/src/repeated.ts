@@ -1,6 +1,6 @@
 import type { RawDocument, RawTextItem } from "@pagepace/schema";
 import { documentLines, type TextLine } from "./lines";
-import { itemsText } from "./spaces";
+import { lineText } from "./spaces";
 import { documentStats } from "./stats";
 import { normalizeForReader } from "./unicode";
 
@@ -24,8 +24,20 @@ import { normalizeForReader } from "./unicode";
  * foot survives as `pageLabels[page]`, which `buildBook` writes to
  * `origin.originalPageLabel` (REQ-EXT-06).
  *
- * Known limits: only the first and the last line of a page are candidates, so
- * a region inside the text block is never found; a page whose only line
+ * A folio the typesetter put in the **middle of the flow** (the `flow` band)
+ * has no stable baseline and no edge to sit on, so it can not cluster like a
+ * head or a foot. Its proof is the sequence itself: a numbered line, small
+ * like the body, with blank space on one of its sides
+ * (`FLOW_FOLIO_ISOLATION_FACTOR` of the line spacing) whose values increase
+ * from page to page by at most `FLOW_FOLIO_MAX_STEP`, on at least the same
+ * share of pages a region needs. Numbered edge lines the edge pass could not
+ * cluster (their baseline wanders) join the same proof. Every qualifying
+ * sequence is removed as one region and feeds `pageLabels` like a numbered
+ * foot.
+ *
+ * Known limits: only the first and the last line of a page are edge
+ * candidates, and only isolated numbered lines are flow candidates, so a
+ * repeated line that is neither is never found; a page whose only line
  * repeats with the neighbours loses it; a document with fewer than
  * `REPEATED_MIN_PAGES` pages keeps everything; and every public entry point
  * strips once — feed these functions the raw document, never one that already
@@ -42,9 +54,13 @@ export const REPEATED_FONT_MAX_FACTOR = 1.05;
 export const REPEATED_BASELINE_TOLERANCE_FACTOR = 0.5;
 /** Non-digit characters a page label may carry around its number ("- 42 -"). */
 export const PAGE_LABEL_DECORATION_MAX = 4;
+/** Vertical whitespace (fraction of the line spacing) that must flank a folio on at least one side. */
+export const FLOW_FOLIO_ISOLATION_FACTOR = 1.0;
+/** Largest step between two consecutive values of one folio sequence (measured max: 4). */
+export const FLOW_FOLIO_MAX_STEP = 5;
 
-/** Which edge of the page a region lives on. */
-export type RepeatedBand = "top" | "bottom";
+/** Which part of the page a region lives on. */
+export type RepeatedBand = "top" | "bottom" | "flow";
 
 /** One line a region removed, on one page. */
 export interface RepeatedOccurrence {
@@ -121,11 +137,22 @@ function signatureOf(text: string): { signature: string; numbered: boolean } {
   return { signature: `#${normalized.replace(/\d+/g, "#")}`, numbered: true };
 }
 
-const contentOf = (line: TextLine): string => itemsText(line.items);
+const contentOf = (line: TextLine): string => lineText(line.items);
 
-/** First and last line of every page that has text, when they are small enough. */
-function candidatesOf(pages: readonly TextLine[][], bodyFontSize: number): Candidate[] {
+/**
+ * Edge candidates (first and last line of each page) plus the mid-flow
+ * candidates: numbered lines, small like the body, with a blank line on at
+ * least one side (`FLOW_FOLIO_ISOLATION_FACTOR` of the line spacing) — the
+ * shape of a folio printed between paragraphs, whether or not the typesetter
+ * left air on both sides of it.
+ */
+function candidatesOf(
+  pages: readonly TextLine[][],
+  bodyFontSize: number,
+  lineHeight: number,
+): Candidate[] {
   const candidates: Candidate[] = [];
+  const isolation = FLOW_FOLIO_ISOLATION_FACTOR * lineHeight;
   pages.forEach((lines, page) => {
     if (lines.length === 0) return;
     // A page with a single line can only lose it as a header: treating it as
@@ -144,6 +171,18 @@ function candidatesOf(pages: readonly TextLine[][], bodyFontSize: number): Candi
       const { signature, numbered } = signatureOf(text);
       candidates.push({ band, page, line, text, signature, numbered });
     }
+    lines.forEach((line, index) => {
+      if (index === 0 || index === lines.length - 1) return;
+      if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) return;
+      const text = contentOf(line);
+      if (text.trim() === "") return;
+      const { signature, numbered } = signatureOf(text);
+      if (!numbered) return;
+      const above = line.top - (lines[index - 1] as TextLine).bottom;
+      const below = (lines[index + 1] as TextLine).top - line.bottom;
+      if (above < isolation && below < isolation) return;
+      candidates.push({ band: "flow", page, line, text, signature, numbered });
+    });
   });
   return candidates;
 }
@@ -170,12 +209,64 @@ function stableCluster(candidates: readonly Candidate[], tolerance: number): Can
   return best;
 }
 
+const BAND_RANK: Record<RepeatedBand, number> = { top: 0, bottom: 1, flow: 2 };
+
 function compareRegions(a: RepeatedRegion, b: RepeatedRegion): number {
-  if (a.band !== b.band) return a.band === "top" ? -1 : 1;
+  const band = BAND_RANK[a.band] - BAND_RANK[b.band];
+  if (band !== 0) return band;
   const firstA = a.occurrences[0]?.page ?? 0;
   const firstB = b.occurrences[0]?.page ?? 0;
   if (firstA !== firstB) return firstA - firstB;
   return a.signature < b.signature ? -1 : a.signature > b.signature ? 1 : 0;
+}
+
+/**
+ * Greedy runs of flow candidates whose printed values increase page after
+ * page by at most `FLOW_FOLIO_MAX_STEP`: a value that repeats, decreases or
+ * jumps too far starts a new run, and only a run long enough to be a region
+ * (`minimum` pages) is kept. The sequence is the proof — the baselines of a
+ * folio wander (chapter openings, part titles), so they can not cluster like
+ * a head or a foot. Candidates are read top to bottom inside each page, the
+ * way the book prints them.
+ */
+function flowRuns(candidates: readonly Candidate[], minimum: number): Candidate[][] {
+  const sorted = [...candidates].sort((a, b) => a.page - b.page || a.line.top - b.line.top);
+  const runs: Candidate[][] = [];
+  let run: Candidate[] = [];
+  let previousValue = Number.NaN;
+  for (const candidate of sorted) {
+    const value = Number(labelOf(candidate.text));
+    const continues =
+      run.length > 0 && value > previousValue && value - previousValue <= FLOW_FOLIO_MAX_STEP;
+    if (!continues && run.length >= minimum) runs.push(run);
+    if (!continues) run = [];
+    run.push(candidate);
+    previousValue = value;
+  }
+  if (run.length >= minimum) runs.push(run);
+  return runs;
+}
+
+/** Turns accepted candidates into a region, in reading order, and records the removal. */
+function acceptRegion(
+  band: RepeatedBand,
+  candidates: readonly Candidate[],
+  regions: RepeatedRegion[],
+  removedLines: RemovedLine[],
+): void {
+  const occurrences: RepeatedOccurrence[] = [];
+  for (const candidate of [...candidates].sort(
+    (a, b) => a.page - b.page || a.line.top - b.line.top,
+  )) {
+    const occurrence: RepeatedOccurrence = {
+      page: candidate.page,
+      text: candidate.text,
+      pageLabel: candidate.numbered ? labelOf(candidate.text) : null,
+    };
+    occurrences.push(occurrence);
+    removedLines.push({ page: candidate.page, line: candidate.line, occurrence });
+  }
+  regions.push({ band, signature: (candidates[0] as Candidate).signature, occurrences });
 }
 
 function analyze(document: RawDocument): Analysis {
@@ -190,7 +281,14 @@ function analyze(document: RawDocument): Analysis {
   const minimum = Math.max(REPEATED_MIN_PAGES, Math.ceil(REPEATED_MIN_PAGE_SHARE * pagesWithText));
 
   const groups = new Map<string, Candidate[]>();
-  for (const candidate of candidatesOf(pages, stats.bodyFontSize)) {
+  const flowCandidates: Candidate[] = [];
+  const numberedEdges: Candidate[] = [];
+  for (const candidate of candidatesOf(pages, stats.bodyFontSize, stats.lineHeight)) {
+    if (candidate.band === "flow") {
+      flowCandidates.push(candidate);
+      continue;
+    }
+    if (candidate.numbered) numberedEdges.push(candidate);
     const key = `${candidate.band}|${candidate.signature}`;
     const bucket = groups.get(key);
     if (bucket === undefined) groups.set(key, [candidate]);
@@ -202,18 +300,23 @@ function analyze(document: RawDocument): Analysis {
   for (const bucket of groups.values()) {
     const cluster = stableCluster(bucket, tolerance);
     if (cluster.length < minimum) continue;
-    const head = bucket[0] as Candidate;
-    const occurrences: RepeatedOccurrence[] = [];
-    for (const candidate of [...cluster].sort((a, b) => a.page - b.page)) {
-      const occurrence: RepeatedOccurrence = {
-        page: candidate.page,
-        text: candidate.text,
-        pageLabel: candidate.numbered ? labelOf(candidate.text) : null,
-      };
-      occurrences.push(occurrence);
-      removedLines.push({ page: candidate.page, line: candidate.line, occurrence });
-    }
-    regions.push({ band: head.band, signature: head.signature, occurrences });
+    acceptRegion((bucket[0] as Candidate).band, cluster, regions, removedLines);
+  }
+  // An edge folio whose baseline wanders (a chapter opening pushes it down)
+  // can not cluster like a running head: the sequence picks up the numbered
+  // edges the edge pass left behind — except on a page whose only line it
+  // is, which no region may ever empty.
+  const removedLineSet = new Set(removedLines.map((entry) => entry.line));
+  const singleLinePages = new Set<number>();
+  pages.forEach((lines, page) => {
+    if (lines.length <= 1) singleLinePages.add(page);
+  });
+  for (const candidate of numberedEdges) {
+    if (singleLinePages.has(candidate.page)) continue;
+    if (!removedLineSet.has(candidate.line)) flowCandidates.push({ ...candidate, band: "flow" });
+  }
+  for (const run of flowRuns(flowCandidates, minimum)) {
+    acceptRegion("flow", run, regions, removedLines);
   }
   regions.sort(compareRegions);
   removedLines.sort((a, b) => a.page - b.page);

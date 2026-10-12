@@ -1,4 +1,5 @@
 import type { RawTextItem } from "@pagepace/schema";
+import { joinsLineBox, type LineBox } from "./lines";
 
 /**
  * Space inference (E2-T03 — layer 2, "espaços inferidos por lacuna de
@@ -32,15 +33,37 @@ export function spaceBetween(previous: RawTextItem, next: RawTextItem): boolean 
   return gap > SPACE_GAP_FACTOR * Math.max(previous.fontSize, next.fontSize);
 }
 
-/**
- * Text of an ordered run of items (a page, in producer order): pdf.js line-end
- * markers (`hasEOL`) break the line, every other boundary follows the gap rule.
- * Empty marker items are skipped — they carry no text, only the flag.
+/** Text of the items of one **page** (producer order): a line-end marker breaks
+ * the line, every other boundary follows the gap rule. Empty marker items are
+ * skipped — they carry no text, only the flag.
+ *
+ * A marker breaks only when the run after it would **not** join the line box
+ * the run before it built (`joinsLineBox`, the very rule `groupLines` groups
+ * by): a marker pdf.js dropped between two runs of the same visual line is an
+ * artifact, and the pair goes through the gap rule instead — a word split in
+ * half comes out whole, a justified gap still gets its space, and a
+ * superscript never opens a phantom line. Pages only: the caller that already
+ * has a visual line uses `lineText`, where a marker can never break anything.
  */
 export function itemsText(items: readonly RawTextItem[]): string {
+  return runsText(items, true);
+}
+
+/**
+ * Text of the items of one **visual line** (`groupLines` already decided the
+ * line): pdf.js line-end markers are artifacts here and never break — the
+ * caller joins the lines itself, so any `\n` inside would end up in the middle
+ * of the reader's block text.
+ */
+export function lineText(items: readonly RawTextItem[]): string {
+  return runsText(items, false);
+}
+
+function runsText(items: readonly RawTextItem[], breaksAtLineEnd: boolean): string {
   let output = "";
   let previous: RawTextItem | null = null;
   let lineEnded = false;
+  let box: LineBox | null = null;
 
   for (const item of items) {
     if (item.text === "") {
@@ -48,9 +71,20 @@ export function itemsText(items: readonly RawTextItem[]): string {
       continue;
     }
     if (previous !== null) {
-      if (lineEnded) output += "\n";
+      const sameLine = box !== null && joinsLineBox(item, box);
+      if (breaksAtLineEnd && lineEnded && !sameLine) output += "\n";
       else if (spaceBetween(previous, item)) output += " ";
+      if (!sameLine) box = null;
     }
+    const baseline = item.y + item.height;
+    box =
+      box === null
+        ? { anchor: baseline, top: item.y, bottom: baseline }
+        : {
+            anchor: box.anchor,
+            top: Math.min(box.top, item.y),
+            bottom: Math.max(box.bottom, baseline),
+          };
     output += item.text;
     previous = item;
     lineEnded = item.hasEOL === true;

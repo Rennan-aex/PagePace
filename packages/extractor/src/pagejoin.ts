@@ -1,6 +1,6 @@
 import type { TextLine } from "./lines";
 import { PARAGRAPH_INDENT_FACTOR } from "./paragraphs";
-import { itemsText } from "./spaces";
+import { lineText } from "./spaces";
 
 /**
  * Cross-page paragraph join (E3-T04 — REQ-EXT-18).
@@ -127,7 +127,7 @@ export function joinCrossPageParagraphs(
         const lastLine = previous.lines.at(-1);
         const firstLine = paragraph[0];
         if (lastLine !== undefined && firstLine !== undefined) {
-          const lastText = itemsText(lastLine.items);
+          const lastText = lineText(lastLine.items);
           if (
             !endsSentence(lastText) &&
             !isTitleLine(lastLine, bodyFontSize) &&

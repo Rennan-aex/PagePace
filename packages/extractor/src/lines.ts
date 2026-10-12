@@ -38,22 +38,40 @@ export interface TextLine {
   fontSize: number;
 }
 
-interface MutableLine {
-  /** Baseline of the first (topmost) item — the reference new items compare to. */
-  anchor: number;
-  top: number;
-  bottom: number;
+interface MutableLine extends LineBox {
   items: RawTextItem[];
 }
 
 const hasContent = (item: RawTextItem): boolean => item.text.trim() !== "";
 const baselineOf = (item: RawTextItem): number => item.y + item.height;
 
-function joinsLine(item: RawTextItem, line: MutableLine): boolean {
+/**
+ * Vertical box a line accumulates as items join it: the anchor baseline the
+ * candidates compare to, plus the outermost top and bottom so far.
+ */
+export interface LineBox {
+  /** Baseline of the first (topmost) item — the reference new items compare to. */
+  anchor: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Whether `item` belongs to the line box: the baseline test `groupLines` joins
+ * by, plus the overlap fallback for raised/lowered items (superscripts). This
+ * is one rule for both callers — `groupLines` builds lines with it and
+ * `itemsText` asks it before a pdf.js line-end marker may break the text, so
+ * a marker can never break where the line grouping itself would not.
+ */
+export function joinsLineBox(item: RawTextItem, box: LineBox): boolean {
   const tolerance = LINE_BASELINE_TOLERANCE_FACTOR * item.fontSize;
-  if (Math.abs(baselineOf(item) - line.anchor) <= tolerance) return true;
-  const overlap = Math.min(baselineOf(item), line.bottom) - Math.max(item.y, line.top);
+  if (Math.abs(baselineOf(item) - box.anchor) <= tolerance) return true;
+  const overlap = Math.min(baselineOf(item), box.bottom) - Math.max(item.y, box.top);
   return overlap >= LINE_OVERLAP_MIN_FACTOR * item.height;
+}
+
+function joinsLine(item: RawTextItem, line: LineBox): boolean {
+  return joinsLineBox(item, line);
 }
 
 function startLine(item: RawTextItem): MutableLine {

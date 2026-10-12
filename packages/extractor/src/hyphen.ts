@@ -1,5 +1,5 @@
 import type { TextLine } from "./lines";
-import { itemsText } from "./spaces";
+import { lineText } from "./spaces";
 
 /**
  * Hyphenation join (E3-T03 — REQ-EXT-07): a word the typesetter broke with a
@@ -177,5 +177,5 @@ export function joinHyphenatedText(text: string): string {
  * through the space rule, hyphen sites glued by the decision above.
  */
 export function paragraphHyphenText(paragraph: readonly TextLine[]): HyphenJoinResult {
-  return joinHyphenatedLines(paragraph.map((line) => itemsText(line.items)));
+  return joinHyphenatedLines(paragraph.map((line) => lineText(line.items)));
 }

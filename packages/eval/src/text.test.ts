@@ -66,15 +66,25 @@ describe("pageText", () => {
 
   it("breaks the line where pdf.js reports hasEOL", () => {
     const first = item("Line one", 72, { hasEOL: true });
-    const second = item("Line two", 72);
+    // The next line sits a leading below: different line box, real break.
+    const second = item("Line two", 72, { y: 116 });
     expect(pageText(page([first, second]))).toBe("Line one\nLine two");
   });
 
   it("reads the empty marker items pdf.js puts between lines", () => {
     const first = item("Line one", 72);
     const marker = item("", 72, { hasEOL: true, width: 0 });
-    const second = item("Line two", 72);
+    const second = item("Line two", 72, { y: 116 });
     expect(pageText(page([first, marker, second]))).toBe("Line one\nLine two");
+  });
+
+  it("does not break where a marker falls between two runs of one line", () => {
+    // pdf.js drops hasEOL markers mid-line too: the runs share the line box,
+    // so the marker is an artifact and the gap rule decides the boundary.
+    const first = item("Mama we", 72, { width: 40 });
+    const marker = item("", 112, { hasEOL: true, width: 0 });
+    const second = item("nt out", 112.2, { width: 40 });
+    expect(pageText(page([first, marker, second]))).toBe("Mama went out");
   });
 
   it("keeps explicit space runs and ignores empty runs without EOL", () => {

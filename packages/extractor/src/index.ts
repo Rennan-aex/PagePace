@@ -74,6 +74,8 @@ export type {
 } from "./repeated";
 export {
   detectRepeatedRegions,
+  FLOW_FOLIO_ISOLATION_FACTOR,
+  FLOW_FOLIO_MAX_STEP,
   PAGE_LABEL_DECORATION_MAX,
   REPEATED_BASELINE_TOLERANCE_FACTOR,
   REPEATED_FONT_MAX_FACTOR,
@@ -81,7 +83,7 @@ export {
   REPEATED_MIN_PAGES,
   stripRepeatedRegions,
 } from "./repeated";
-export { itemsText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
+export { itemsText, lineText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {
   documentStats,

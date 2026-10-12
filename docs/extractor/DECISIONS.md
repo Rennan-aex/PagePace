@@ -56,6 +56,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-049 | Fonte com mapeamento quebrado: sinal por bloco, texto preservado, aviso no documento | accepted |
 | ADR-050 | Dieta de contexto: arquivos quentes enxutos e orçamento de docs | accepted |
 | ADR-051 | Consertos dos achados dos checklists manuais numa rodada só | accepted |
+| ADR-052 | Marcador hasEOL mid-run e folio no meio do fluxo | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -444,3 +445,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A · consertar no meio da rodada de testes (a cada achado a IA para, corrige, e o PO refaz trechos já aprovados) · B · fechar todos os checklists primeiro e fazer **uma tarefa só** com os dois consertos, no formato da skill `add-heuristic` (teste que falha antes, constantes nomeadas, `pnpm eval` sem regressão).
 **Decisão:** B (escolha 1A do PO) — os dois defeitos viram tarefa própria imediatamente após o fim dos checklists, na mesma rodada, avaliados juntos pelo gate de métricas.
 **Consequências:** os achados ficam no BACKLOG (P1) durante os testes, sem conserto de emergência, e o histórico de validação só contém testes; preço: tempo entre achado e conserto, aceito pelo PO.
+
+### ADR-052 · Marcador hasEOL mid-run e folio no meio do fluxo · accepted · 2026-10-12
+**Contexto:** dois P1 dos checklists de 2026-10-11: `\n` no meio da palavra dentro de um bloco (marcador pdf.js `hasEOL` solto entre runs da mesma linha — 8.635 parágrafos afetados nos 13 PDFs digitais) e folio entre parágrafos virando bloco `paragraph` (`n1-pt-curinga`: 297 blocos só-número, baseline instável e fora das bordas da página).
+**Alternativas:** `\n` — A: testar o par de runs com tolerância de baseline (falha em sobrescritos/frações, que o `groupLines` só junta pela caixa da linha); B: decidir com `joinsLineBox` (a própria regra do `groupLines`) e criar `lineText`, sem quebra, para quem já tem a linha. Folio — A: exigir linha em branco dos dois lados (deixa 80 casos); B: isolamento de um lado + bordas numeradas não agrupadas entram na prova sequencial.
+**Decisão:** B nos dois casos. Páginas usam `itemsText` (quebra só quando o run seguinte não entra na caixa da linha); linhas usam `lineText` (nunca quebra). O folio mid-flow virou a banda `flow` de `RepeatedBand`: numerado, ≤ 1,05 × corpo, linha em branco de um lado, valores crescentes com passo ≤ `FLOW_FOLIO_MAX_STEP` (5, medido 4) em ≥ `minimum` páginas; alimenta `pageLabels`.
+**Consequências:** zero `\n` dentro de bloco no corpus digital; `n1-pt-curinga` foi de 297 para 0 blocos só-número (1.927 `pageLabels`). Número de corpo isolado que case com a sequência pode ser removido (aceito, medido sem regressão no `pnpm eval --ci`); revisar se um golden real mostrar remoção errada.

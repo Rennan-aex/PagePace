@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { documentParagraphs, paragraphText } from "./paragraphs";
 import {
   detectRepeatedRegions,
+  FLOW_FOLIO_ISOLATION_FACTOR,
+  FLOW_FOLIO_MAX_STEP,
   PAGE_LABEL_DECORATION_MAX,
   REPEATED_BASELINE_TOLERANCE_FACTOR,
   REPEATED_FONT_MAX_FACTOR,
@@ -101,6 +103,78 @@ function runningHeadBook(): RawDocument {
     fixturePage(0, { head: "MY BOOK", foot: "1" }),
     fixturePage(1, { head: "MY BOOK", foot: "2" }),
     fixturePage(2, { head: "MY BOOK", foot: "3" }),
+  ]);
+}
+
+const FLOW_BODY_LINES = 6;
+
+/**
+ * The n1-pt-curinga shape: a numbered line in the middle of the flow, body
+ * text around it and a baseline that need not repeat from page to page —
+ * only the printed value carries the sequence. `folioBaseline = 700` glues
+ * the number to the text above it; `tailOffset = 15` closes the blank line
+ * below it as well.
+ */
+function flowFolioPage(
+  index: number,
+  folio: string | null,
+  folioBaseline = 715,
+  folioSize = BODY,
+  tailOffset = 30,
+): RawPage {
+  const items: RawTextItem[] = [];
+  for (let n = 0; n < FLOW_BODY_LINES; n++) {
+    items.push(
+      item(`Body line ${index + 1}.${n + 1} of the page text.`, MARGIN, 610 + n * LEADING, BODY, {
+        width: 400,
+      }),
+    );
+  }
+  if (folio !== null) {
+    items.push(item(folio, MARGIN, folioBaseline, folioSize));
+    items.push(
+      item(
+        `Closing line ${index + 1} of the page text.`,
+        MARGIN,
+        folioBaseline + tailOffset,
+        BODY,
+        {
+          width: 400,
+        },
+      ),
+    );
+  } else {
+    items.push(
+      item(`Closing line ${index + 1} of the page text.`, MARGIN, 715, BODY, { width: 400 }),
+    );
+  }
+  return page(items, index);
+}
+
+/** A page whose folio opens it: an edge number with a baseline that wanders. */
+function edgeFolioPage(index: number, folio: string, folioBaseline: number): RawPage {
+  const items: RawTextItem[] = [item(folio, MARGIN, folioBaseline, BODY)];
+  for (let n = 0; n < FLOW_BODY_LINES; n++) {
+    items.push(
+      item(
+        `Body line ${index + 1}.${n + 1} of the page text.`,
+        MARGIN,
+        folioBaseline + 45 + n * LEADING,
+        BODY,
+        { width: 400 },
+      ),
+    );
+  }
+  return page(items, index);
+}
+
+/** Four pages carrying the folios 16 to 19 between the body lines. */
+function flowFolioBook(): RawDocument {
+  return doc([
+    flowFolioPage(0, "16", 715),
+    flowFolioPage(1, "17", 720),
+    flowFolioPage(2, "18", 712),
+    flowFolioPage(3, "19", 725),
   ]);
 }
 
@@ -231,6 +305,107 @@ describe("stripRepeatedRegions", () => {
     expect(REPEATED_BASELINE_TOLERANCE_FACTOR).toBeGreaterThan(0);
     expect(REPEATED_BASELINE_TOLERANCE_FACTOR).toBeLessThan(1);
     expect(PAGE_LABEL_DECORATION_MAX).toBeGreaterThanOrEqual(0);
+    // One blank line of whitespace (1.0 leading) isolates a folio; the
+    // measured corpus never stepped a folio sequence by more than 4.
+    expect(FLOW_FOLIO_ISOLATION_FACTOR).toBe(1);
+    expect(FLOW_FOLIO_MAX_STEP).toBe(5);
+  });
+});
+
+describe("mid-flow folios (the flow band)", () => {
+  it("removes the folio sequence in the middle of the flow and fills the page labels", () => {
+    const stripped = stripRepeatedRegions(flowFolioBook());
+    expect(stripped.removed.map((occurrence) => occurrence.text)).toEqual(["16", "17", "18", "19"]);
+    // The baselines wander (712 to 725): only the increasing values prove it.
+    expect(stripped.regions.map((region) => region.band)).toEqual(["flow"]);
+    expect(stripped.pageLabels).toEqual(["16", "17", "18", "19"]);
+    const firstPage = stripped.document.pages[0] as RawPage;
+    expect(firstPage.items.map((current) => current.text)).not.toContain("16");
+    expect(firstPage.items).toHaveLength(FLOW_BODY_LINES + 1);
+  });
+
+  it("keeps a mid-flow number the blank lines do not isolate", () => {
+    const stripped = stripRepeatedRegions(
+      doc([
+        flowFolioPage(0, "16", 700, BODY, 15),
+        flowFolioPage(1, "17", 700, BODY, 15),
+        flowFolioPage(2, "18", 700, BODY, 15),
+        flowFolioPage(3, "19", 700, BODY, 15),
+      ]),
+    );
+    expect(stripped.removed).toEqual([]);
+  });
+
+  it("removes a folio glued to the text above when the blank line sits below", () => {
+    const stripped = stripRepeatedRegions(
+      doc([
+        flowFolioPage(0, "16", 700),
+        flowFolioPage(1, "17", 700),
+        flowFolioPage(2, "18", 700),
+        flowFolioPage(3, "19", 700),
+      ]),
+    );
+    expect(stripped.removed.map((occurrence) => occurrence.text)).toEqual(["16", "17", "18", "19"]);
+  });
+
+  it("picks up an edge folio whose baseline wanders", () => {
+    // The edge pass needs a stable baseline; a chapter opening pushes the
+    // folio down. The sequence still proves it and takes it over.
+    const stripped = stripRepeatedRegions(
+      doc([
+        edgeFolioPage(0, "16", 70),
+        edgeFolioPage(1, "17", 85),
+        edgeFolioPage(2, "18", 75),
+        edgeFolioPage(3, "19", 90),
+      ]),
+    );
+    expect(stripped.removed.map((occurrence) => occurrence.text)).toEqual(["16", "17", "18", "19"]);
+    expect(stripped.regions.map((region) => region.band)).toEqual(["flow"]);
+  });
+
+  it("keeps the numbers when the sequence jumps: a body number is not a folio", () => {
+    const stripped = stripRepeatedRegions(
+      doc([
+        flowFolioPage(0, "16", 715),
+        flowFolioPage(1, "17", 715),
+        flowFolioPage(2, "40", 715),
+        flowFolioPage(3, "41", 715),
+      ]),
+    );
+    expect(stripped.removed).toEqual([]);
+  });
+
+  it("keeps a sequence too short to be a region", () => {
+    const stripped = stripRepeatedRegions(
+      doc([
+        flowFolioPage(0, "16", 715),
+        flowFolioPage(1, "17", 715),
+        flowFolioPage(2, null),
+        flowFolioPage(3, null),
+        flowFolioPage(4, null),
+        flowFolioPage(5, null),
+      ]),
+    );
+    expect(stripped.removed).toEqual([]);
+  });
+
+  it("keeps a mid-flow number bigger than the body font", () => {
+    const stripped = stripRepeatedRegions(
+      doc([
+        flowFolioPage(0, "16", 715, 18),
+        flowFolioPage(1, "17", 715, 18),
+        flowFolioPage(2, "18", 715, 18),
+        flowFolioPage(3, "19", 715, 18),
+      ]),
+    );
+    expect(stripped.removed).toEqual([]);
+  });
+
+  it("reports the flow region without touching the document", () => {
+    const document = flowFolioBook();
+    const regions = detectRepeatedRegions(document);
+    expect(regions.map((region) => region.band)).toEqual(["flow"]);
+    expect(document.pages[0]?.items.map((current) => current.text)).toContain("16");
   });
 });
 
@@ -264,5 +439,11 @@ describe("documentParagraphs after the strip", () => {
         "Body line 3.1 of the page text. Body line 3.2 of the page text. Body line 3.3 of the page text.",
       ],
     ]);
+  });
+
+  it("drops a mid-flow folio before grouping: the number is never a paragraph", () => {
+    const texts = documentParagraphs(flowFolioBook()).flat().map(paragraphText);
+    expect(texts).not.toContain("16");
+    expect(texts).not.toContain("17");
   });
 });

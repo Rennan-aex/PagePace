@@ -14,7 +14,7 @@ import {
   documentLines,
   documentParagraphs,
   ingestPdfjs,
-  itemsText,
+  lineText,
   paragraphHyphenText,
   paragraphText,
   ScannedPdfError,
@@ -451,7 +451,7 @@ export function headerFooterRemoval(
     const haystack = pageText.get(page) ?? global;
     const trigrams = pageTrigrams.get(page) ?? globalTrigrams;
     for (const line of lines) {
-      const text = normalizeText(itemsText(line.items));
+      const text = normalizeText(lineText(line.items));
       if (text === "") continue;
       if (haystack.includes(` ${text} `) || holdsByTrigrams(text, trigrams)) continue;
       reference.push(`${page}:${text}`);

@@ -237,6 +237,34 @@ describe("paragraphText", () => {
     expect(paragraphText(lines)).toBe("word next");
   });
 
+  it("keeps a word whole when pdf.js dropped a hasEOL marker mid-line", () => {
+    // The marker sits on the baseline of the line between two touching runs:
+    // the block text must come out as one word, with no line break inside.
+    const lines = groupLines(
+      page([
+        item("Mama we", MARGIN, 100, 12),
+        item("", MARGIN + 42, 100, 12, { hasEOL: true, width: 0, y: 100, height: 0 }),
+        item("nt out", MARGIN + 42.2, 100, 12),
+      ]),
+    );
+    expect(paragraphText(lines)).toBe("Mama went out");
+  });
+
+  it("keeps no line break inside the block when the marker splits runs of one line", () => {
+    // Equation shape (n4-pt-astrofisica): the producer put an end-of-line
+    // marker between two runs groupLines merged into one line (a superscript
+    // above the baseline). Whatever the geometry, block text never carries \n.
+    const lines = groupLines(
+      page([
+        item("R", MARGIN, 100, 12),
+        item("", MARGIN + 6, 95, 12, { hasEOL: true, width: 0, y: 95, height: 0 }),
+        item("2", MARGIN + 6, 95, 8),
+      ]),
+    );
+    expect(lines).toHaveLength(1);
+    expect(paragraphText(lines)).toBe("R2");
+  });
+
   it("is empty for an empty paragraph", () => {
     expect(paragraphText([])).toBe("");
   });

@@ -3,7 +3,7 @@
 // docs/extractor/DECISIONS.md (ADR-040), not from a guess.
 import type { RawTextItem } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
-import { itemsText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
+import { itemsText, lineText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 
 const item = (text: string, x: number, options: Partial<RawTextItem> = {}): RawTextItem => ({
   text,
@@ -89,13 +89,35 @@ describe("itemsText", () => {
   });
 
   it("breaks the line where pdf.js reports hasEOL", () => {
-    expect(itemsText([item("Line one", 72, { hasEOL: true }), item("Line two", 72)])).toBe(
+    // The next line sits one leading below the first, the way a real page
+    // prints it: different baselines are a real break, marker or not.
+    expect(
+      itemsText([item("Line one", 72, { hasEOL: true }), item("Line two", 72, { y: 112 })]),
+    ).toBe("Line one\nLine two");
+    const marker = item("", 72, { hasEOL: true, width: 0, y: 112, height: 0 });
+    expect(itemsText([item("Line one", 72), marker, item("Line two", 72, { y: 112 })])).toBe(
       "Line one\nLine two",
     );
-    const marker = item("", 72, { hasEOL: true, width: 0 });
-    expect(itemsText([item("Line one", 72), marker, item("Line two", 72)])).toBe(
-      "Line one\nLine two",
-    );
+  });
+
+  it("glues the word a mid-line hasEOL marker split (same baseline, x touching)", () => {
+    // Corpus shape (n1-en-curinga): the marker sits on the baseline of the
+    // line, between two runs that touch — one word, no break, no space.
+    const marker = item("", 119.6, { hasEOL: true, width: 0, y: 112, height: 0 });
+    const line = [
+      item("Mama we", 72, { width: 47.6 }),
+      marker,
+      item("nt out", 119.8, { width: 40 }),
+    ];
+    expect(itemsText(line)).toBe("Mama went out");
+  });
+
+  it("keeps the word gap when a mid-line hasEOL marker falls inside it", () => {
+    // The same artifact inside a justified gap is still a word boundary: the
+    // gap rule decides, the marker adds nothing of its own.
+    const marker = item("", 92, { hasEOL: true, width: 0, y: 112, height: 0 });
+    const line = [item("word", 72, { width: 20 }), marker, item("other", 97, { width: 30 })];
+    expect(itemsText(line)).toBe("word other");
   });
 
   it("ignores marker items without an end of line", () => {
@@ -104,5 +126,34 @@ describe("itemsText", () => {
 
   it("returns an empty string for no items", () => {
     expect(itemsText([])).toBe("");
+  });
+});
+
+describe("lineText", () => {
+  it("never breaks: the line is decided, a marker inside it is just a marker", () => {
+    // Equation shape (n4-pt-astrofisica): two runs of one visual line at
+    // different baselines with a marker between them. The page text would
+    // break there; the line text must not — the caller joins the lines.
+    const marker = item("", 92, { hasEOL: true, width: 0, y: 124, height: 0 });
+    const runs = [item("num", 72, { width: 20 }), marker, item("den", 95, { y: 116, width: 20 })];
+    expect(lineText(runs)).toBe("num den");
+    expect(itemsText(runs)).toBe("num\nden");
+  });
+
+  it("glues the word a mid-line hasEOL marker split", () => {
+    const marker = item("", 119.6, { hasEOL: true, width: 0, y: 112, height: 0 });
+    const runs = [
+      item("Mama we", 72, { width: 47.6 }),
+      marker,
+      item("nt out", 119.8, { width: 40 }),
+    ];
+    expect(lineText(runs)).toBe("Mama went out");
+  });
+
+  it("applies the gap rule across a marker", () => {
+    const marker = item("", 92, { hasEOL: true, width: 0, y: 112, height: 0 });
+    expect(
+      lineText([item("word", 72, { width: 20 }), marker, item("other", 97, { width: 30 })]),
+    ).toBe("word other");
   });
 });
