@@ -11,9 +11,10 @@
 - Clusters de tamanho/peso/espaçamento relativos ao corpo; centralização; linhas curtas isoladas; numeração (`1.2`, `Capítulo`); evitar legendas e epígrafes.
 - **Aceite:** `heading_f1` e `heading_level_acc` ≥ meta; relatório de falsos positivos.
 - **Feito (branch `e4-t02-detect-headings`, ADR-055):** `headings.ts` (porta + sinais de exibição, nível por cluster de tamanho com fallback na ordem de leitura), `buildBook` emite `kind: "heading"` com `level`, `headingDetection` + `blockHeadingDetection` no eval (coluna, seção de falsos positivos e `METRIC_DIRECTIONS`). `pnpm verify` verde (565 testes); `heading_f1`/`heading_level_acc` = 1,0000 em 6 dos 7 medidos e 0,0000 em `syn-n2-en-columns` (colunas = alvo da E6; nenhum falso positivo em nenhum documento); baseline atualizado, nenhum outro regrediu.
-### E4-T03 · Sumário
+### E4-T03 · Sumário — **concluída 2026-10-14**
 - Usar bookmarks do PDF quando existirem e conferir com títulos detectados; fallback: derivar dos títulos. Cada entrada aponta para `blockId`.
 - **Aceite:** teste com PDF com e sem bookmarks; discrepâncias viram `warnings`.
+- **Feito (branch `e4-t03-build-toc`, ADR-056):** `toc.ts` (`flattenOutline` pré-ordem + `buildToc(blocks, outline?)` — título/nível do bookmark quando ele casa com um título detectado, título da página ou primeiro bloco como *fallback*, entrada descartada quando não há destino; sem outline o toc é a lista dos títulos detectados) + integração em `buildBook` (nível do bookmark substitui o nível detectado nos casados) + `toc.test.ts` (18 casos) e `test/toc-pdf.test.ts` (PDF gerado por `minipdf` **com, sem e com bookmark discrepante**). Único warning `toc-outline-unmatched`; `toc-heading-unlisted` medido e removido (dispara em 7 dos 8 documentos com bookmarks — o outline é legitimamente um subconjunto dos títulos, ADR-056).
 ### E4-T04 · Metadados
 - Título, autores, idioma (`pt|en|mixed|unknown`) por detecção simples (léxico de stopwords) + metadados do PDF.
 - **Aceite:** idioma correto em 100% dos documentos do corpus com idioma conhecido.

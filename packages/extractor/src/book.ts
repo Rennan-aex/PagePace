@@ -9,6 +9,7 @@ import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
 import { paragraphRuns } from "./runs";
 import { documentStats } from "./stats";
+import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
 
 /**
@@ -75,10 +76,12 @@ import { normalizeForReader } from "./unicode";
  * lives in `detectHeadings` (font size, bold, centering, numbering, short
  * isolated lines against the body size, the leading and the measure).
  *
- * Known limits: a table of contents or metadata is not detected, the single
- * column rule of the paragraph layer stands, a heading without space above it
- * needs a display signal of its own, and the eval's `hyphen_join_acc`
- * still scores only intra-page sites (it walks the per-page paragraphs).
+ * Known limits: a table of contents comes from the PDF bookmarks or from the
+ * detected headings (`buildToc`, E4-T03) — the printed index of the book is
+ * still read as text, metadata is not detected (E4-T04), the single column
+ * rule of the paragraph layer stands, a heading without space above it needs
+ * a display signal of its own, and the eval's `hyphen_join_acc` still scores
+ * only intra-page sites (it walks the per-page paragraphs).
  */
 
 /** Value written to `extraction.tool`. */
@@ -189,15 +192,23 @@ export function buildBook(document: RawDocument): Book {
     throw new BookError("documento sem texto: nenhum bloco para gerar o Book");
   }
 
+  // E4-T03: the table of contents, and the levels the bookmarks settle.
+  const toc = buildToc(blocks, document.outline);
+  for (const block of blocks) {
+    const level = toc.outlineLevels.get(block.id);
+    if (level !== undefined) block.level = level;
+  }
+
   const warnings: string[] = fromOcr ? ["ocr-text-layer"] : [];
   if (brokenBlocks > 0) warnings.push(BROKEN_FONT_MAPPING);
+  warnings.push(...toc.warnings);
 
   return parseBook({
     schemaVersion: SCHEMA_VERSION,
     id: document.source.sha256,
     source: { fileName: document.source.fileName, pageCount: document.source.pageCount },
     metadata: { language: "unknown" },
-    toc: [],
+    toc: toc.toc,
     blocks,
     extraction: {
       tool: EXTRACTOR_TOOL,

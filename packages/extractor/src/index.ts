@@ -124,5 +124,14 @@ export {
   LINE_HEIGHT_MIN_FACTOR,
   StatsError,
 } from "./stats";
+export type { FlatOutlineItem, TocResult } from "./toc";
+export {
+  buildToc,
+  flattenOutline,
+  TOC_MIN_MATCH_CHARS,
+  TOC_OUTLINE_UNMATCHED,
+  titlesAnswer,
+  tocTitleKey,
+} from "./toc";
 export { normalizeForReader, normalizeUnicode, SOFT_HYPHEN } from "./unicode";
 export const PACKAGE_NAME = "@pagepace/extractor";
