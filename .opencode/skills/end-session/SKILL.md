@@ -12,7 +12,13 @@ description: Use ao terminar uma tarefa ou quando a sessão estiver perto do fim
    - **Log:** registro de **3 a 4 linhas** (data · tarefa · o que ficou · próximo). Ao registrar, **mova** as entradas além das 2 mais recentes para `docs/extractor/archive/` (nada é apagado; uma entrada não pode crescer sem limite).
    - **Handoff:** no máximo **15 linhas**.
 3. Se tomou decisão: skill `record-decision` (ADR de no máximo 12 linhas).
-4. Commit (Conventional Commits em inglês), `git push`, abra PR com `.github/pull_request_template.md` preenchido.
+4. Commit (Conventional Commits em inglês) e `git push` da branch.
+5. Abra o PR: `gh pr create --base main --title "<Conventional Commits, em inglês>" --body-file <arquivo temporário fora do repositório>` (nunca `--body` com texto de várias linhas — aspas quebram no PowerShell; o `.github/pull_request_template.md` é o guia do conteúdo).
+6. Rode `gh pr checks`:
+   - Todos os checks obrigatórios (o `verify`) passando: **mescle na mesma sessão** com `gh pr merge --squash --delete-branch` e depois `git branch -D <nome>` (a branch local; o `-d` minusculo falha depois de squash, e isso é esperado).
+   - Algum check falhado ou pendente: **não mescle**; deixe para o `start-session` da próxima sessão conferir e mesclar (corrigir agora só se o erro for desta tarefa).
+7. Se o `gh` falhar por qualquer motivo (rede, auth etc.), não insista: registre em STATE.md (Bloqueios) e entregue ao PO o título e a descrição do PR pela skill `report-to-po`, como era feito antes do `gh`.
+8. Reporte ao PO pela skill `report-to-po` o que aconteceu: PR aberto / mesclado / aguardando CI.
 
 ## Se a sessão vai acabar no meio da tarefa
 1. Faça commit `wip: <o que está feito>` com o código no estado mais estável possível (testes que falham de propósito devem estar marcados `it.todo`/`skip` com comentário).

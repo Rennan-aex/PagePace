@@ -44,6 +44,15 @@ Atalho: skill `end-session`.
 2. Marque a tarefa na fase (`[x]`), atualize `STATE.md` (estado, próximo passo, bloqueios) e `DECISIONS.md` se houve decisão.
 3. Commit, push, abra PR (use `.github/pull_request_template.md`).
 
+## Branches, PR e merge
+- Nunca dar push direto na main, nunca mexer em configuracoes do repositorio, nunca mexer em outro repositorio, nunca usar --force, nunca apagar branch remota manualmente.
+- Commits WIP frequentes e `git push` na branch da tarefa assim que houver mudanca salva: o GitHub e o backup do trabalho.
+- So abrir o PR quando a tarefa estiver pronta (aceite cumprido, verify verde). Usar `gh pr create --base main --title "<Conventional Commits, ingles>" --body-file <arquivo temporario fora do repo>` (nunca --body com texto de varias linhas, por causa de aspas no PowerShell).
+- O merge e sempre squash (configurado no repositorio): os commits WIP da branch se tornam 1 commit na main. Por isso nunca reaproveitar uma branch ja mesclada.
+- O agente PODE fazer o merge sozinho, mas só quando `gh pr checks` mostrar todos os checks obrigatorios (o `verify`) como passando. Se algum check falhar ou estiver pendente, NAO mesclar: corrigir (se o erro for da tarefa) ou esperar (se for so o CI ainda rodando) e tentar de novo numa proxima checagem, nunca insistindo em loop apertado.
+- Comando de merge: `gh pr merge --squash --delete-branch`. A branch remota some sozinha nesse comando; a branch LOCAL so se remove depois, com `git branch -D <nome>` (o `-d` minusculo falha depois de squash, e isso e esperado).
+- Se o `gh` falhar por qualquer motivo (rede, auth, etc.), nao insistir: registrar em STATE.md e entregar ao PO o titulo/descricao do PR pela skill report-to-po, como era feito antes.
+
 ## Regras invioláveis
 1. **Nenhum PDF no git, nunca.** Públicos: `corpus/public/` (ignorado, baixado por script). Privados: fora do repositório, via `CORPUS_PRIVATE_DIR`. Nenhum texto de livro com copyright em gabaritos, fixtures, issues ou PRs.
 2. **Regra de ouro das métricas:** nenhuma mudança de heurística é aceita se piorar qualquer métrica do baseline. Piora justificada exige registro em `DECISIONS.md` e atualização explícita do baseline.
@@ -52,7 +61,7 @@ Atalho: skill `end-session`.
 5. **Dependências:** proibido AGPL/GPL (MuPDF, PyMuPDF, Poppler são só referência de estudo). Antes de adicionar qualquer dependência: licença (MIT/BSD/Apache/ISC), tamanho, e se roda no navegador/WebView. Registre em `DECISIONS.md`.
 6. **Núcleo portável:** `schema`, `extractor` (núcleo), `segmenter` não podem usar APIs exclusivas de Node (`fs`, `path`...) fora de adaptadores/CLI.
 7. **Determinismo:** mesma entrada, mesma saída. Sem `Date.now()`/aleatoriedade na lógica de extração.
-8. **`main` é protegida e sempre verde.** Trabalhe em branch, abra PR, squash merge, Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+8. **Conventional Commits** nas mensagens de commit e no título do PR (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 9. **Sem decisões silenciosas.** Se escolheu entre alternativas, escreveu em `DECISIONS.md`.
 
 ## Definição de pronto (uma tarefa)

@@ -58,6 +58,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-051 | Consertos dos achados dos checklists manuais numa rodada só | accepted |
 | ADR-052 | Marcador hasEOL mid-run e folio no meio do fluxo | accepted |
 | ADR-053 | Item só-espaço nunca carrega estilo | accepted |
+| ADR-054 | Autonomia de git com gh (commit, push, PR, checks, merge) | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -458,3 +459,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — herdar a fonte do item (espaço vira negrito, diverge do gabarito); B — item só-espaço é sempre neutro (sem estilo).
 **Decisão:** B — em `lineSegments`, um item cujo texto é só branco recebe o estilo neutro, então o espaço se funde ao lado regular.
 **Consequências:** `style_f1` de `syn-n2-pt-estilos` foi de 0,9737 para 1,0000; nenhum outro `pnpm eval` regrediu. Run interna de um único item (ex.: "muito importante" em negrito) mantém o espaço interno, porque lá o espaço não é item próprio.
+
+### ADR-054 · Autonomia de git com gh (commit, push, PR, checks, merge) · accepted · 2026-10-14
+**Contexto:** o `gh` (GitHub CLI) agora está instalado e autenticado na máquina do PO. Antes, cada PR/merge exigia o PO clicando na web e a sessão ficava parada esperando.
+**Alternativas:** A — manter o PO como único executor de push/PR/merge (lento, depende de humano); B — dar autonomia de git aos agentes com limites claros do que continua proibido.
+**Decisão:** B — o agente pode commitar, dar push na branch da tarefa, abrir PR (`gh pr create` com `--body-file` fora do repo), conferir `gh pr checks` e mesclar (`gh pr merge --squash --delete-branch`) quando todos os checks obrigatórios passarem. Continua proibido: push direto na `main`, mexer em configurações do repositório, outro repositório, `--force` e apagar branch remota na mão. Regras completas na seção "Branches, PR e merge" do AGENTS.md e nas skills `start-session`/`end-session`.
+**Consequências:** menos handoffs manuais; o gate é o `verify` no CI + a `main` protegida. Se o `gh` falhar (rede/auth), não insistir: registrar em STATE.md e entregar o PR ao PO via `report-to-po` (fluxo antigo ainda válido).
