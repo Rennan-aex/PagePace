@@ -21,6 +21,8 @@ export {
   isSuspectCodePoint,
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";
+export type { FontStyle, FontStyleBasis } from "./fontstyle";
+export { classifyFontName, fontNameTokens } from "./fontstyle";
 export type { HyphenJoinDecision, HyphenJoinResult, HyphenSite } from "./hyphen";
 export {
   HYPHEN_CLITICS_EN,
@@ -83,6 +85,13 @@ export {
   REPEATED_MIN_PAGES,
   stripRepeatedRegions,
 } from "./repeated";
+export type { ItemStyle } from "./runs";
+export {
+  itemRunStyle,
+  paragraphRuns,
+  SUPSUB_MAX_SIZE_RATIO,
+  SUPSUB_RISE_FACTOR,
+} from "./runs";
 export { itemsText, lineText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {

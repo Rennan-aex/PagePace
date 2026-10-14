@@ -441,7 +441,8 @@ describe("baseline and CI gate", () => {
     // enough pages (one line per page at a different height), so the extraction
     // removes nothing and the golden leaves nothing out (E3-T02). And
     // `hyphen_join_acc` is 1 because no line ends in a hyphen, so the join
-    // decides nothing and an empty hypothesis scores 1 (E3-T03).
+    // decides nothing and an empty hypothesis scores 1 (E3-T03). And
+    // `style_f1` is 1 because neither side flags any character (E4-T01).
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
@@ -451,6 +452,7 @@ describe("baseline and CI gate", () => {
           hyphen_join_acc: 1,
           para_boundary_f1: 1,
           reading_order: 0,
+          style_f1: 1,
           text_cer: 0,
         },
       },

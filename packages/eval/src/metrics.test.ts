@@ -6,6 +6,7 @@ import {
   PARA_BOUNDARY_WINDOW,
   paraBoundaryF1,
   readingOrder,
+  styleF1,
   textCer,
 } from "./metrics";
 
@@ -313,5 +314,78 @@ describe("hyphenJoinAcc", () => {
   it("is deterministic: the same sites always give the same number", () => {
     const sites = [{ word: "palavra" }, { word: "guarda-chuva" }];
     expect(hyphenJoinAcc(golden, sites).acc).toBe(hyphenJoinAcc(golden, sites).acc);
+  });
+});
+
+describe("styleF1", () => {
+  it("scores 1 when the two sides flag the same characters", () => {
+    const blocks = [
+      [
+        { text: "Um aviso " },
+        { text: "importante", bold: true },
+        { text: " e um termo " },
+        { text: "latino", italic: true },
+        { text: "." },
+      ],
+    ];
+    const result = styleF1(blocks, blocks);
+    expect(result.f1).toBe(1);
+    expect(result.bold.f1).toBe(1);
+    expect(result.italic.f1).toBe(1);
+    expect(result.bold.truePositives).toBe(10);
+    expect(result.italic.truePositives).toBe(6);
+  });
+
+  it("scores 1 when neither side flags anything", () => {
+    const blocks = [[{ text: "Sem estilo nenhum." }]];
+    const result = styleF1(blocks, blocks);
+    expect(result.f1).toBe(1);
+    expect(result.bold).toMatchObject({ truePositives: 0, falsePositives: 0, falseNegatives: 0 });
+  });
+
+  it("counts a missed bold as a false negative and drops the F1", () => {
+    const golden = [[{ text: "aviso " }, { text: "urgente", bold: true }]];
+    const plain = [[{ text: "aviso urgente" }]];
+    const result = styleF1(golden, plain);
+    expect(result.bold.falseNegatives).toBe(7);
+    expect(result.bold.truePositives).toBe(0);
+    expect(result.bold.f1).toBe(0);
+    expect(result.f1).toBe(0.5); // italic had nothing on either side
+  });
+
+  it("counts an invented bold as a false positive", () => {
+    const golden = [[{ text: "aviso urgente" }]];
+    const bolded = [[{ text: "aviso " }, { text: "urgente", bold: true }]];
+    const result = styleF1(golden, bolded);
+    expect(result.bold.falsePositives).toBe(7);
+    expect(result.bold.f1).toBe(0);
+  });
+
+  it("scores a style shifted to the wrong characters below 1", () => {
+    const golden = [[{ text: "abc" }, { text: "def", bold: true }]];
+    const shifted = [[{ text: "abcd", bold: true }, { text: "ef" }]];
+    const result = styleF1(golden, shifted);
+    expect(result.bold.truePositives).toBe(1); // position 3: both flag "d"
+    expect(result.bold.falsePositives).toBe(3); // "abc" flagged only by the extraction
+    expect(result.bold.falseNegatives).toBe(2); // "ef" flagged only by the golden
+    expect(result.bold.f1).toBe(2 / 7); // 2·1 / (2·1 + 3 + 2)
+  });
+
+  it("collapses whitespace and trims block edges on both sides", () => {
+    const golden = [[{ text: "aviso " }, { text: "urgente\n", bold: true }]];
+    const extracted = [[{ text: "aviso " }, { text: "urgente", bold: true }]];
+    expect(styleF1(golden, extracted).f1).toBe(1);
+  });
+
+  it("keeps the block boundary neutral (a gap is never styled)", () => {
+    const golden = [[{ text: "linha ", bold: true }], [{ text: "da outra linha" }]];
+    const extracted = [[{ text: "linha ", bold: true }], [{ text: "da outra linha" }]];
+    expect(styleF1(golden, extracted).f1).toBe(1);
+  });
+
+  it("is deterministic: the same runs always give the same number", () => {
+    const golden = [[{ text: "a" }, { text: "b", bold: true }]];
+    const extracted = [[{ text: "ab" }]];
+    expect(styleF1(golden, extracted).f1).toBe(styleF1(golden, extracted).f1);
   });
 });

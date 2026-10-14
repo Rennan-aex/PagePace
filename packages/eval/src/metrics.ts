@@ -373,3 +373,154 @@ export function hyphenJoinAcc(
   const total = hypothesis.length;
   return { acc: total === 0 ? 1 : correct / total, correct, total, uncertain };
 }
+
+/** One inline run of either side of the style comparison (golden or extraction). */
+export interface StyleRunLike {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface StyleFlagResult {
+  /** `2 · precision · recall / (precision + recall)`, 1 when no character is flagged. */
+  f1: number;
+  /** Flagged characters ÷ flagged characters of the extraction. */
+  precision: number;
+  /** Flagged characters ÷ flagged characters of the golden. */
+  recall: number;
+  /** Characters both sides flagged. */
+  truePositives: number;
+  /** Characters only the extraction flagged (invented or shifted style). */
+  falsePositives: number;
+  /** Characters only the golden flagged (missed style). */
+  falseNegatives: number;
+}
+
+export interface StyleF1Result {
+  /** Mean of the bold and italic F1 — the scalar the baseline stores. */
+  f1: number;
+  bold: StyleFlagResult;
+  italic: StyleFlagResult;
+  /** Characters compared position by position (the shorter stream). */
+  comparedChars: number;
+  /** Characters the golden has beyond the comparison (the longer stream won). */
+  extraReferenceChars: number;
+  /** Characters the extraction has beyond the comparison. */
+  extraHypothesisChars: number;
+}
+
+interface LabeledChars {
+  chars: string[];
+  flags: boolean[];
+}
+
+/**
+ * One character stream with a flag per character: blocks in order, each
+ * block through the same normalization the other metrics use (`normalizeForReader`
+ * + whitespace collapsed to single spaces, block edges trimmed), a space
+ * carrying the flag of the run it came from.
+ */
+function labeledChars(
+  blocks: readonly (readonly StyleRunLike[])[],
+  flag: "bold" | "italic",
+): LabeledChars {
+  const chars: string[] = [];
+  const flags: boolean[] = [];
+  let previousSpace = true;
+  for (const runs of blocks) {
+    for (const run of runs) {
+      const value = run[flag] === true;
+      for (const char of normalizeForReader(run.text)) {
+        if (/\s/.test(char)) {
+          if (previousSpace) continue;
+          chars.push(" ");
+          flags.push(value);
+          previousSpace = true;
+          continue;
+        }
+        chars.push(char);
+        flags.push(value);
+        previousSpace = false;
+      }
+    }
+    // A block boundary is always a space, whatever the run edges hold.
+    if (!previousSpace) {
+      chars.push(" ");
+      flags.push(false);
+      previousSpace = true;
+    }
+  }
+  if (chars[chars.length - 1] === " ") {
+    chars.pop();
+    flags.pop();
+  }
+  return { chars, flags };
+}
+
+function flagCounts(
+  reference: LabeledChars,
+  hypothesis: LabeledChars,
+): Omit<StyleFlagResult, "f1" | "precision" | "recall"> {
+  const shared = Math.min(reference.flags.length, hypothesis.flags.length);
+  let truePositives = 0;
+  let falsePositives = 0;
+  let falseNegatives = 0;
+  for (let index = 0; index < shared; index++) {
+    const golden = reference.flags[index] === true;
+    const extracted = hypothesis.flags[index] === true;
+    if (golden && extracted) truePositives++;
+    else if (extracted) falsePositives++;
+    else if (golden) falseNegatives++;
+  }
+  for (let index = shared; index < reference.flags.length; index++) {
+    if (reference.flags[index] === true) falseNegatives++;
+  }
+  for (let index = shared; index < hypothesis.flags.length; index++) {
+    if (hypothesis.flags[index] === true) falsePositives++;
+  }
+  return { truePositives, falsePositives, falseNegatives };
+}
+
+function finishFlag(counts: Omit<StyleFlagResult, "f1" | "precision" | "recall">): StyleFlagResult {
+  const { truePositives, falsePositives, falseNegatives } = counts;
+  const total = 2 * truePositives + falsePositives + falseNegatives;
+  const precision =
+    truePositives + falsePositives === 0 ? 1 : truePositives / (truePositives + falsePositives);
+  const recall =
+    truePositives + falseNegatives === 0 ? 1 : truePositives / (truePositives + falseNegatives);
+  return { f1: total === 0 ? 1 : (2 * truePositives) / total, precision, recall, ...counts };
+}
+
+/**
+ * Inline style F1 per character (E4-T01, `style_f1`): bold and italic are
+ * scored separately over the two character streams — golden blocks against
+ * the blocks the `Book` builder emits — and the metric is the mean of the
+ * two F1s. A character both sides flag is a hit, a character only one side
+ * flags is an error, and a document with no flagged character on either
+ * side scores 1 (nothing to find, nothing invented).
+ *
+ * The streams are compared **position by position** on the normalized text,
+ * like the known limit of `reading_order` (ADR-043): a text error shifts the
+ * stream and costs style too — with `text_cer = 0` the comparison is exact.
+ * Deterministic: same runs, same numbers.
+ */
+export function styleF1(
+  reference: readonly (readonly StyleRunLike[])[],
+  hypothesis: readonly (readonly StyleRunLike[])[],
+): StyleF1Result {
+  const referenceBold = labeledChars(reference, "bold");
+  const hypothesisBold = labeledChars(hypothesis, "bold");
+  const bold = finishFlag(flagCounts(referenceBold, hypothesisBold));
+  const italic = finishFlag(
+    flagCounts(labeledChars(reference, "italic"), labeledChars(hypothesis, "italic")),
+  );
+  const shared = Math.min(referenceBold.chars.length, hypothesisBold.chars.length);
+  return {
+    f1: (bold.f1 + italic.f1) / 2,
+    bold,
+    italic,
+    comparedChars: shared,
+    extraReferenceChars: referenceBold.chars.length - shared,
+    extraHypothesisChars: hypothesisBold.chars.length - shared,
+  };
+}

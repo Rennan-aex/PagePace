@@ -7,6 +7,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n1-pt-acentos": {
@@ -14,6 +15,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n1-pt-cabecalhos": {
@@ -21,6 +23,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n1-pt-hifenizacao": {
@@ -28,6 +31,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n2-en-columns": {
@@ -35,6 +39,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 0,
       "reading_order": 0.1428571428571429,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n2-pt-estilos": {
@@ -42,6 +47,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     },
     "syn-n3-en-footnotes": {
@@ -49,6 +55,7 @@
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
+      "style_f1": 1,
       "text_cer": 0
     }
   }

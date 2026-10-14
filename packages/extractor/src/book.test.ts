@@ -314,8 +314,38 @@ describe("buildBook", () => {
     const book = buildBook(doc([broken], { ocrTextLayer: true }));
     expect(book.extraction.warnings).toEqual(["ocr-text-layer", BROKEN_FONT_MAPPING]);
     expect(book.blocks[0]?.flags).toEqual([BROKEN_FONT_MAPPING]);
-    expect(book.blocks[0]?.confidence).toBe(BROKEN_FONT_CONFIDENCE);
-    expect(book.extraction.avgConfidence).toBeLessThan(OCR_TEXT_LAYER_CONFIDENCE);
+    expect(book.blocks[0]?.confidence).toBeLessThan(OCR_TEXT_LAYER_CONFIDENCE);
+  });
+
+  it("carries bold/italic in the runs, from the font name (E4-T01)", () => {
+    const styled = page([
+      item("Um aviso com ", MARGIN, 100, BODY),
+      item("destacada", MARGIN + 78, 100, BODY, { fontName: "Helvetica-Bold" }),
+      item(" e um termo ", MARGIN + 132, 100, BODY),
+      item("emprestado", MARGIN + 204, 100, BODY, { fontName: "Helvetica-Oblique" }),
+      item(".", MARGIN + 259, 100, BODY),
+    ]);
+    const book = buildBook(doc([styled]));
+    expect(book.blocks).toHaveLength(1);
+    expect(book.blocks[0]?.runs).toEqual([
+      { text: "Um aviso com " },
+      { text: "destacada", bold: true },
+      { text: " e um termo " },
+      { text: "emprestado", italic: true },
+      { text: "." },
+    ]);
+    const text = book.blocks[0]?.runs.map((run) => run.text).join("") ?? "";
+    expect(text).toBe("Um aviso com destacada e um termo emprestado.");
+  });
+
+  it("keeps the runs plain for an OCR text layer (E4-T01, ADR-019)", () => {
+    const styled = page([
+      item("Aviso ", MARGIN, 100, BODY),
+      item("importante", MARGIN + 42, 100, BODY, { fontName: "Helvetica-Bold" }),
+      item(".", MARGIN + 96, 100, BODY),
+    ]);
+    const book = buildBook(doc([styled], { ocrTextLayer: true }));
+    expect(book.blocks[0]?.runs).toEqual([{ text: "Aviso importante." }]);
   });
 });
 

@@ -6,6 +6,7 @@ import { sha256Hex } from "./ingest/sha256";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
+import { paragraphRuns } from "./runs";
 import { documentStats } from "./stats";
 import { normalizeForReader } from "./unicode";
 
@@ -21,7 +22,12 @@ import { normalizeForReader } from "./unicode";
  *
  * Confidence is a provisional constant (the model of REQ-EXT-13 is E7): one
  * value for digital text, a reduced one plus the `ocr-text-layer` warning
- * for embedded OCR layers (ADR-019). Runs carry no styles yet — that is E4.
+ * for embedded OCR layers (ADR-019).
+ *
+ * Inline styles (E4-T01): runs carry bold/italic from the embedded font
+ * name and sup/sub from size and baseline (`paragraphRuns`), with adjacent
+ * runs of one style merged; an OCR text layer keeps plain runs (ADR-019).
+ * The concatenated run text is the same text the join always produced.
  *
  * Reading order (E2-T06): blocks come out **page by page and, inside a page,
  * top to bottom** — the trivial single-column order of REQ-EXT-02. Pages
@@ -153,7 +159,7 @@ export function buildBook(document: RawDocument): Book {
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: "paragraph",
-      runs: [{ text }],
+      runs: paragraphRuns(paragraph.lines, { styles: !fromOcr }),
       origin: {
         pageFrom: paragraph.pageFrom,
         pageTo: paragraph.pageTo,

@@ -57,6 +57,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-050 | Dieta de contexto: arquivos quentes enxutos e orçamento de docs | accepted |
 | ADR-051 | Consertos dos achados dos checklists manuais numa rodada só | accepted |
 | ADR-052 | Marcador hasEOL mid-run e folio no meio do fluxo | accepted |
+| ADR-053 | Item só-espaço nunca carrega estilo | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -451,3 +452,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** `\n` — A: testar o par de runs com tolerância de baseline (falha em sobrescritos/frações, que o `groupLines` só junta pela caixa da linha); B: decidir com `joinsLineBox` (a própria regra do `groupLines`) e criar `lineText`, sem quebra, para quem já tem a linha. Folio — A: exigir linha em branco dos dois lados (deixa 80 casos); B: isolamento de um lado + bordas numeradas não agrupadas entram na prova sequencial.
 **Decisão:** B nos dois casos. Páginas usam `itemsText` (quebra só quando o run seguinte não entra na caixa da linha); linhas usam `lineText` (nunca quebra). O folio mid-flow virou a banda `flow` de `RepeatedBand`: numerado, ≤ 1,05 × corpo, linha em branco de um lado, valores crescentes com passo ≤ `FLOW_FOLIO_MAX_STEP` (5, medido 4) em ≥ `minimum` páginas; alimenta `pageLabels`.
 **Consequências:** zero `\n` dentro de bloco no corpus digital; `n1-pt-curinga` foi de 297 para 0 blocos só-número (1.927 `pageLabels`). Número de corpo isolado que case com a sequência pode ser removido (aceito, medido sem regressão no `pnpm eval --ci`); revisar se um golden real mostrar remoção errada.
+
+### ADR-053 · Item só-espaço nunca carrega estilo · accepted · 2026-10-13
+**Contexto:** o pdf.js emite o espaço de fim/início de run como item próprio e esse item herda a fonte da run (um espaço em negrito depois de uma run em negrito). O gabarito põe o espaço de fronteira no lado regular, então `style_f1` de `syn-n2-pt-estilos` caiu para 0,9737 (um espaço em negrito a mais).
+**Alternativas:** A — herdar a fonte do item (espaço vira negrito, diverge do gabarito); B — item só-espaço é sempre neutro (sem estilo).
+**Decisão:** B — em `lineSegments`, um item cujo texto é só branco recebe o estilo neutro, então o espaço se funde ao lado regular.
+**Consequências:** `style_f1` de `syn-n2-pt-estilos` foi de 0,9737 para 1,0000; nenhum outro `pnpm eval` regrediu. Run interna de um único item (ex.: "muito importante" em negrito) mantém o espaço interno, porque lá o espaço não é item próprio.

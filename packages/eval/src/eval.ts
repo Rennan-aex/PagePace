@@ -44,6 +44,8 @@ import {
   paraBoundaryF1,
   type ReadingOrderResult,
   readingOrder,
+  type StyleF1Result,
+  styleF1,
   textCer,
 } from "./metrics";
 import { documentText } from "./text";
@@ -74,6 +76,8 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
   hyphen_join_acc   share of line-end hyphen sites the join decided the way
                     the golden writes the word (E3-T03), 1 = every break
                     hyphen joined and every legitimate hyphen kept
+  style_f1          mean of the per-character F1 of bold and of italic
+                    (E4-T01), 1 = every styled character in the right place
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -140,6 +144,8 @@ export interface DocumentResult {
   headerFooter: HeaderFooterResult | null;
   /** Hyphenation join accuracy (E3-T03), `null` when not measured. */
   hyphens: HyphenJoinAccResult | null;
+  /** Inline style F1 (E4-T01), `null` when not measured. */
+  styles: StyleF1Result | null;
   error: string | null;
 }
 
@@ -197,6 +203,10 @@ function formatHeaderFooter(value: HeaderFooterResult | null): string {
 
 function formatHyphen(value: HyphenJoinAccResult | null): string {
   return value === null ? "-" : value.acc.toFixed(4);
+}
+
+function formatStyle(value: StyleF1Result | null): string {
+  return value === null ? "-" : value.f1.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -292,6 +302,7 @@ async function measure(
     order: blockReadingOrder(golden, document, coverage),
     headerFooter: headerFooterRemoval(golden, document, coverage),
     hyphens: hyphenJoinAccuracy(golden, document, coverage),
+    styles: blockStyleF1(golden, document, coverage),
     error: null,
   };
 }
@@ -368,6 +379,34 @@ export function blockReadingOrder(
     .map((block) => block.runs.map((run) => run.text).join(""));
   return readingOrder(
     golden.blocks.map((block) => block.runs.map((run) => run.text).join("")),
+    extracted,
+  );
+}
+
+/**
+ * `style_f1` of one document (E4-T01): the bold/italic of the golden runs
+ * against the runs the `Book` builder emits for the covered pages. The
+ * acceptance test calls the very function the runner measures with.
+ *
+ * The hypothesis is the `Book` — the runs the reader receives — cropped by
+ * `coverage.pages` exactly like `blockReadingOrder`. The golden side needs
+ * no crop (`parseGolden` already refuses a block outside the coverage).
+ */
+export function blockStyleF1(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): StyleF1Result {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const extracted = buildBook(document)
+    .blocks.filter((block) => wanted === null || wanted.has(block.origin.pageFrom + 1))
+    .map((block) =>
+      block.runs.map((run) => ({ text: run.text, bold: run.bold, italic: run.italic })),
+    );
+  return styleF1(
+    golden.blocks.map((block) =>
+      block.runs.map((run) => ({ text: run.text, bold: run.bold, italic: run.italic })),
+    ),
     extracted,
   );
 }
@@ -561,6 +600,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         order: null,
         headerFooter: null,
         hyphens: null,
+        styles: null,
         error: messageOf(error),
       });
       errors++;
@@ -579,6 +619,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         order: null,
         headerFooter: null,
         hyphens: null,
+        styles: null,
         error: null,
       });
       continue;
@@ -617,6 +658,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         order: null,
         headerFooter: null,
         hyphens: null,
+        styles: null,
         error: messageOf(error),
       });
       errors++;
@@ -698,13 +740,15 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const order = document.order;
     const headerFooter = document.headerFooter;
     const hyphens = document.hyphens;
+    const styles = document.styles;
     if (
       document.status !== "measured" ||
       document.cer === null ||
       boundaries === null ||
       order === null ||
       headerFooter === null ||
-      hyphens === null
+      hyphens === null ||
+      styles === null
     ) {
       continue;
     }
@@ -713,6 +757,7 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       hyphen_join_acc: hyphens.acc,
       para_boundary_f1: boundaries.f1,
       reading_order: order.score,
+      style_f1: styles.f1,
       text_cer: document.cer,
     };
   }
@@ -899,6 +944,7 @@ function renderReport(
     formatOrder(document.order),
     formatHeaderFooter(document.headerFooter),
     formatHyphen(document.hyphens),
+    formatStyle(document.styles),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -913,6 +959,7 @@ function renderReport(
       { name: "reading_order", align: "right" },
       { name: "header_footer_f1", align: "right" },
       { name: "hyphen_join_acc", align: "right" },
+      { name: "style_f1", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
