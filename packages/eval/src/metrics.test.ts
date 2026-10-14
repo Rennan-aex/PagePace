@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  headingDetection,
   hyphenJoinAcc,
   MAX_CER_CELLS,
   normalizeText,
@@ -387,5 +388,89 @@ describe("styleF1", () => {
     const golden = [[{ text: "a" }, { text: "b", bold: true }]];
     const extracted = [[{ text: "ab" }]];
     expect(styleF1(golden, extracted).f1).toBe(styleF1(golden, extracted).f1);
+  });
+});
+
+describe("headingDetection", () => {
+  it("scores 1 when the two sides declare the same headings at the same levels", () => {
+    const headings = [
+      { text: "Chapter 1", level: 1 },
+      { text: "The method", level: 2 },
+    ];
+    const result = headingDetection(headings, headings);
+    expect(result).toMatchObject({ f1: 1, precision: 1, recall: 1, levelAcc: 1 });
+    expect(result.truePositives).toBe(2);
+    expect(result.falsePositives).toEqual([]);
+    expect(result.falseNegatives).toEqual([]);
+    expect(result.levelMismatches).toEqual([]);
+  });
+
+  it("scores 1 when neither side declares a heading", () => {
+    expect(headingDetection([], [])).toMatchObject({ f1: 1, levelAcc: 1 });
+  });
+
+  it("matches on the normalized text, so spacing and Unicode form never move a heading", () => {
+    expect(
+      headingDetection([{ text: "  Capítulo  3 ", level: 1 }], [{ text: "Capítulo 3", level: 1 }])
+        .f1,
+    ).toBe(1);
+  });
+
+  it("counts a heading only the extraction emits as a false positive", () => {
+    const result = headingDetection(
+      [{ text: "Chapter 1", level: 1 }],
+      [{ text: "A. note", level: 1 }],
+    );
+    expect(result.truePositives).toBe(0);
+    expect(result.falsePositives).toEqual([{ text: "A. note", level: 1 }]);
+    expect(result).toMatchObject({ precision: 0, recall: 0, f1: 0, levelAcc: 0 });
+  });
+
+  it("counts a golden heading the extraction missed as a false negative", () => {
+    const result = headingDetection([{ text: "Chapter 1", level: 1 }], []);
+    expect(result.falseNegatives).toEqual([{ text: "Chapter 1", level: 1 }]);
+    expect(result).toMatchObject({ precision: 1, recall: 0, f1: 0 });
+  });
+
+  it("keeps levelAccuracy on the matched headings only and reports the mismatch", () => {
+    const result = headingDetection(
+      [
+        { text: "Chapter 1", level: 1 },
+        { text: "The method", level: 2 },
+      ],
+      [
+        { text: "Chapter 1", level: 1 },
+        { text: "The method", level: 3 },
+      ],
+    );
+    expect(result.truePositives).toBe(2);
+    expect(result.f1).toBe(1);
+    expect(result.levelAcc).toBe(0.5);
+    expect(result.levelMismatches).toEqual([{ text: "The method", expected: 2, actual: 3 }]);
+  });
+
+  it("matches a repeated heading as a multiset, not as a set", () => {
+    const result = headingDetection(
+      [
+        { text: "Notes", level: 2 },
+        { text: "Notes", level: 3 },
+      ],
+      [{ text: "Notes", level: 2 }],
+    );
+    expect(result.truePositives).toBe(1);
+    expect(result.falseNegatives).toEqual([{ text: "Notes", level: 3 }]);
+    expect(result.levelMismatches).toEqual([]);
+  });
+
+  it("treats a heading without a level as a level disagreement, never as a crash", () => {
+    const result = headingDetection([{ text: "Notes" }], [{ text: "Notes", level: 2 }]);
+    expect(result.levelAcc).toBe(0);
+    expect(result.levelMismatches).toEqual([{ text: "Notes", expected: null, actual: 2 }]);
+  });
+
+  it("is deterministic: the same headings always give the same numbers", () => {
+    const golden = [{ text: "Chapter 1", level: 1 }];
+    const extracted = [{ text: "Chapter 1", level: 2 }];
+    expect(headingDetection(golden, extracted)).toEqual(headingDetection(golden, extracted));
   });
 });

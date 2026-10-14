@@ -442,13 +442,17 @@ describe("baseline and CI gate", () => {
     // removes nothing and the golden leaves nothing out (E3-T02). And
     // `hyphen_join_acc` is 1 because no line ends in a hyphen, so the join
     // decides nothing and an empty hypothesis scores 1 (E3-T03). And
-    // `style_f1` is 1 because neither side flags any character (E4-T01).
+    // `style_f1` is 1 because neither side flags any character (E4-T01). And
+    // `heading_f1`/`heading_level_acc` are 1 because the golden declares no
+    // heading and the extraction finds none (E4-T02).
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
       documents: {
         "n1-en-sample": {
           header_footer_f1: 1,
+          heading_f1: 1,
+          heading_level_acc: 1,
           hyphen_join_acc: 1,
           para_boundary_f1: 1,
           reading_order: 0,

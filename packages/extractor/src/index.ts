@@ -23,6 +23,29 @@ export {
 } from "./brokenfont";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
+export type { HeadingContext, HeadingDecision, PageMeasure } from "./headings";
+export {
+  detectHeadings,
+  HEADING_BOLD_SHARE,
+  HEADING_CAPTION_MARKER,
+  HEADING_CENTER_TOLERANCE,
+  HEADING_CENTER_WIDTH_SHARE,
+  HEADING_INDENT_MAX_FACTOR,
+  HEADING_ISOLATION_FACTOR,
+  HEADING_ITALIC_MAX_SHARE,
+  HEADING_LIST_MARKER,
+  HEADING_MAX_LEVEL,
+  HEADING_MAX_LINES,
+  HEADING_MIN_SIZE_FACTOR,
+  HEADING_NUMBERING_WORD,
+  HEADING_SECTION_NUMBERING,
+  HEADING_SHORT_MAX_LINES,
+  HEADING_SHORT_WIDTH_SHARE,
+  HEADING_SIZE_CLUSTER_FACTOR,
+  HEADING_SIZE_FACTOR,
+  headingLevels,
+  pageMeasureOf,
+} from "./headings";
 export type { HyphenJoinDecision, HyphenJoinResult, HyphenSite } from "./hyphen";
 export {
   HYPHEN_CLITICS_EN,

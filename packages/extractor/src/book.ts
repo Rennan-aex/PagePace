@@ -1,6 +1,7 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import { joinCrossPageParagraphs } from "./pagejoin";
@@ -68,8 +69,15 @@ import { normalizeForReader } from "./unicode";
  * and its thresholds live in `brokenFontSignal`. `extraction.avgConfidence`
  * is the mean of the block confidences, so one broken chapter moves it.
  *
+ * Headings (E4-T02 — layer 4, "semântica"): the paragraph list is classified
+ * before the blocks are built, and a paragraph the layout marks as display
+ * type becomes `kind: "heading"` with a `level` from 1 to 6. Every signal
+ * lives in `detectHeadings` (font size, bold, centering, numbering, short
+ * isolated lines against the body size, the leading and the measure).
+ *
  * Known limits: a table of contents or metadata is not detected, the single
- * column rule of the paragraph layer stands, and the eval's `hyphen_join_acc`
+ * column rule of the paragraph layer stands, a heading without space above it
+ * needs a display signal of its own, and the eval's `hyphen_join_acc`
  * still scores only intra-page sites (it walks the per-page paragraphs).
  */
 
@@ -125,11 +133,15 @@ export function blockId(page: number, ordinal: number, text: string): string {
 export function buildBook(document: RawDocument): Book {
   const stripped = stripRepeatedRegions(document);
   const hasText = stripped.document.pages.some((page) => page.items.length > 0);
-  const bodyFontSize = hasText ? documentStats(stripped.document).bodyFontSize : 0;
-  const paragraphs = joinCrossPageParagraphs(
-    groupDocumentParagraphs(stripped.document),
+  const stats = hasText ? documentStats(stripped.document) : null;
+  const bodyFontSize = stats?.bodyFontSize ?? 0;
+  const pages = groupDocumentParagraphs(stripped.document);
+  const paragraphs = joinCrossPageParagraphs(pages, bodyFontSize);
+  const headings = detectHeadings(paragraphs, {
     bodyFontSize,
-  );
+    lineHeight: stats?.lineHeight ?? 0,
+    measures: pages.map((page) => pageMeasureOf(page.flat())),
+  });
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
@@ -137,7 +149,7 @@ export function buildBook(document: RawDocument): Book {
   const confidences: number[] = [];
   let brokenBlocks = 0;
   const ordinals = new Map<number, number>();
-  for (const paragraph of paragraphs) {
+  for (const [index, paragraph] of paragraphs.entries()) {
     const hyphen = paragraphHyphenText(paragraph.lines);
     const text = normalizeForReader(hyphen.text);
     if (text.trim() === "") continue;
@@ -156,9 +168,12 @@ export function buildBook(document: RawDocument): Book {
       brokenBlocks += 1;
     }
     confidences.push(blockConfidence);
+    const decision = headings[index];
+    const heading = decision?.heading === true;
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: "paragraph",
+      kind: heading ? "heading" : "paragraph",
+      ...(heading ? { level: decision.level } : {}),
       runs: paragraphRuns(paragraph.lines, { styles: !fromOcr }),
       origin: {
         pageFrom: paragraph.pageFrom,

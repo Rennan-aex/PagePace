@@ -524,3 +524,102 @@ export function styleF1(
     extraHypothesisChars: hypothesisBold.chars.length - shared,
   };
 }
+
+/** One heading of either side of the comparison (golden or extraction). */
+export interface HeadingLike {
+  text: string;
+  /** Only meaningful when both sides declare it (schema: 1..6 for a heading). */
+  level?: number;
+}
+
+/** A matched heading whose level did not agree. */
+export interface HeadingLevelMismatch {
+  text: string;
+  expected: number | null;
+  actual: number | null;
+}
+
+export interface HeadingDetectionResult {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side has headings. */
+  f1: number;
+  /** Headings found ÷ headings the extraction emitted. */
+  precision: number;
+  /** Headings found ÷ headings the golden declares. */
+  recall: number;
+  /** Matched headings whose level also matched ÷ matched headings, 1 when nothing matched on both sides. */
+  levelAcc: number;
+  /** Headings both sides declare, matched on their normalized text. */
+  truePositives: number;
+  /** Headings only the extraction emitted (false positives). */
+  falsePositives: HeadingLike[];
+  /** Headings only the golden declares (missed headings). */
+  falseNegatives: HeadingLike[];
+  /** Matched headings whose level disagrees. */
+  levelMismatches: HeadingLevelMismatch[];
+}
+
+/**
+ * Heading detection and levels (E4-T02, `heading_f1` / `heading_level_acc`):
+ * precision and recall over the headings of each side, matched on their
+ * normalized text (a multiset — the same title twice on both sides matches
+ * twice). A heading the extraction invented is a false positive, one the
+ * golden declares is missed, and a heading found at the wrong depth is a
+ * level mismatch: `levelAcc` is the share of matched headings whose level
+ * agreed. Two empty sides score 1 (nothing to find, nothing invented).
+ * Deterministic: same headings, same numbers.
+ */
+export function headingDetection(
+  reference: readonly HeadingLike[],
+  hypothesis: readonly HeadingLike[],
+): HeadingDetectionResult {
+  const unmatched = new Map<string, HeadingLike[]>();
+  for (const heading of reference) {
+    const key = normalizeText(heading.text);
+    const bucket = unmatched.get(key);
+    if (bucket === undefined) unmatched.set(key, [heading]);
+    else bucket.push(heading);
+  }
+
+  const falsePositives: HeadingLike[] = [];
+  const falseNegatives: HeadingLike[] = [];
+  const levelMismatches: HeadingLevelMismatch[] = [];
+  let truePositives = 0;
+  let levelMatches = 0;
+  for (const heading of hypothesis) {
+    const key = normalizeText(heading.text);
+    const match = unmatched.get(key)?.shift();
+    if (match === undefined) {
+      falsePositives.push(heading);
+      continue;
+    }
+    truePositives++;
+    if (match.level === heading.level) {
+      levelMatches++;
+    } else {
+      levelMismatches.push({
+        text: key,
+        expected: match.level ?? null,
+        actual: heading.level ?? null,
+      });
+    }
+  }
+  for (const bucket of unmatched.values()) falseNegatives.push(...bucket);
+
+  const precision = hypothesis.length === 0 ? 1 : truePositives / hypothesis.length;
+  const recall = reference.length === 0 ? 1 : truePositives / reference.length;
+  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  const levelAcc =
+    reference.length === 0 && hypothesis.length === 0
+      ? 1
+      : levelMatches / Math.max(truePositives, 1);
+  return {
+    f1,
+    precision,
+    recall,
+    levelAcc,
+    truePositives,
+    falsePositives,
+    falseNegatives,
+    levelMismatches,
+  };
+}

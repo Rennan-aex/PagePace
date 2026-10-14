@@ -7,9 +7,10 @@
 - A partir do resultado do spike S2: nome da fonte + flags; casos de sobrescrito por tamanho/posição; produzir `runs`.
 - **Aceite:** `style_f1` ≥ meta em N1; `runs` adjacentes com o mesmo estilo são fundidos; testes de fronteiras (estilo no meio da palavra).
 - **Feito (branch `e4-t01-inline-styles`, ADR-053):** `fontstyle.ts` (nome → bold/italic), `runs.ts` (runs por item + sup/sub por tamanho/posição + fusão de vizinhos iguais + item só-espaço neutro), `style_f1` no eval (F1 por caractere de negrito/itálico). `pnpm verify` verde (532 testes); `style_f1` = 1,0000 nos 7 documentos, nenhum outro regrediu.
-### E4-T02 · Detecção de títulos e níveis
+### E4-T02 · Detecção de títulos e níveis — **concluída 2026-10-14**
 - Clusters de tamanho/peso/espaçamento relativos ao corpo; centralização; linhas curtas isoladas; numeração (`1.2`, `Capítulo`); evitar legendas e epígrafes.
 - **Aceite:** `heading_f1` e `heading_level_acc` ≥ meta; relatório de falsos positivos.
+- **Feito (branch `e4-t02-detect-headings`, ADR-055):** `headings.ts` (porta + sinais de exibição, nível por cluster de tamanho com fallback na ordem de leitura), `buildBook` emite `kind: "heading"` com `level`, `headingDetection` + `blockHeadingDetection` no eval (coluna, seção de falsos positivos e `METRIC_DIRECTIONS`). `pnpm verify` verde (565 testes); `heading_f1`/`heading_level_acc` = 1,0000 em 6 dos 7 medidos e 0,0000 em `syn-n2-en-columns` (colunas = alvo da E6; nenhum falso positivo em nenhum documento); baseline atualizado, nenhum outro regrediu.
 ### E4-T03 · Sumário
 - Usar bookmarks do PDF quando existirem e conferir com títulos detectados; fallback: derivar dos títulos. Cada entrada aponta para `blockId`.
 - **Aceite:** teste com PDF com e sem bookmarks; discrepâncias viram `warnings`.

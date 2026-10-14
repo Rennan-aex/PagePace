@@ -4,6 +4,8 @@
   "documents": {
     "syn-n1-en-paragraphs": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
@@ -12,6 +14,8 @@
     },
     "syn-n1-pt-acentos": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
@@ -20,6 +24,8 @@
     },
     "syn-n1-pt-cabecalhos": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
@@ -28,6 +34,8 @@
     },
     "syn-n1-pt-hifenizacao": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
@@ -36,6 +44,8 @@
     },
     "syn-n2-en-columns": {
       "header_footer_f1": 1,
+      "heading_f1": 0,
+      "heading_level_acc": 0,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 0,
       "reading_order": 0.1428571428571429,
@@ -44,6 +54,8 @@
     },
     "syn-n2-pt-estilos": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,
@@ -52,6 +64,8 @@
     },
     "syn-n3-en-footnotes": {
       "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
       "hyphen_join_acc": 1,
       "para_boundary_f1": 1,
       "reading_order": 1,

@@ -8,7 +8,8 @@
 |---|---|---|
 | `text_cer` | Taxa de erro de caracteres entre o texto extraído (normalizado) e o gabarito | todas |
 | `para_boundary_f1` | F1 das fronteiras de parágrafo (posição no fluxo de texto normalizado) | E2+ |
-| `heading_f1` / `heading_level_acc` | Detecção de títulos e acerto do nível | E4+ |
+| `heading_f1` | Detecção de títulos (F1 por texto do título) | E4+ |
+| `heading_level_acc` | Acerto do nível (1..6) dos títulos casados | E4+ |
 | `reading_order` | Distância de edição normalizada entre a ordem de blocos extraída e a do gabarito | E2, E6 |
 | `hyphen_join_acc` | Acerto de junção de palavras hifenizadas (e preservação de hifens legítimos) | E3 |
 | `header_footer_f1` | Precisão/recall de remoção de cabeçalho/rodapé/numeração | E3 |
@@ -24,6 +25,7 @@
 | `text_cer` | ≤ 0,5% | ≤ 1% | ≤ 1% | ≤ 2% |
 | `para_boundary_f1` | ≥ 0,98 | ≥ 0,93 | ≥ 0,93 | ≥ 0,90 |
 | `heading_f1` | ≥ 0,95 | ≥ 0,90 | ≥ 0,90 | ≥ 0,85 |
+| `heading_level_acc` | ≥ 0,95 | ≥ 0,90 | ≥ 0,90 | ≥ 0,85 |
 | `reading_order` | ≥ 0,99 | ≥ 0,95 | ≥ 0,95 | ≥ 0,92 |
 | `hyphen_join_acc` | ≥ 0,98 | ≥ 0,95 | ≥ 0,95 | ≥ 0,95 |
 | `header_footer_f1` | ≥ 0,98 | ≥ 0,95 | ≥ 0,95 | ≥ 0,92 |
@@ -100,6 +102,14 @@
 - **Na baseline:** valores hoje **1,0000 nos 7 medidos** — o 7º é o sintético novo `syn-n1-pt-hifenizacao` (11 sítios, todos decididos como o gabarito escreve; 1 incerto `Ex-Ministro`, reportado na seção). O gerador sintético ganhou o **marcador U+00AD** no texto da spec: quebra a linha **imprimindo `-`** (a menos que o texto já termine em `-`, que é o hífen legítimo escrito à mão) e **some do golden** — a mesma string escreve o PDF quebrado e a palavra do leitor. Sem `\n` na spec de propósito: o golden não registra layout (ADR-039) e o teste de contagem de linhas de lado.
 - **Aceite da E3-T03:** `packages/eval/src/hyphen.test.ts` roda em **todo documento N1 com golden** e exige **`hyphen_join_acc ≥ 0,98`** (meta de N1 da tabela), com **`=== 1` no sintético de hifenização** e um **teste guardião** que falha se nenhum N1 puder ser conferido — a mensagem da falha traz quantos sítios estavam errados e quantos incertos. Os casos pt/en das regras (juntar, léxico, ênclise, dígitos, incerto, não-sítio) vivem em `packages/extractor/src/hyphen.test.ts`.
 - **Limite conhecido (ADR-047):** sem dicionário, `no-`+`me` e `dá-`+`me` são indistinguíveis — os léxicos são minúsculos de propósito e a dúvida que sobra é **marcada** (`uncertain-hyphen` + confiança 0,7), não silenciada. Junção entre páginas = E3-T04; palavra partida mais de uma vez no meio do parágrafo conta um sítio por quebra.
+
+## Títulos e níveis (E4-T02, ADR-055)
+- **O que mede:** `heading_f1` = F1 do casamento por **texto normalizado** entre os blocos `heading` que o `Book` emite e os que o gabarito declara; `heading_level_acc` = parcela dos títulos casados cujo **nível (1..6) também coincidiu**. Um título inventado é falso positivo, um do gabarito não achado é falso negativo, um achado no nível errado é só erro de nível (`heading_f1` continua 1). Dois lados vazios valem 1 (nada a achar, nada inventado).
+- **Quem decide:** `detectHeadings(paragraphs, context)` em `packages/extractor/src/headings.ts` — **porta** (≤ `HEADING_MAX_LINES` 3 linhas, nunca menor que o corpo, colado na margem, não itálico-majoritário, não legenda) **e** ao menos um **sinal de exibição**: fonte ≥ `HEADING_SIZE_FACTOR` 1,2 × corpo, negrito ≥ `HEADING_BOLD_SHARE` 0,6, centralizado (≤ `HEADING_CENTER_TOLERANCE` 0,03 da medida), numeração (`1.2`, `Capítulo 3`) ou **linha curta isolada** (≤ 0,7 da medida, com folga ≥ 1,5 × entrelinha dos dois lados e que **não termina frase** — `endsSentence`). Linha que abre como item de lista (`1.`, `•`) precisa do tamanho ou do peso sozinhos. **Nível = cluster de tamanhos de fonte** dos títulos do livro (maior = 1, cada cluster menor = +1, teto `HEADING_MAX_LEVEL` 6); **sem evidência de tamanho** (todos iguais) o nível cai para a **ordem de leitura** (1º = nível 1) — **ADR-055**.
+- **Onde roda:** `buildBook` passa as medidas de cada página (`pageMeasureOf`) e as estatísticas do corpo para `detectHeadings`; cada parágrafo vira `kind: "heading"` com `level` ou continua `paragraph`. Runner: `blockHeadingDetection(golden, document, coverage)` no `eval.ts` (a hipótese é o `buildBook` cortado por `coverage.pages`, igual a `blockReadingOrder`; o **teste de aceite chama a mesma função**), coluna `heading_f1` na tabela, seção **`Heading detection (false positives / missed / wrong level)`** sempre no `pnpm eval`, `METRIC_DIRECTIONS` = *maior é melhor* para as duas → `--ci` falha se cair além de 0,002.
+- **Na baseline:** `heading_f1` **1,0000 em 6 dos 7 medidos** e **0,0000 em `syn-n2-en-columns`** (o título vive em duas colunas intercaladas — alvo da E6, como `para_boundary_f1`/`reading_order`; o relatório reporta `missed "Notes on Light"` e **nenhum falso positivo em nenhum documento**). `heading_level_acc` acompanha (1,0000 em 6, 0 no de colunas) — inclusive `syn-n3-en-footnotes`, cujo gabarito espera o nível 2.
+- **Aceite da E4-T02:** `packages/eval/src/headings.test.ts` roda em **todo documento N1 com golden** e exige **`heading_f1 ≥ 0,95` e `heading_level_acc ≥ 0,95`** (metas de N1 da tabela), com um **teste guardião** que falha se algum N1 não tiver título no gabarito (dois lados vazios dariam 1) — a mensagem da falha já lista falsos positivos, perdidos e níveis errados. Os casos de cada sinal vivem em `packages/extractor/src/headings.test.ts`.
+- **Limite conhecido (ADR-055):** o nível por ordem de leitura só aparece quando **todos** os títulos têm o mesmo tamanho, e aí a hierarquia real fica de fora (os bookmarks do PDF, resolvidos pela E4-T03, é o plano); `1. Introduction` no corpo é lido como item de lista; título no pé de página pode ser engolido pela junção E3-T04; a medida é de coluna única (E6).
 
 ## Testes golden de página
 Para depurar, além do corpus: pares `fixture de itens brutos (JSON) → blocos esperados (JSON)` por camada, em `packages/extractor/test/fixtures/`. Eles não contêm texto com copyright (texto sintético ou domínio público).

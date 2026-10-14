@@ -36,8 +36,11 @@ import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import {
   type HeaderFooterResult,
+  type HeadingDetectionResult,
+  type HeadingLike,
   type HyphenJoinAccResult,
   headerFooterF1,
+  headingDetection,
   hyphenJoinAcc,
   normalizeText,
   type ParaBoundaryResult,
@@ -78,6 +81,10 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
                     hyphen joined and every legitimate hyphen kept
   style_f1          mean of the per-character F1 of bold and of italic
                     (E4-T01), 1 = every styled character in the right place
+  heading_f1        F1 of the headings the Book builder emits against the
+                    ones the golden declares (E4-T02), 1 = same headings
+  heading_level_acc share of the matched headings whose level (1..6) also
+                    agreed (E4-T02), 1 = every heading at the right depth
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -146,6 +153,8 @@ export interface DocumentResult {
   hyphens: HyphenJoinAccResult | null;
   /** Inline style F1 (E4-T01), `null` when not measured. */
   styles: StyleF1Result | null;
+  /** Heading detection and levels (E4-T02), `null` when not measured. */
+  headings: HeadingDetectionResult | null;
   error: string | null;
 }
 
@@ -206,6 +215,10 @@ function formatHyphen(value: HyphenJoinAccResult | null): string {
 }
 
 function formatStyle(value: StyleF1Result | null): string {
+  return value === null ? "-" : value.f1.toFixed(4);
+}
+
+function formatHeading(value: HeadingDetectionResult | null): string {
   return value === null ? "-" : value.f1.toFixed(4);
 }
 
@@ -303,6 +316,7 @@ async function measure(
     headerFooter: headerFooterRemoval(golden, document, coverage),
     hyphens: hyphenJoinAccuracy(golden, document, coverage),
     styles: blockStyleF1(golden, document, coverage),
+    headings: blockHeadingDetection(golden, document, coverage),
     error: null,
   };
 }
@@ -407,6 +421,41 @@ export function blockStyleF1(
     golden.blocks.map((block) =>
       block.runs.map((run) => ({ text: run.text, bold: run.bold, italic: run.italic })),
     ),
+    extracted,
+  );
+}
+
+function headingOf(text: string, level: number | undefined): HeadingLike {
+  return level === undefined ? { text } : { text, level };
+}
+
+/**
+ * `heading_f1` and `heading_level_acc` of one document (E4-T02): the headings
+ * the golden declares against the heading blocks the `Book` builder emits for
+ * the covered pages. The acceptance test calls the very function the runner
+ * measures with.
+ *
+ * Both sides are the `kind: "heading"` blocks (their text and level), cropped
+ * by `coverage.pages` exactly like `blockReadingOrder`; a paragraph the
+ * builder kept as a paragraph is simply not a heading, so a missed title is a
+ * false negative and an invented one is a false positive.
+ */
+export function blockHeadingDetection(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): HeadingDetectionResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const extracted = buildBook(document)
+    .blocks.filter(
+      (block) =>
+        block.kind === "heading" && (wanted === null || wanted.has(block.origin.pageFrom + 1)),
+    )
+    .map((block) => headingOf(block.runs.map((run) => run.text).join(""), block.level));
+  return headingDetection(
+    golden.blocks
+      .filter((block) => block.kind === "heading")
+      .map((block) => headingOf(block.runs.map((run) => run.text).join(""), block.level)),
     extracted,
   );
 }
@@ -601,6 +650,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headerFooter: null,
         hyphens: null,
         styles: null,
+        headings: null,
         error: messageOf(error),
       });
       errors++;
@@ -620,6 +670,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headerFooter: null,
         hyphens: null,
         styles: null,
+        headings: null,
         error: null,
       });
       continue;
@@ -659,6 +710,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headerFooter: null,
         hyphens: null,
         styles: null,
+        headings: null,
         error: messageOf(error),
       });
       errors++;
@@ -741,6 +793,7 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const headerFooter = document.headerFooter;
     const hyphens = document.hyphens;
     const styles = document.styles;
+    const headings = document.headings;
     if (
       document.status !== "measured" ||
       document.cer === null ||
@@ -748,12 +801,15 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       order === null ||
       headerFooter === null ||
       hyphens === null ||
-      styles === null
+      styles === null ||
+      headings === null
     ) {
       continue;
     }
     metrics[document.id] = {
       header_footer_f1: headerFooter.f1,
+      heading_f1: headings.f1,
+      heading_level_acc: headings.levelAcc,
       hyphen_join_acc: hyphens.acc,
       para_boundary_f1: boundaries.f1,
       reading_order: order.score,
@@ -945,6 +1001,7 @@ function renderReport(
     formatHeaderFooter(document.headerFooter),
     formatHyphen(document.hyphens),
     formatStyle(document.styles),
+    formatHeading(document.headings),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -960,6 +1017,7 @@ function renderReport(
       { name: "header_footer_f1", align: "right" },
       { name: "hyphen_join_acc", align: "right" },
       { name: "style_f1", align: "right" },
+      { name: "heading_f1", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -1060,7 +1118,46 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}\n`;
+  // The acceptance of E4-T02 asks for the heading errors by document: the
+  // headings the extraction invented (false positives), the ones the golden
+  // declares and it missed, and the ones it placed at the wrong level.
+  const headingErrors = documents.filter(
+    (document): document is DocumentResult & { headings: HeadingDetectionResult } =>
+      document.headings !== null &&
+      (document.headings.falsePositives.length > 0 ||
+        document.headings.falseNegatives.length > 0 ||
+        document.headings.levelMismatches.length > 0),
+  );
+  const headingSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nHeading detection (false positives / missed / wrong level):\n${
+          headingErrors.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : headingErrors
+                .map(
+                  (document) =>
+                    `  ${document.id}: ` +
+                    `heading_f1 ${document.headings.f1.toFixed(4)}, ` +
+                    `heading_level_acc ${document.headings.levelAcc.toFixed(4)}; ` +
+                    `false positive(s) ${headingList(document.headings.falsePositives)}; ` +
+                    `missed ${headingList(document.headings.falseNegatives)}; ` +
+                    `wrong level ${headingList(document.headings.levelMismatches)}`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}\n`;
+}
+
+/** `"none"` or the offending texts, shortened so one report line stays readable. */
+function headingList(entries: readonly { text: string }[]): string {
+  if (entries.length === 0) return "none";
+  return entries
+    .map((entry) =>
+      JSON.stringify(entry.text.length > 40 ? `${entry.text.slice(0, 37)}...` : entry.text),
+    )
+    .join(", ");
 }
 
 /** CLI entry: `--help`, the baseline flags and usage errors live here. */

@@ -59,6 +59,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-052 | Marcador hasEOL mid-run e folio no meio do fluxo | accepted |
 | ADR-053 | Item só-espaço nunca carrega estilo | accepted |
 | ADR-054 | Autonomia de git com gh (commit, push, PR, checks, merge) | accepted |
+| ADR-055 | Nível do título por cluster de fonte, com fallback na ordem de leitura | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -465,3 +466,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — manter o PO como único executor de push/PR/merge (lento, depende de humano); B — dar autonomia de git aos agentes com limites claros do que continua proibido.
 **Decisão:** B — o agente pode commitar, dar push na branch da tarefa, abrir PR (`gh pr create` com `--body-file` fora do repo), conferir `gh pr checks` e mesclar (`gh pr merge --squash --delete-branch`) quando todos os checks obrigatórios passarem. Continua proibido: push direto na `main`, mexer em configurações do repositório, outro repositório, `--force` e apagar branch remota na mão. Regras completas na seção "Branches, PR e merge" do AGENTS.md e nas skills `start-session`/`end-session`.
 **Consequências:** menos handoffs manuais; o gate é o `verify` no CI + a `main` protegida. Se o `gh` falhar (rede/auth), não insistir: registrar em STATE.md e entregar o PR ao PO via `report-to-po` (fluxo antigo ainda válido).
+
+### ADR-055 · Nível do título por cluster de fonte, com fallback na ordem de leitura · accepted · 2026-10-14
+**Contexto:** a E4-T02 precisa pôr `level` 1..6 em cada título detectado e o gabarito dos sintéticos declara o nível de verdade (`syn-n1-en-paragraphs` espera L1 e L2 com o mesmo corpo de 11 pt; `syn-n3-en-footnotes` espera L2 para o único título coberto). Os bookmarks (`raw.outline`) dariam a hierarquia de graça, mas os PDFs sintéticos são gerados sem outline.
+**Alternativas:** A — usar os bookmarks já agora (só existem nos PDFs reais, e o `RawDocument` de teste não tem); B — nível pelo cluster de tamanhos de fonte dos títulos do livro e, quando todos têm o mesmo tamanho, pela ordem de leitura; C — sempre pela ordem de leitura (reprova `syn-n1-en-paragraphs`, que espera L2 para o segundo título).
+**Decisão:** B — `headingLevels(sizes)` em `headings.ts`: agrupa tamanhos com tolerância `HEADING_SIZE_CLUSTER_FACTOR` (0,05), o maior cluster é o nível 1 e cada cluster menor desce um nível, teto `HEADING_MAX_LEVEL` 6; cluster único cai para `[1, 2, 3, …]` pela ordem de leitura. A hierarquia real fica com os bookmarks, que são da E4-T03.
+**Consequências:** `heading_f1` e `heading_level_acc` = 1,0000 em 6 dos 7 medidos (0,0000 só em `syn-n2-en-columns`, alvo da E6) e nenhum falso positivo em nenhum documento; um livro cujos títulos são todos do mesmo corpo ganha níveis por ordem de aparição (limitação escrita no módulo e no `EVALUATION.md`) e `1. Introduction` no corpo continua sendo item de lista.

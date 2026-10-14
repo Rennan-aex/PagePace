@@ -16,6 +16,8 @@ export type MetricDirection = "lower" | "higher";
 /** Which way each metric improves. Every new metric registers here (E2+). */
 export const METRIC_DIRECTIONS: Readonly<Record<string, MetricDirection>> = Object.freeze({
   header_footer_f1: "higher",
+  heading_f1: "higher",
+  heading_level_acc: "higher",
   hyphen_join_acc: "higher",
   para_boundary_f1: "higher",
   reading_order: "higher",
