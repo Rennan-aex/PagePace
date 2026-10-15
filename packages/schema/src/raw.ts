@@ -86,6 +86,15 @@ export interface RawDocument {
     /** Total pages of the PDF. `pages` may hold fewer entries when only a range was extracted. */
     pageCount: number;
     producer?: string;
+    /**
+     * `Title` from the PDF info dictionary — the producer's claim, not
+     * validated truth; `buildBook` sanitizes it before `Book.metadata.title` (E4-T04).
+     */
+    title?: string;
+    /** `Author` from the PDF info dictionary, kept as one raw string (E4-T04). */
+    author?: string;
+    /** Catalog `/Lang`, free-form (`pt-BR`, `en-US`); a hint for `Book.metadata.language` (E4-T04). */
+    lang?: string;
     /** True when the PDF declares `MarkInfo.Marked = true` — not the same as "reliable" (see `tagHints.reliable`). */
     tagged: boolean;
     /**
@@ -160,6 +169,9 @@ export const rawDocumentSchema: z.ZodType<RawDocument> = z.strictObject({
     sha256: sha256Schema,
     pageCount: z.number().int().min(1),
     producer: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
+    author: z.string().min(1).optional(),
+    lang: z.string().min(1).optional(),
     tagged: z.boolean(),
     ocrTextLayer: z.boolean().optional(),
   }),

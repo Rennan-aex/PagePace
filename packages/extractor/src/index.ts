@@ -80,6 +80,22 @@ export {
   LINE_BASELINE_TOLERANCE_FACTOR,
   LINE_OVERLAP_MIN_FACTOR,
 } from "./lines";
+export {
+  AUTHOR_MAX_COUNT,
+  buildMetadata,
+  detectLanguage,
+  foldForLanguage,
+  LANGUAGE_MIN_HITS,
+  LANGUAGE_MIN_SAMPLE_CHARS,
+  LANGUAGE_MIXED_MAX_RATIO,
+  LANGUAGE_MIXED_MIN_HITS,
+  LANGUAGE_STOPWORDS_EN,
+  LANGUAGE_STOPWORDS_PT,
+  langHintOf,
+  sanitizePdfTitle,
+  splitPdfAuthors,
+  TITLE_MAX_CHARS,
+} from "./metadata";
 export type { JoinedParagraph } from "./pagejoin";
 export { endsSentence, joinCrossPageParagraphs, PAGE_JOIN_TITLE_FONT_FACTOR } from "./pagejoin";
 export {

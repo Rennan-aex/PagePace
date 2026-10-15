@@ -232,10 +232,18 @@ async function buildOutline(pdf: PDFDocumentProxy): Promise<RawOutlineItem[] | u
 }
 
 function readProducer(metadata: { info?: unknown } | null): string | undefined {
-  const info = metadata?.info as { Producer?: unknown } | undefined;
-  const producer = info?.Producer;
-  if (typeof producer !== "string") return undefined;
-  const trimmed = producer.trim();
+  return readInfoString(metadata, "Producer");
+}
+
+/** One trimmed string from the PDF info dictionary, or undefined when absent/blank. */
+function readInfoString(
+  metadata: { info?: unknown } | null,
+  key: "Producer" | "Title" | "Author" | "Language",
+): string | undefined {
+  const info = metadata?.info as Record<string, unknown> | undefined;
+  const value = info?.[key];
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
 }
 
@@ -400,6 +408,11 @@ export async function ingestPdfjs(
     const tagHints = buildTagHints({ marked: tagged, pages: tagPages });
 
     const producer = readProducer(metadata);
+    // The producer's claim about the document (E4-T04): kept raw and optional,
+    // `buildBook` sanitizes it into `Book.metadata` (ADR-057).
+    const pdfTitle = readInfoString(metadata, "Title");
+    const pdfAuthor = readInfoString(metadata, "Author");
+    const pdfLang = readInfoString(metadata, "Language");
 
     // Detector B (ADR-019): most characters invisible -> the text layer of a
     // scan. Measured on the pages actually read (a `pageRange` is a sample).
@@ -412,6 +425,9 @@ export async function ingestPdfjs(
         sha256: digest,
         pageCount,
         ...(producer ? { producer } : {}),
+        ...(pdfTitle ? { title: pdfTitle } : {}),
+        ...(pdfAuthor ? { author: pdfAuthor } : {}),
+        ...(pdfLang ? { lang: pdfLang } : {}),
         tagged,
         ...(ocrTextLayer ? { ocrTextLayer: true } : {}),
       },

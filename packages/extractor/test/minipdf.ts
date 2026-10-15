@@ -3,7 +3,8 @@
  *
  * It emits only what the tests need: one or more pages with a Type 1 font
  * (optionally non-embedded, which is the case that exercises the standard
- * fonts of pdf.js), an optional struct tree and an optional outline. Offsets
+ * fonts of pdf.js), an optional struct tree, an optional outline and the
+ * optional `/Info` + `/Lang` metadata (E4-T04). Offsets
  * are computed while writing, so the xref table is always correct.
  *
  * Nothing here reaches production code: the helper lives under `test/`.
@@ -29,6 +30,10 @@ export interface BuildPdfOptions {
   tagged?: boolean;
   /** Build an `/Outlines` tree. */
   outlines?: OutlineSpec[];
+  /** `/Info` dictionary entries (E4-T04: the path that reads Title/Author). */
+  info?: { Title?: string; Author?: string };
+  /** Catalog `/Lang` entry (E4-T04: free-form, e.g. `pt-BR`). */
+  lang?: string;
   mediaBox?: [number, number, number, number];
 }
 
@@ -136,6 +141,8 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     fonts,
     tagged = false,
     outlines,
+    info,
+    lang,
     mediaBox = [0, 0, 600, 800],
   } = options;
   const pageCount = contentStreams.length;
@@ -168,6 +175,17 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     .map(([name, number]) => `/${name} ${number} 0 R`)
     .join(" ");
 
+  const langEntry = lang === undefined ? "" : ` /Lang (${escapeLiteral(lang)})`;
+
+  // `/Info` dictionary: only the entries the tests exercise (E4-T04).
+  let infoNumber = 0;
+  if (info?.Title !== undefined || info?.Author !== undefined) {
+    const infoParts: string[] = [];
+    if (info?.Title !== undefined) infoParts.push(`/Title (${escapeLiteral(info.Title)})`);
+    if (info?.Author !== undefined) infoParts.push(`/Author (${escapeLiteral(info.Author)})`);
+    infoNumber = push(`<< ${infoParts.join(" ")} >>`);
+  }
+
   // One `P` element per marked-content id; ids restart at 0 on each page.
   const structNumbers: number[] = [];
   if (tagged) {
@@ -194,9 +212,9 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
         .map((number) => `${number} 0 R`)
         .join(" ")}] >>`;
     objects[catalogNumber - 1] =
-      `<< /Type /Catalog /Pages ${pagesNumber} 0 R /StructTreeRoot ${rootNumber} 0 R /MarkInfo << /Marked true >> >>`;
+      `<< /Type /Catalog /Pages ${pagesNumber} 0 R /StructTreeRoot ${rootNumber} 0 R /MarkInfo << /Marked true >>${langEntry} >>`;
   } else {
-    objects[catalogNumber - 1] = `<< /Type /Catalog /Pages ${pagesNumber} 0 R >>`;
+    objects[catalogNumber - 1] = `<< /Type /Catalog /Pages ${pagesNumber} 0 R${langEntry} >>`;
   }
 
   const outlineFlat: OutlineRecord[] =
@@ -253,10 +271,11 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     body += `${index + 1} 0 obj\n${object}\nendobj\n`;
   });
   const xrefOffset = body.length;
+  const infoRef = infoNumber === 0 ? "" : ` /Info ${infoNumber} 0 R`;
   body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (let index = 1; index <= objects.length; index++) {
     body += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
   }
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${infoRef} >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
   return new Uint8Array(Buffer.from(body, "latin1"));
 }

@@ -45,7 +45,7 @@ function page(items: RawTextItem[], index = 0): RawPage {
 
 function doc(pages: RawPage[], extra: Partial<RawDocument["source"]> = {}): RawDocument {
   return {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     source: {
       fileName: "book.pdf",
       sha256: "a".repeat(64),
@@ -70,7 +70,7 @@ describe("buildBook", () => {
   it("produces a Book that validates against the schema", () => {
     const book = buildBook(doc([twoParagraphs]));
     expect(() => parseBook(book)).not.toThrow();
-    expect(book.schemaVersion).toBe("1.1.0");
+    expect(book.schemaVersion).toBe("1.2.0");
     expect(book.id).toBe("a".repeat(64));
     expect(book.source).toEqual({ fileName: "book.pdf", pageCount: 1 });
     expect(book.metadata).toEqual({ language: "unknown" });
@@ -346,6 +346,31 @@ describe("buildBook", () => {
     ]);
     const book = buildBook(doc([styled], { ocrTextLayer: true }));
     expect(book.blocks[0]?.runs).toEqual([{ text: "Aviso importante." }]);
+  });
+
+  it("fills metadata from the PDF claims and the stopword lexicons (E4-T04)", () => {
+    const portuguese = page([
+      item(
+        "O livro que ela comprou na cidade era muito interessante porque contava " +
+          "a história de uma família que vivia no campo. A autora descreve os " +
+          "personagens com cuidado e mostra como eles mudam ao longo dos anos.",
+        MARGIN,
+        100,
+        BODY,
+      ),
+    ]);
+    const book = buildBook(
+      doc([portuguese], {
+        title: "O Mundo de Sofia",
+        author: "Jostein Gaarder",
+        lang: "pt-BR",
+      }),
+    );
+    expect(book.metadata).toEqual({
+      title: "O Mundo de Sofia",
+      authors: ["Jostein Gaarder"],
+      language: "pt",
+    });
   });
 });
 

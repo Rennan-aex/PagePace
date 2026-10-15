@@ -3,23 +3,22 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** E4 (Títulos/estilos/sumário) — T01 e T02 `done` (PRs #38 e #40); T03 concluída no **PR #42** (branch `e4-t03-build-toc`); T04…T05 `todo`. E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
-- **Tarefa atual:** **E4-T04 — Metadados** (cópia abaixo, 2026-10-14). A E4-T03 (sumário) está concluída no **PR #42**.
+- **Fase atual:** E4 (Títulos/estilos/sumário) — T01…T04 `done` (PRs #38, #40, #42 e o da E4-T04); T05 `todo`. E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
+- **Tarefa atual:** **E4-T05 — Estilo vs texto original em títulos** (cópia abaixo, 2026-10-15). A E4-T04 (metadados) está concluída no **PR #43**.
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh` instalado na máquina.
-- **Status:** `pnpm verify` verde (586 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 sem regressão (o sumário não é métrica; baseline intocada: `heading_f1`/`heading_level_acc` 1,0000 em 6 dos 7 medidos, 0,0000 só em `syn-n2-en-columns` = alvo da E6).
-- **Última atualização:** 2026-10-14 (E4-T03 concluída — PR #42).
+- **Status:** `pnpm verify` verde (616 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 sem regressão (nenhuma métrica mudou — idioma/título/autores não são métricas; baseline intocada).
+- **Última atualização:** 2026-10-15 (E4-T04 concluída).
 
-## Tarefa atual — E4-T04 · Metadados (cópia de `phases/E4-headings-styles.md`, 2026-10-14)
-- Título, autores, idioma (`pt|en|mixed|unknown`) por detecção simples (léxico de stopwords) + metadados do PDF.
-- **Aceite:** idioma correto em 100% dos documentos do corpus com idioma conhecido.
+## Tarefa atual — E4-T05 · Estilo vs texto original em títulos (cópia de `phases/E4-headings-styles.md`, 2026-10-15)
+- Títulos não herdam negrito do estilo de título como `bold` de run (evita duplicar a semântica); decidir e registrar ADR.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **E4-T03 — Sumário — CONCLUÍDA** (2026-10-14, PR #42, branch `e4-t03-build-toc`): `toc.ts` + `toc.test.ts` (18 casos) + `test/toc-pdf.test.ts` (3 PDFs por `minipdf`); `pnpm verify` 586 testes; `pnpm eval --ci` exit 0.
-- **Próxima tarefa: E4-T04 — Metadados** (cópia acima). Comece pela skill `start-session`.
-- **O que ficou:** `buildToc(blocks, outline?)` — outline não vazio vira o toc (walk pré-ordem; título e nível do bookmark, nível substitui o detectado nos casados); bloco resolvido por título que responde na página, depois por título depois do último casamento, depois pelo primeiro título da página, depois pelo primeiro bloco; sem outline o toc é a lista dos títulos detectados. `buildBook` aplica os níveis e empurra o warning `toc-outline-unmatched` (código do extrator, contrato intacto — ADR-049 d1).
-- **O que decidiu o design (sonda `.pagepace-cache/tmp/probe-t03.ts`):** 8 dos 26 documentos têm bookmarks, 139 entradas — 73 casam com um título detectado, 13 caem em página com título diferente, 51 em página sem título detectado (limite da E4-T02/E6), 2 descartadas. `toc-heading-unlisted` disparava em 7 dos 8 (1.151 títulos contra 139 bookmarks) e foi **removido** (ADR-056).
-- **Para mexer no sumário depois:** aceite em `test/toc-pdf.test.ts` (`minipdf` com/sem/bookmark discrepante), casos de comportamento em `src/toc.test.ts`, matching em `tocTitleKey`/`titlesAnswer`.
-- Contexto herdado (E4-T02, PR #40): níveis por cluster de fonte com fallback na ordem de leitura (**ADR-055**); limitações anotadas no `headings.ts` e no `EVALUATION.md` (medida de coluna única = E6).
+- **E4-T04 — Metadados — CONCLUÍDA** (2026-10-15, **PR #43**, branch `e4-t04-detect-metadata`): `metadata.ts` (léxico stopwords pt/en dobrado sem acentos e **disjunto**: 126/152; `detectLanguage` — texto decide com dominância, ambos fortes e próximos = `mixed`, amostra fraca cai no hint `/Lang` do PDF, aceitando subtag primária + `por`/`eng`, senão `unknown`; `sanitizePdfTitle` descarta URL/nome-de-arquivo/vazio; `splitPdfAuthors` por `;`) + schema **1.2.0** (`RawDocument.source.title/author/lang`, ADR-057) + `minipdf` com `/Info`+`/Lang`; `metadata.test.ts` (18) e `test/metadata-pdf.test.ts` (3).
+- **Aceite medido:** sonda `.pagepace-cache/tmp/probe-t04.ts` — **idioma correto em 24/24 documentos com `Book`**; os 2 escaneados (`n5-*`) são recusados pela ADR-018 e não têm `Book`. Prova de robustez: `n3-pt-scielo-wittgenstein` declara `/Lang en-US` e sai `pt`.
+- **Próxima tarefa: E4-T05 — Estilo vs texto original em títulos** (cópia acima). Comece pela skill `start-session`.
+- **Para mexer no idioma depois:** constantes `LANGUAGE_*` e os sets `LANGUAGE_STOPWORDS_PT/EN` em `metadata.ts`; calibre com a sonda `probe-t04.ts` (compara com o campo `lang` dos manifests). `Book.metadata` é preenchido por `buildMetadata(blocks, document.source)` no fim do `buildBook`.
+- **Cuidado com o schema:** `schemaVersionSchema` é `z.literal(SCHEMA_VERSION)` — bump exige atualizar fixtures/testes que citam a versão (feito: 1.1.0 → 1.2.0 em 8 arquivos). Tag `schema-v1.2.0` criar após o merge.
+- Contexto herdado (E4-T03, PR #42): `buildToc(blocks, outline?)` (ADR-056); níveis de título por cluster de fonte (ADR-055); limitações anotadas no `headings.ts` e no `EVALUATION.md` (coluna única = E6).
 - `raw.outline` (`RawOutlineItem {title, pageIndex, children}`) vem da ingestão (E1-T01, `ingest/pdfjs.ts` → `buildOutline`).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
@@ -40,7 +39,7 @@
 | E1 | done (2026-10-07, PR #22) |
 | E2 | done (2026-10-08, PR #28; checklist manual concluído 2026-10-11) |
 | E3 | done (2026-10-11, PRs #29–#34; checklist manual concluído 2026-10-11) |
-| E4 | in progress (T01 PR #38, T02 PR #40, T03 PR #42; T04…T05 todo) |
+| E4 | in progress (T01 PR #38, T02 PR #40, T03 PR #42, T04 PR #43; T05 todo) |
 | E5…E10, SEG | todo (E8 descarta `font.data`; E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
@@ -49,8 +48,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-15 · **E4-T04 (metadados) — CONCLUÍDO** · **PR #43** (branch `e4-t04-detect-metadata`) · `metadata.ts` (stopwords pt/en disjuntas + `detectLanguage` com hint `/Lang` + saneação de título/autores) + schema **1.2.0** (`source.title/author/lang`, **ADR-057**) + `minipdf` com `/Info`+`/Lang` + 22 testes novos; **616 testes**; `pnpm eval --ci` exit 0; sonda `probe-t04.ts`: **24/24 idiomas corretos** (2 escaneados sem `Book`, ADR-018).
 - 2026-10-14 · **E4-T03 (sumário) — CONCLUÍDO** · **PR #42** (branch `e4-t03-build-toc`) · `toc.ts` (`flattenOutline` pré-ordem + `buildToc(blocks, outline?)`: bookmarks do PDF conferidos contra os títulos detectados, 4 passos de resolução, nível do bookmark substitui o detectado — **ADR-056**) + integração em `buildBook` + `toc.test.ts` (18) e `test/toc-pdf.test.ts` (3, PDF por `minipdf`); **586 testes**; `pnpm eval --ci` exit 0 sem regressão; `toc-heading-unlisted` medido e removido (disparava em 7 dos 8 documentos com bookmarks).
-- 2026-10-14 · **E4-T02 (títulos e níveis) — CONCLUÍDO** · **PR #40 na `main`** (branch `e4-t02-detect-headings`) · `headings.ts` (porta + 5 sinais de exibição; nível por cluster de tamanhos de fonte, fallback na ordem de leitura — **ADR-055**) + `buildBook` emite `kind: "heading"`/`level` + `headingDetection`/`blockHeadingDetection` no eval (coluna `heading_f1` + seção de falsos positivos); **565 testes**; aceite N1 ≥ 0,95 nos 4 documentos; `heading_f1` = 1,0000 em 6 dos 7 e 0,0000 só em `syn-n2-en-columns` (alvo da E6), nenhum falso positivo; baseline só com as 2 chaves novas (regra de ouro).
 - Sessões anteriores: `docs/extractor/archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md` e `archive/STATE-log-2026-10-14.md` (seções "Handoff" e "Log de sessões").
 
 Histórico completo: docs/extractor/archive/

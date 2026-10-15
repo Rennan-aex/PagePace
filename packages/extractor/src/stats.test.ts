@@ -20,7 +20,7 @@ function page(items: RawTextItem[], index = 0): RawPage {
 
 function doc(pages: RawPage[]): RawDocument {
   return {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     source: {
       fileName: "stats.pdf",
       sha256: "0".repeat(64),

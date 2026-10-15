@@ -4,6 +4,7 @@ import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from ".
 import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
+import { buildMetadata } from "./metadata";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
@@ -76,9 +77,15 @@ import { normalizeForReader } from "./unicode";
  * lives in `detectHeadings` (font size, bold, centering, numbering, short
  * isolated lines against the body size, the leading and the measure).
  *
+ * Metadata (E4-T04): `metadata` is filled by `buildMetadata` — title and
+ * authors from the sanitized PDF info claims (`source.title`/`source.author`),
+ * language from the stopword lexicons over the block text combined with the
+ * PDF's `/Lang` hint. A document with no usable signal keeps
+ * `language: "unknown"` and no title/authors.
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
- * still read as text, metadata is not detected (E4-T04), the single column
+ * still read as text, the single column
  * rule of the paragraph layer stands, a heading without space above it needs
  * a display signal of its own, and the eval's `hyphen_join_acc` still scores
  * only intra-page sites (it walks the per-page paragraphs).
@@ -207,7 +214,7 @@ export function buildBook(document: RawDocument): Book {
     schemaVersion: SCHEMA_VERSION,
     id: document.source.sha256,
     source: { fileName: document.source.fileName, pageCount: document.source.pageCount },
-    metadata: { language: "unknown" },
+    metadata: buildMetadata(blocks, document.source),
     toc: toc.toc,
     blocks,
     extraction: {

@@ -35,7 +35,7 @@ describe("@pagepace/schema", () => {
   });
 
   it("publishes schema version 1.1.0", () => {
-    expect(SCHEMA_VERSION).toBe("1.1.0");
+    expect(SCHEMA_VERSION).toBe("1.2.0");
   });
 });
 
@@ -49,6 +49,13 @@ describe("valid fixtures round-trip", () => {
     expect(document.source.ocrTextLayer).toBe(true);
     // Absent (not false) on a normal document: consumers test truthiness.
     expect(parseRawDocument(validRawDocument).source.ocrTextLayer).toBeUndefined();
+  });
+
+  it("keeps the PDF info strings on `source` (E4-T04)", () => {
+    const document = parseRawDocument(validRawDocument);
+    expect(document.source.title).toBe("Philosophy of Mind");
+    expect(document.source.author).toBe("Smith; Doe");
+    expect(document.source.lang).toBe("en-US");
   });
 
   it("parses the sample Book", () => {

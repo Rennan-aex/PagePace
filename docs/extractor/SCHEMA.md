@@ -1,6 +1,6 @@
-# Esquema (contrato) v1.1.0
+# Esquema (contrato) v1.2.0
 
-> **Status:** **`1.1.0`** — fechado em `1.0.0` pela E1-T01 (2026-10-05) e ampliado pela E1-T03 (campo `source.ocrTextLayer`, 2026-10-05, ver changelog). A fonte de verdade em código é `packages/schema` (tipos TypeScript + validadores de runtime com `zod` — `parseRawDocument`, `parseBook`, `parseOverlay`, `parseAnchor`); este documento explica a intenção. Qualquer mudança segue as regras de versionamento abaixo.
+> **Status:** **`1.2.0`** — fechado em `1.0.0` pela E1-T01 (2026-10-05), ampliado pela E1-T03 (`source.ocrTextLayer`, 2026-10-05) e pela E4-T04 (`source.title`/`author`/`lang`, 2026-10-15, ver changelog). A fonte de verdade em código é `packages/schema` (tipos TypeScript + validadores de runtime com `zod` — `parseRawDocument`, `parseBook`, `parseOverlay`, `parseAnchor`); este documento explica a intenção. Qualquer mudança segue as regras de versionamento abaixo.
 
 ## Versionamento
 `MAJOR.MINOR.PATCH` em `SCHEMA_VERSION`.
@@ -15,7 +15,8 @@ Formato comum para PDF.js e para OCR.
 interface RawDocument {
   schemaVersion: string;
   source: { fileName: string; sha256: string; pageCount: number; producer?: string; tagged: boolean;
-            ocrTextLayer?: boolean };   // true = texto de OCR invisível (Tr 3, ADR-019)
+            ocrTextLayer?: boolean;          // true = texto de OCR invisível (Tr 3, ADR-019)
+            title?: string; author?: string; lang?: string };  // alegação do próprio PDF, sem validação (E4-T04)
   outline?: RawOutlineItem[];            // bookmarks do PDF
   tagHints?: TagHints;                   // pistas normalizadas da árvore de tags (nunca a árvore crua)
   pages: RawPage[];
@@ -98,6 +99,7 @@ interface Run {
 
 **Texto de um bloco** = concatenação de `runs[].text`. Offsets de âncora sempre referem a esse texto.
 **Hifenização:** o texto do bloco já vem com palavras unidas; hifens genuínos de palavras compostas são preservados.
+**`metadata` (E4-T04):** `language` sai da detecção léxica (stopwords pt/en sobre o texto dos blocos) somada à dica `source.lang` do PDF; `title`/`authors` vêm dos campos `Title`/`Author` do PDF depois da saneação (vazio e nome de arquivo descartados). PDF sem sinal → `language: "unknown"`, campos de título/autores ausentes.
 **Palavras:** não estão no modelo; ver `@pagepace/segmenter`.
 
 ## 3. `Anchor` (para o app ancorar posição, marcações e anotações)
@@ -134,3 +136,4 @@ type CorrectionOp = { id: string; createdAt: string; target: Anchor } & (
 - `0.1.0-draft` (doc, 2026-10-04): códigos de `extraction.warnings` documentados (`"ocr-text-layer"`) e a tabela dos dois estados de PDF escaneado — só documentação, **nenhum tipo mudou** (ADR-019).
 - `1.0.0` (2026-10-05, E1-T01): contrato fechado em código. `structTree?: unknown` → **`tagHints?: TagHints`** (a árvore crua não é persistida — ADR-025). Validação de runtime com `zod` (ADR-024): objetos estritos (chaves desconhecidas rejeitadas), `confidence`/`avgConfidence` em 0..1, `blocks` e `runs` não vazios, `heading` exige `level`, `origin.pageTo >= pageFrom`, `Anchor.end >= start`, `CorrectionOp` como união discriminada por `op`, `createdAt` ISO-8601 com fuso. Fixtures válidas e inválidas em `packages/schema/src/fixtures.ts`.
 - `1.1.0` (2026-10-05, E1-T03): **MINOR** — campo opcional `source.ocrTextLayer?: boolean` no `RawDocument`, marcado quando a maioria dos caracteres vem de uma camada de OCR invisível (`Tr 3`, ADR-019/ADR-029); é ele que o construtor do `Book` transforma em `extraction.warnings: ["ocr-text-layer"]`, confiança reduzida e runs sem negrito/itálico. Sem migração (nada foi removido); como `schemaVersion` é literal, JSON gravado como `1.0.0` deixa de validar — hoje não existe nenhum artefato gravado. Detector A (ADR-018) não acrescenta campo: PDF sem camada de texto não gera `RawDocument` (`ScannedPdfError`).
+- `1.2.0` (2026-10-15, E4-T04): **MINOR** — três campos opcionais em `RawDocument.source`: `title?`, `author?` e `lang?`, a cópia cruza do que o próprio PDF declara (`Info.Title`, `Info.Author` e o `/Lang` do catálogo, lidos pelo PDF.js na ingestão). São alegação do produtor, não verdade: o extrator saneia antes de virar `Book.metadata` (ADR-057). Sem migração; os campos são ausentes quando o PDF não os declara (mesmo padrão do `producer`).

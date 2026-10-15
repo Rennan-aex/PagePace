@@ -6,12 +6,15 @@ import type { RawDocument } from "./raw";
 export const FIXTURE_SHA256 = "0123456789abcdef".repeat(4);
 
 export const validRawDocument: RawDocument = {
-  schemaVersion: "1.1.0",
+  schemaVersion: "1.2.0",
   source: {
     fileName: "n1-en-rebus-philosophy-mind.pdf",
     sha256: FIXTURE_SHA256,
     pageCount: 2,
     producer: "Prince 12.5",
+    title: "Philosophy of Mind",
+    author: "Smith; Doe",
+    lang: "en-US",
     tagged: true,
   },
   outline: [
@@ -144,7 +147,7 @@ export const figureBlock: Block = {
 };
 
 export const validBook: Book = {
-  schemaVersion: "1.1.0",
+  schemaVersion: "1.2.0",
   id: FIXTURE_SHA256,
   source: { fileName: "n1-en-rebus-philosophy-mind.pdf", pageCount: 99 },
   metadata: {
@@ -177,7 +180,7 @@ export const validBookOcrTextLayer: Book = {
 };
 
 export const validOverlay: Overlay = {
-  schemaVersion: "1.1.0",
+  schemaVersion: "1.2.0",
   bookId: FIXTURE_SHA256,
   ops: [
     { id: "op-1", createdAt: "2026-10-05T12:00:00Z", target: validAnchor, op: "merge_with_next" },
@@ -295,6 +298,12 @@ export const invalidFixtures: InvalidFixture[] = [
     target: "RawDocument",
     reason: "ocrTextLayer is a boolean flag (ADR-019)",
     data: { ...validRawDocument, source: { ...validRawDocument.source, ocrTextLayer: "yes" } },
+  },
+  {
+    name: "raw-document-empty-pdf-title",
+    target: "RawDocument",
+    reason: "an empty PDF info string is dropped, never stored (E4-T04)",
+    data: { ...validRawDocument, source: { ...validRawDocument.source, title: "" } },
   },
   {
     name: "book-with-struct-tree",

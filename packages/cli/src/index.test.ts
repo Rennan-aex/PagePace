@@ -117,7 +117,7 @@ describe("dump-raw", () => {
       source: { fileName: string; pageCount: number };
       pages: { items: { text: string }[] }[];
     };
-    expect(document.schemaVersion).toBe("1.1.0");
+    expect(document.schemaVersion).toBe("1.2.0");
     expect(document.source.fileName).toBe("digital.pdf");
     expect(document.source.pageCount).toBe(1);
     expect(document.pages[0]?.items.map((item) => item.text)).toEqual(["hello world"]);
@@ -246,7 +246,7 @@ describe("extract", () => {
     expect(code).toBe(EXIT_OK);
     expect(streams.err()).toBe("");
     const book = parseBook(JSON.parse(streams.out()));
-    expect(book.schemaVersion).toBe("1.1.0");
+    expect(book.schemaVersion).toBe("1.2.0");
     expect(book.source).toEqual({ fileName: "extract.pdf", pageCount: 1 });
     expect(book.blocks.length).toBeGreaterThan(0);
     expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);

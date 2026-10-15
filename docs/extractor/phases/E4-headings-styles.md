@@ -15,8 +15,9 @@
 - Usar bookmarks do PDF quando existirem e conferir com títulos detectados; fallback: derivar dos títulos. Cada entrada aponta para `blockId`.
 - **Aceite:** teste com PDF com e sem bookmarks; discrepâncias viram `warnings`.
 - **Feito (branch `e4-t03-build-toc`, ADR-056):** `toc.ts` (`flattenOutline` pré-ordem + `buildToc(blocks, outline?)` — título/nível do bookmark quando ele casa com um título detectado, título da página ou primeiro bloco como *fallback*, entrada descartada quando não há destino; sem outline o toc é a lista dos títulos detectados) + integração em `buildBook` (nível do bookmark substitui o nível detectado nos casados) + `toc.test.ts` (18 casos) e `test/toc-pdf.test.ts` (PDF gerado por `minipdf` **com, sem e com bookmark discrepante**). Único warning `toc-outline-unmatched`; `toc-heading-unlisted` medido e removido (dispara em 7 dos 8 documentos com bookmarks — o outline é legitimamente um subconjunto dos títulos, ADR-056).
-### E4-T04 · Metadados
+### E4-T04 · Metadados — **concluída 2026-10-15**
 - Título, autores, idioma (`pt|en|mixed|unknown`) por detecção simples (léxico de stopwords) + metadados do PDF.
 - **Aceite:** idioma correto em 100% dos documentos do corpus com idioma conhecido.
+- **Feito (branch `e4-t04-detect-metadata`, ADR-057, schema 1.2.0):** `metadata.ts` (léxico pt/en dobrado sem acentos e disjunto, `detectLanguage` com dominância/`mixed`/hint `/Lang`+`por`/`eng`/`unknown`, `sanitizePdfTitle` e `splitPdfAuthors`), `RawDocument.source` ganhou `title?`/`author?`/`lang?` lidos do `getMetadata()` na ingestão, `buildBook` aplica `buildMetadata`, `minipdf` emite `/Info`+`/Lang`, `metadata.test.ts` (18 casos) e `test/metadata-pdf.test.ts` (3 PDFs). Sonda `probe-t04.ts`: **idioma correto em 24/24 documentos com `Book`** (os 2 escaneados são recusados pela ADR-018 e não têm `Book`); `n3-pt-scielo-wittgenstein` declara `/Lang en-US` e o léxico acerta `pt` — o texto decide sobre o hint.
 ### E4-T05 · Estilo vs texto original em títulos
 - Títulos não herdam negrito do estilo de título como `bold` de run (evita duplicar a semântica); decidir e registrar ADR.
