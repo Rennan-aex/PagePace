@@ -1,7 +1,8 @@
 import type { RawPage, RawTextItem } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
+import { HEADING_BOLD_SHARE } from "./headings";
 import { groupLines } from "./lines";
-import { itemRunStyle, paragraphRuns, SUPSUB_MAX_SIZE_RATIO } from "./runs";
+import { headingRuns, itemRunStyle, paragraphRuns, SUPSUB_MAX_SIZE_RATIO } from "./runs";
 
 const BODY = 12;
 const MARGIN = 72;
@@ -184,5 +185,60 @@ describe("paragraphRuns", () => {
     const nbsp = String.fromCharCode(0x00a0);
     const runs = lineRuns([item(`e${ff}ect a${nbsp}b`, MARGIN, 100)]);
     expect(runs).toEqual([{ text: "effect a b" }]);
+  });
+});
+
+describe("headingRuns (E4-T05)", () => {
+  it("drops the bold that is the title style and merges the plain neighbors", () => {
+    // 9 of the 13 non-space characters are bold: the weight is the heading's
+    // own face, and `kind: "heading"` already says so — no run keeps `bold`.
+    const runs = headingRuns([{ text: "Bold Title", bold: true }, { text: " tail" }]);
+    expect(runs).toEqual([{ text: "Bold Title tail" }]);
+  });
+
+  it("strips exactly at HEADING_BOLD_SHARE", () => {
+    expect(HEADING_BOLD_SHARE).toBe(0.6);
+    // 6 bold characters of 10: the same weight that marks a bold title.
+    expect(headingRuns([{ text: "abcdef", bold: true }, { text: "ghij" }])).toEqual([
+      { text: "abcdefghij" },
+    ]);
+  });
+
+  it("counts only non-space characters, so a boundary space never tips the share", () => {
+    // 3 bold of 5 non-space characters = 0.6: the trailing space of the bold
+    // run (the golden convention of ADR-053) does not vote.
+    expect(headingRuns([{ text: "abc ", bold: true }, { text: "de" }])).toEqual([
+      { text: "abc de" },
+    ]);
+  });
+
+  it("keeps word-level bold below the threshold (emphasis of the original text)", () => {
+    const runs = [{ text: "Chapter " }, { text: "One", bold: true }];
+    expect(headingRuns(runs)).toEqual([{ text: "Chapter " }, { text: "One", bold: true }]);
+  });
+
+  it("keeps italic, sup and sub of a title whose bold it stripped", () => {
+    expect(
+      headingRuns([
+        { text: "PART ", bold: true },
+        { text: "I", bold: true, italic: true },
+      ]),
+    ).toEqual([{ text: "PART " }, { text: "I", italic: true }]);
+    expect(
+      headingRuns([
+        { text: "E = mc", bold: true },
+        { text: "2", bold: true, sup: true },
+      ]),
+    ).toEqual([{ text: "E = mc" }, { text: "2", sup: true }]);
+  });
+
+  it("never mutates the runs it receives", () => {
+    const original = [{ text: "Bold Title", bold: true }];
+    headingRuns(original);
+    expect(original).toEqual([{ text: "Bold Title", bold: true }]);
+  });
+
+  it("keeps plain headings plain", () => {
+    expect(headingRuns([{ text: "A quiet title" }])).toEqual([{ text: "A quiet title" }]);
   });
 });

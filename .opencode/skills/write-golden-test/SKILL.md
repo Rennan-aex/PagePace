@@ -24,7 +24,7 @@ description: Use para criar gabaritos (golden) e testes golden do extrator, seja
 ```
 - **`schemaVersion` é a versão do FORMATO do golden** (`GOLDEN_FORMAT_VERSION` em `packages/eval/src/golden.ts`), **não** a do `@pagepace/schema`. Major tem que bater; mudança de formato = bump + registro em `DECISIONS.md`.
 - **`kind`** vem da lista fechada `BLOCK_KINDS` do `@pagepace/schema` (mesma do `Book.blocks`); **`level` 1..6 é obrigatório quando `kind = "heading"`**.
-- **`bold`/`italic`** nas runs espelham `Run` do esquema — são a verdade para o `style_f1` (E4).
+- **`bold`/`italic`** nas runs espelham `Run` do esquema — são a verdade para o `style_f1` (E4). Em bloco `heading`, **não** se marca o negrito do estilo de título (o `kind`/`level` já o dizem — ADR-058); só negrito palavra a palavra em título de corpo regular.
 - **`coverage.pages`** limita a avaliação às páginas anotadas (gabarito parcial é válido e preferido para páginas difíceis): 1-based, não vazio, estritamente crescente. **Com cobertura, todo bloco precisa de `origin` dentro dela** — senão a comparação é contra texto recortado.
 - **Chave desconhecida em qualquer nível = erro.** Chaves de topo são só: `id`, `schemaVersion`, `source`, `coverage`, `blocks`.
 - Gravação: `serializeGolden` (2 espaços, LF, `\n` final, `coverage: null` omitido) — use-o em vez de `JSON.stringify` para o arquivo não "piscar" no git.

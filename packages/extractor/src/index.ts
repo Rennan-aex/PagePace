@@ -126,6 +126,7 @@ export {
 } from "./repeated";
 export type { ItemStyle } from "./runs";
 export {
+  headingRuns,
   itemRunStyle,
   paragraphRuns,
   SUPSUB_MAX_SIZE_RATIO,

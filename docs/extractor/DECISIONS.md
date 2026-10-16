@@ -61,7 +61,8 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-054 | Autonomia de git com gh (commit, push, PR, checks, merge) | accepted |
 | ADR-055 | Nível do título por cluster de fonte, com fallback na ordem de leitura | accepted |
 | ADR-056 | Sumário vem dos bookmarks do PDF, conferidos contra os títulos detectados | accepted |
-| ADR-057 | Metadados do livro: léxico de stopwords + alegações do PDF em `RawDocument.source` (schema 1.2.0) | accepted |
+| ADR-057 | Metadados do livro: léxico de stopwords + alegações do PDF | accepted |
+| ADR-058 | Título não herda o negrito do estilo de título como bold de run | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -486,3 +487,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — só léxico (sem mexer no schema; título/autores ficariam sem fonte, e 2 PDFs reais têm `/Lang` errado — o `n3-pt-scielo-wittgenstein` declara `en-US`); B — léxico de stopwords pt/en sobre o texto dos blocos para o idioma + `Info.Title`/`Info.Author`/`/Lang` do PDF guardados cru em `RawDocument.source` (schema **1.2.0**, MINOR, precedente `ocrTextLayer` da ADR-029); C — confiar só nos metadados do PDF (reprova os sintéticos, que não têm `/Info`, e os campos são frequentemente lixo — S1 §3).
 **Decisão:** B — `detectLanguage`/`buildMetadata` em `packages/extractor/src/metadata.ts`: léxico dobrado sem acentos e disjunto (126 pt / 152 en), texto decide quando há dominância, ambos fortes e próximos = `mixed`, amostra fraca cai no hint `/Lang` (subtags primárias + `por`/`eng`) e depois `unknown`; título/autores vêm só das alegações do PDF, saneadas (URL, nome de arquivo e vazio descartados). Sonda `probe-t04.ts`: **24/24 documentos com `Book` corretos** (os 2 escaneados nem geram `Book`, ADR-018).
 **Consequências:** `metadata.language` deixa de ser sempre `"unknown"` (contrato da ADR-042 atualizado no mesmo PR); o eval não mede idioma (revisar se virar métrica); sem detecção de título/autores pelo conteúdo — livro sem `/Info` fica sem esses campos.
+
+### ADR-058 · Título não herda o negrito do estilo de título como bold de run · accepted · 2026-10-15
+**Contexto:** a E4-T01 escreve `bold` de run a partir do nome da fonte; num `kind: "heading"` esse negrito é quase sempre o próprio estilo do título (sinal de negrito da E4-T02) e duplica a semântica que `kind` + `level` já carregam. Sonda em 24 documentos (1.151 títulos): 155 com negrito-majoritário e 4 com negrito palavra-a-palavra em título de corpo regular.
+**Alternativas:** A — remover `bold` de todo run de título (simples, mas apaga ênfase genuína de títulos não negritos) · B — remover só o negrito-majoritário, com o mesmo `HEADING_BOLD_SHARE` 0,6 que na E4-T02 marca um título em negrito.
+**Decisão:** B — `headingRuns(runs)` em `runs.ts`, aplicada em `buildBook`: share de negrito entre os caracteres não-espaço ≥ `HEADING_BOLD_SHARE` → nenhum run de título sai com `bold` e os vizinhos plain fundem; abaixo do limiar o negrito palavra-a-palavra fica (é texto original); `italic`/`sup`/`sub` nunca são tocados. Convenção de gabarito: título não marca o negrito do estilo de título (os sintéticos já assim); `@pagepace/schema` intocado.
+**Consequências:** o peso do título é lido do `kind`/`level`, não das runs; `style_f1` e baseline intocados (nenhum gabarito tem título negrito); revisar se um gabarito real precisar de negrito-majoritário dentro de título.

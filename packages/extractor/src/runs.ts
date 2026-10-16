@@ -1,5 +1,6 @@
 import type { RawTextItem, Run } from "@pagepace/schema";
 import { classifyFontName, type FontStyle } from "./fontstyle";
+import { HEADING_BOLD_SHARE } from "./headings";
 import { hyphenSiteBetween } from "./hyphen";
 import type { TextLine } from "./lines";
 import { spaceBetween } from "./spaces";
@@ -26,6 +27,15 @@ import { normalizeForReader } from "./unicode";
  *
  * An OCR text layer (`ocr-text-layer`, ADR-019) carries no real style: the
  * caller passes `styles: false` and every run comes out plain.
+ *
+ * Headings (E4-T05 — ADR-058): the runs of a `kind: "heading"` block pass
+ * through `headingRuns` before reaching the `Book`. When the block's
+ * non-space characters are bold-dominant (share ≥ `HEADING_BOLD_SHARE`, the
+ * same weight that itself marks a bold title) the bold is the **title
+ * style** — `kind` + `level` already carry that meaning — so every run loses
+ * it and the plain neighbors merge back; a heading that is not bold-dominant
+ * keeps its word-level bold (emphasis of the original text). `italic`, `sup`
+ * and `sub` are never touched: they are always emphasis of the text.
  *
  * Known limits: style is per item, so a word drawn as one item with an inner
  * style change (rare) stays uniform; normalization runs per segment, so a
@@ -209,4 +219,54 @@ export function paragraphRuns(
   const styles = options.styles ?? true;
   const lines = paragraph.map((line) => lineSegments(line, styles));
   return mergeRuns(joinLineSegments(lines));
+}
+
+/** Two neighbors merge when every style field of the schema agrees. */
+function sameRunStyle(a: Run, b: Run): boolean {
+  return (
+    (a.bold === true) === (b.bold === true) &&
+    (a.italic === true) === (b.italic === true) &&
+    (a.sup === true) === (b.sup === true) &&
+    (a.sub === true) === (b.sub === true) &&
+    (a.smallCaps === true) === (b.smallCaps === true) &&
+    a.noteRef === b.noteRef &&
+    a.lang === b.lang
+  );
+}
+
+/**
+ * Heading runs without the title style's bold (E4-T05, ADR-058): when the
+ * non-space characters of the block are bold-dominant (share ≥
+ * `HEADING_BOLD_SHARE` — the same weight that on its own marks a bold
+ * title), the weight is the **title style** and `kind` + `level` already say
+ * it, so every run loses `bold` and the neighbors left plain merge back. A
+ * heading that is not bold-dominant keeps its word-level bold (emphasis of
+ * the original text); `italic`, `sup` and `sub` are never touched. The text
+ * of every run is the text it received, and the input is never mutated.
+ */
+export function headingRuns(runs: readonly Run[]): Run[] {
+  let boldChars = 0;
+  let totalChars = 0;
+  for (const run of runs) {
+    const chars = run.text.replace(/\s+/g, "").length;
+    totalChars += chars;
+    if (run.bold === true) boldChars += chars;
+  }
+  const titleStyleIsBold = totalChars > 0 && boldChars / totalChars >= HEADING_BOLD_SHARE;
+  if (!titleStyleIsBold) return [...runs];
+  const merged: Run[] = [];
+  for (const run of runs) {
+    let current: Run = run;
+    if (run.bold === true) {
+      const { bold: _bold, ...rest } = run;
+      current = rest;
+    }
+    const previous = merged[merged.length - 1];
+    if (previous !== undefined && sameRunStyle(previous, current)) {
+      previous.text += current.text;
+      continue;
+    }
+    merged.push({ ...current });
+  }
+  return merged;
 }

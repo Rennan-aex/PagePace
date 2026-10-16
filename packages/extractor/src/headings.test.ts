@@ -304,3 +304,45 @@ describe("buildBook with headings (E4-T02)", () => {
     ]);
   });
 });
+
+describe("heading runs vs the title style (E4-T05)", () => {
+  it("does not carry the title style's bold as run bold", () => {
+    // The heading is bold face at the body size: the weight says "title" and
+    // `kind` + `level` already carry that meaning, so no run keeps `bold`.
+    const book = buildBook(
+      doc([
+        page([
+          ...BODY_LONG(100),
+          ...lines(["Bold Title"], 155, BODY, { fontName: "Helvetica-Bold" }),
+          ...BODY_LONG(180),
+        ]),
+      ]),
+    );
+    const heading = book.blocks.find((block) => block.kind === "heading");
+    expect(heading?.runs).toEqual([{ text: "Bold Title" }]);
+  });
+
+  it("keeps word-level bold inside a heading whose face is not bold", () => {
+    // Detected by size alone (14 >= 1.2 · 11); "One" is bold for emphasis,
+    // not as the title face (3 of the 10 non-space characters), so it stays.
+    const title = [
+      item("Chapter ", MARGIN, 155, 14),
+      item("One", MARGIN + "Chapter ".length * 7, 155, 14, { fontName: "Helvetica-Bold" }),
+    ];
+    const book = buildBook(doc([page([...BODY_LONG(100), ...title, ...BODY_LONG(180)])]));
+    const heading = book.blocks.find((block) => block.kind === "heading");
+    expect(heading?.runs).toEqual([{ text: "Chapter " }, { text: "One", bold: true }]);
+  });
+
+  it("strips the bold of a bold-dominant heading and merges the plain fragment", () => {
+    // 7 of the 10 non-space characters are bold (>= HEADING_BOLD_SHARE): the
+    // whole face is the title style, so the plain fragment loses the split.
+    const title = [
+      item("Chapter ", MARGIN, 155, 14, { fontName: "Helvetica-Bold" }),
+      item("One", MARGIN + "Chapter ".length * 7, 155, 14),
+    ];
+    const book = buildBook(doc([page([...BODY_LONG(100), ...title, ...BODY_LONG(180)])]));
+    const heading = book.blocks.find((block) => block.kind === "heading");
+    expect(heading?.runs).toEqual([{ text: "Chapter One" }]);
+  });
+});

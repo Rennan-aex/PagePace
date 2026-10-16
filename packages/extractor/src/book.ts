@@ -8,7 +8,7 @@ import { buildMetadata } from "./metadata";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
-import { paragraphRuns } from "./runs";
+import { headingRuns, paragraphRuns } from "./runs";
 import { documentStats } from "./stats";
 import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
@@ -76,6 +76,12 @@ import { normalizeForReader } from "./unicode";
  * type becomes `kind: "heading"` with a `level` from 1 to 6. Every signal
  * lives in `detectHeadings` (font size, bold, centering, numbering, short
  * isolated lines against the body size, the leading and the measure).
+ *
+ * Heading styles (E4-T05 — ADR-058): a heading's runs go through
+ * `headingRuns`, so the bold that is the **title style** (a bold-dominant
+ * face, share ≥ `HEADING_BOLD_SHARE`) is not written as `bold` — `kind` +
+ * `level` already carry that meaning — while word-level bold in a
+ * not-bold-dominant heading stays, and italic/sup/sub are never touched.
  *
  * Metadata (E4-T04): `metadata` is filled by `buildMetadata` — title and
  * authors from the sanitized PDF info claims (`source.title`/`source.author`),
@@ -180,11 +186,15 @@ export function buildBook(document: RawDocument): Book {
     confidences.push(blockConfidence);
     const decision = headings[index];
     const heading = decision?.heading === true;
+    const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: heading ? "heading" : "paragraph",
       ...(heading ? { level: decision.level } : {}),
-      runs: paragraphRuns(paragraph.lines, { styles: !fromOcr }),
+      // E4-T05 (ADR-058): a heading never carries its title style as run
+      // bold — `kind` + `level` already say it. Word-level bold below the
+      // title-style share stays, as do italic/sup/sub.
+      runs: heading ? headingRuns(runs) : runs,
       origin: {
         pageFrom: paragraph.pageFrom,
         pageTo: paragraph.pageTo,
