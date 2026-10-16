@@ -63,6 +63,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-056 | Sumário vem dos bookmarks do PDF, conferidos contra os títulos detectados | accepted |
 | ADR-057 | Metadados do livro: léxico de stopwords + alegações do PDF | accepted |
 | ADR-058 | Título não herda o negrito do estilo de título como bold de run | accepted |
+| ADR-059 | Nota com marcador numérico sem pontuação | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -493,3 +494,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — remover `bold` de todo run de título (simples, mas apaga ênfase genuína de títulos não negritos) · B — remover só o negrito-majoritário, com o mesmo `HEADING_BOLD_SHARE` 0,6 que na E4-T02 marca um título em negrito.
 **Decisão:** B — `headingRuns(runs)` em `runs.ts`, aplicada em `buildBook`: share de negrito entre os caracteres não-espaço ≥ `HEADING_BOLD_SHARE` → nenhum run de título sai com `bold` e os vizinhos plain fundem; abaixo do limiar o negrito palavra-a-palavra fica (é texto original); `italic`/`sup`/`sub` nunca são tocados. Convenção de gabarito: título não marca o negrito do estilo de título (os sintéticos já assim); `@pagepace/schema` intocado.
 **Consequências:** o peso do título é lido do `kind`/`level`, não das runs; `style_f1` e baseline intocados (nenhum gabarito tem título negrito); revisar se um gabarito real precisar de negrito-majoritário dentro de título.
+
+### ADR-059 · Nota com marcador numérico sem pontuação · accepted · 2026-10-16
+**Contexto:** E5-T01: o marcador era só `1.`/`1)`/`(1)`/`[1]`/símbolo. Nos PDFs reais do corpus (SciELO PT/EN, editoras) a nota abre com o número e um espaço (`1 Sustainable development…`), então 4 dos 7 documentos com a feature `footnotes` ficavam com zero notas; ao aceitar o número cru entram rodapés (`10 Filosofia Unisinos…`), rótulos de capítulo (`8 SUBSTANCE DUALISM IN DESCARTES`) e linhas de tabela (`10 2 10 2 CDM15`).
+**Alternativas:** A) manter só o marcador pontuado (recall zero nos SciELO; precisão estável) · B) aceitar o número cru com guarda-chuva: prosa depois do número, sem capitulares, sem repetição em ≥3 páginas com a mesma linha e a mesma baseline.
+**Decisão:** B — três constantes nomeadas (`FOOTNOTE_PROSE_MIN_LETTERS`, `FOOTNOTE_FURNITURE_MIN_PAGES`, `FOOTNOTE_FURNITURE_BASELINE_TOLERANCE`) que só recusam, nunca classificam; `pnpm eval --ci` saiu 0, nenhuma métrica mudou.
+**Consequências:** 218 blocos `footnote` no corpus (eram 76). Restam FP conhecidos — item de lista numerado com fonte quase-do-corpo e linha de referência (`641 [arXiv:…]`); anotados no BACKLOG para E5-T05/E5-T06 e para o flag de "nota sem chamada" da E5-T02. Revisar quando `block_kind_f1` passar a medir.

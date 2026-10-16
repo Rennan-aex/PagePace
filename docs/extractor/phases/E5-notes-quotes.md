@@ -3,9 +3,10 @@
 **Requisitos:** REQ-EXT-08, 09, 19. **Depende de:** E4. **Saída:** `footnote_link_acc` ≥ meta em N3; `block_kind_f1` medido.
 
 ## Tarefas
-### E5-T01 · Notas de rodapé: detecção
+### E5-T01 · Notas de rodapé: detecção — **concluída 2026-10-16**
 - Região inferior com fonte menor e marcador numérico/símbolo; separador horizontal quando existir.
 - **Aceite:** blocos `footnote` com `origin`; testes com numeração reiniciando por capítulo e por página.
+- **Resultado (2026-10-16):** `packages/extractor/src/footnotes.ts` (camada 4) — `detectFootnotes` por página: região inferior (≥ 0,5 da altura de texto), fonte < 0,95 × body, marcador (`1.`/`1)`/`(1)`/`[4]`/`*`/`††`, e o número cru do estilo SciELO com guarda de prosa, de capitulares e de mobiliário de página — **ADR-059**) ou régua impressa (confiança baixa + flag). 21 `testes` verdes, `pnpm eval --ci` = 0 (nenhuma métrica mudou), corpus: **218 blocos `footnote`** (eram 76) em 10 documentos; FP residuais de lista/referência em **BACKLOG 2026-10-16** (P2, E5-T05/E5-T06).
 ### E5-T02 · Notas: ligação à chamada
 - Encontrar a chamada (sobrescrito/número no texto), ligar `noteRef` no `run` e `anchor` na nota; tratar nota que continua na página seguinte.
 - **Aceite:** `footnote_link_acc` ≥ meta; chamadas sem nota e notas sem chamada viram `flags` e baixam confiança.

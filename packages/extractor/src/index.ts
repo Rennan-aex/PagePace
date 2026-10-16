@@ -23,6 +23,20 @@ export {
 } from "./brokenfont";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
+export type { FootnoteContext, FootnoteDecision } from "./footnotes";
+export {
+  detectFootnotes,
+  FOOTNOTE_BARE_MARKER,
+  FOOTNOTE_FURNITURE_BASELINE_TOLERANCE,
+  FOOTNOTE_FURNITURE_MIN_PAGES,
+  FOOTNOTE_MARKER,
+  FOOTNOTE_MAX_SIZE_FACTOR,
+  FOOTNOTE_PROSE_MIN_LETTERS,
+  FOOTNOTE_REGION_TOP_SHARE,
+  FOOTNOTE_RULE_MIN_CHARS,
+  FOOTNOTE_UNCERTAIN_CONFIDENCE,
+  UNCERTAIN_FOOTNOTE_FLAG,
+} from "./footnotes";
 export type { HeadingContext, HeadingDecision, PageMeasure } from "./headings";
 export {
   detectHeadings,

@@ -3,24 +3,24 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E4 concluída** (T01…T05; PRs #38, #40, #42, #43 e #44). Próxima: **E5 — Notas e citações** (8 tarefas, começa pela E5-T01). E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
-- **Tarefa atual:** nenhuma em andamento — E4-T05 concluída nesta sessão; a próxima sessão entra em `e5-t01-detect-footnotes` (cópia abaixo, 2026-10-15).
+- **Fase atual:** **E5 em andamento** — T01 concluída (2026-10-16); próxima **E5-T02**. E4 fechada (PRs #38, #40, #42, #43 e #44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
+- **Tarefa atual:** **E5-T01 concluída** (branch `e5-t01-detect-footnotes`, **PR #45**; cópia abaixo virou E5-T02).
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh` instalado na máquina.
-- **Status:** `pnpm verify` verde (626 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 sem regressão (nenhuma métrica mudou — gabaritos de título não têm negrito).
-- **Última atualização:** 2026-10-15 (E4-T05 concluída).
+- **Status:** `pnpm verify` verde (647 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 sem regressão (nenhuma métrica depende de `kind`).
+- **Última atualização:** 2026-10-16 (E5-T01 concluída).
 
-## Tarefa atual — E5-T01 · Notas de rodapé: detecção (cópia de `phases/E5-notes-quotes.md`, 2026-10-15)
-- Região inferior com fonte menor e marcador numérico/símbolo; separador horizontal quando existir.
-- **Aceite:** blocos `footnote` com `origin`; testes com numeração reiniciando por capítulo e por página.
+## Tarefa atual — E5-T02 · Notas: ligação à chamada (cópia de `phases/E5-notes-quotes.md`)
+- Encontrar a chamada (sobrescrito/número no texto), ligar `noteRef` no `run` e `anchor` na nota; tratar nota que continua na página seguinte.
+- **Aceite:** `footnote_link_acc` ≥ meta; chamadas sem nota e notas sem chamada viram `flags` e baixam confiança.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **E4-T05 — Estilo vs texto original em títulos — CONCLUÍDA** (2026-10-15, **PR #44**, branch `e4-t05-heading-run-styles`): `headingRuns(runs)` em `runs.ts` — share de negrito dos caracteres não-espaço ≥ `HEADING_BOLD_SHARE` 0,6 (o mesmo peso que na E4-T02 marca um título em negrito) = **estilo de título** → nenhum run de título sai com `bold` e os vizinhos plain fundem; abaixo do limiar o negrito palavra-a-palavra fica (texto original); `italic`/`sup`/`sub` intactos — **ADR-058**; aplicada em `buildBook` nos blocos `heading` e exportada por `@pagepace/extractor`.
-- **Aceite medido:** sonda `.pagepace-cache/tmp/probe-t05.ts` (24 documentos) — **155 negritos de estilo-título removidos e 4 ênfases palavra-a-palavra preservadas em 1.151 títulos**; `pnpm eval --ci` exit 0 e baseline intocada; **+10 testes** (`runs.test.ts` 7, `headings.test.ts` 3) → **626 testes**.
-- **Convenção de gabarito (ADR-058):** título não marca o negrito do estilo de título — linha nova na skill `write-golden-test` e seção nova no `EVALUATION.md` ("Estilo do título vs texto original em títulos").
-- **E4 completa:** E4-T01…T05 fechadas (ADRs-053/055/056/057/058).
-- **Próxima tarefa: E5-T01 — Notas de rodapé: detecção** (cópia acima; fase `phases/E5-notes-quotes.md`, 8 tarefas). Comece pela skill `start-session`.
-- Contexto herdado (E4-T03/T04, PRs #42/#43): `buildToc(blocks, outline?)` (ADR-056); `detectLanguage`/`buildMetadata` (ADR-057); `Book.metadata` é preenchido por `buildMetadata(blocks, document.source)` no fim do `buildBook`; tag `schema-v1.2.0` já criada.
-- `raw.outline` (`RawOutlineItem {title, pageIndex, children}`) vem da ingestão (E1-T01, `ingest/pdfjs.ts` → `buildOutline`).
+- **Sessão 2026-10-16 — E5-T01 (notas de rodapé: detecção) — CONCLUÍDA:** `packages/extractor/src/footnotes.ts` (camada 4, pura) + integração em `buildBook` (`kind: "footnote"`, `origin`; nota vence título) + 21 testes em `footnotes.test.ts` (sinais, negativos, **numeração reiniciando por página e por capítulo**).
+- Heurística (por página, nunca comparando vizinhos): região inferior (≥ `FOOTNOTE_REGION_TOP_SHARE` 0,5 da altura de texto), fonte < `FOOTNOTE_MAX_SIZE_FACTOR` 0,95 × body, marcador `FOOTNOTE_MARKER` (`1.`/`1)`/`(1)`/`[4]`/`*`/`††`) **ou número cru do estilo SciELO** com 3 guarda-chuvas que só recusam (prosa após o número, capitulares = rótulo impresso, mobiliário repetido em ≥ 3 páginas na mesma baseline) — **ADR-059**; régua impressa sem marcador → flag `uncertain-footnote` + confiança 0,7.
+- Verificações: `pnpm verify` verde (647 testes, 46 arquivos) e `pnpm eval --ci` exit 0 (baseline intacta — nenhuma métrica lê `kind`).
+- Sondas: `.pagepace-cache/tmp/audit-notes.ts` (antes/depois em `audit-before.txt`/`audit-after2.txt`) e `debug-footnotes.ts` (recorte por página); corpus: **218 blocos `footnote`** (eram 76) em 10 documentos.
+- FP residuais (lista numerada com fonte quase-do-corpo, linha de referência `641 [arXiv:…]`, linha de catálogo da p. 4 de `n4-pt-astrofisica`) → **BACKLOG 2026-10-16 (P2)**; rodapés com palavras que mudam por capítulo sobrevivem ao strip da E3-T02 → **BACKLOG 2026-10-16 (P3)**.
+- Contexto herdado: `buildToc` só considera `kind === "heading"`; `footnote_link_acc` e `block_kind_f1` ainda não existem (E5-T02/E5-T04); gabarito sintético `syn-n3-en-footnotes` tem 1 nota (página 2, `size` 9).
+- Próximo passo: **E5-T02** — chamada↔nota, `noteRef`/`anchor`, flag de nota órfã, nota que continua na página seguinte (hoje é join de parágrafo, recusado pela regra de página única).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [x] Checklist manual da fase E2 (`phases/E2-lines-paragraphs.md`) — **feito (2026-10-11):** parágrafos corretos em `n1-pt-sofia` e `n1-en-curinga`; defeito à parte registrado no **BACKLOG 2026-10-11** (quebra no meio da palavra em `n1-en-curinga`, 1.303 ocorrências, P1).
@@ -41,7 +41,8 @@
 | E2 | done (2026-10-08, PR #28; checklist manual concluído 2026-10-11) |
 | E3 | done (2026-10-11, PRs #29–#34; checklist manual concluído 2026-10-11) |
 | E4 | done (T01 PR #38, T02 PR #40, T03 PR #42, T04 PR #43, T05 PR #44) |
-| E5…E10, SEG | todo (E8 descarta `font.data`; E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
+| E5 | in progress (T01 concluída 2026-10-16, **PR #45**) |
+| E6…E10, SEG | todo (E8 descarta `font.data`; E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
 - `pnpm eval`: 26 documentos (11 públicos + 15 privados); 7 com gabarito (sintéticos `syn-*`); nenhum PDF real com gabarito ainda.
@@ -49,8 +50,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-16 · **E5-T01 (notas de rodapé: detecção) — CONCLUÍDO** · **PR #45** (branch `e5-t01-detect-footnotes`) · `footnotes.ts` (`detectFootnotes` puro na camada 4: região inferior + fonte menor + marcador pontuado/símbolo **ou número cru com guarda-chuvas — ADR-059**; régua = nota incerta) + `buildBook` (`kind: "footnote"`, `origin`) + 21 testes; **647 testes**; `pnpm eval --ci` exit 0; sondas `audit-notes.ts`/`debug-footnotes.ts`: **218 notas no corpus (eram 76)**; FP residuais → BACKLOG 2026-10-16 (P2/P3).
 - 2026-10-15 · **E4-T05 (estilo do título) — CONCLUÍDO** · **PR #44** (branch `e4-t05-heading-run-styles`) · `headingRuns` em `runs.ts` (negrito-majoritário = estilo de título some das runs; negrito palavra-a-palavra fica — **ADR-058**) + integração em `buildBook` + convenção de gabarito na skill `write-golden-test`; **626 testes**; `pnpm eval --ci` exit 0; sonda `probe-t05.ts`: 155 negritos de estilo-título removidos, 4 ênfases preservadas, em 1.151 títulos.
-- 2026-10-15 · **E4-T04 (metadados) — CONCLUÍDO** · **PR #43** (branch `e4-t04-detect-metadata`) · `metadata.ts` (stopwords pt/en disjuntas + `detectLanguage` com hint `/Lang` + saneação de título/autores) + schema **1.2.0** (`source.title/author/lang`, **ADR-057**) + `minipdf` com `/Info`+`/Lang` + 22 testes novos; **616 testes**; `pnpm eval --ci` exit 0; sonda `probe-t04.ts`: **24/24 idiomas corretos** (2 escaneados sem `Book`, ADR-018).
 - Sessões anteriores: `docs/extractor/archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md` e `archive/STATE-log-2026-10-14.md` (seções "Handoff" e "Log de sessões").
 
 Histórico completo: docs/extractor/archive/

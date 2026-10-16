@@ -1,6 +1,11 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import {
+  detectFootnotes,
+  FOOTNOTE_UNCERTAIN_CONFIDENCE,
+  UNCERTAIN_FOOTNOTE_FLAG,
+} from "./footnotes";
 import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
@@ -89,6 +94,17 @@ import { normalizeForReader } from "./unicode";
  * PDF's `/Lang` hint. A document with no usable signal keeps
  * `language: "unknown"` and no title/authors.
  *
+ * Footnotes (E5-T01 — REQ-EXT-08): a paragraph the layout marks as a note
+ * becomes `kind: "footnote"` instead of `paragraph` — the bottom half of the
+ * page, a font smaller than the body and a marker (`1.`, `*`, or the bare
+ * `1 A note…` of the SciELO style) or a printed rule above it
+ * (`detectFootnotes`). The text, the runs and the origin do not change: only
+ * the kind does, and a note accepted by the rule alone carries
+ * `flags: ["uncertain-footnote"]` with the reduced
+ * `FOOTNOTE_UNCERTAIN_CONFIDENCE`. Notes restart their numbering by page and
+ * by chapter, so the decisions are per page and never compare neighbours;
+ * linking a note to its call is E5-T02.
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
  * still read as text, the single column
@@ -158,6 +174,13 @@ export function buildBook(document: RawDocument): Book {
     lineHeight: stats?.lineHeight ?? 0,
     measures: pages.map((page) => pageMeasureOf(page.flat())),
   });
+  // E5-T01: the notes are read off the pages the paragraphs came from — every
+  // signal (region, size, marker, rule) is a fact of that page alone.
+  const footnotes = detectFootnotes(
+    paragraphs,
+    pages.map((page) => page.flat()),
+    { bodyFontSize },
+  );
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
@@ -183,13 +206,20 @@ export function buildBook(document: RawDocument): Book {
       blockConfidence = Math.min(blockConfidence, BROKEN_FONT_CONFIDENCE);
       brokenBlocks += 1;
     }
+    if (footnotes[index]?.uncertain === true) {
+      flags.push(UNCERTAIN_FOOTNOTE_FLAG);
+      blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
+    }
     confidences.push(blockConfidence);
+    const footnote = footnotes[index]?.footnote === true;
     const decision = headings[index];
-    const heading = decision?.heading === true;
+    // A note and a heading can not be the same paragraph (the size gates are
+    // complementary), but the kind of the note wins if they ever disagree.
+    const heading = !footnote && decision?.heading === true;
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: heading ? "heading" : "paragraph",
+      kind: footnote ? "footnote" : heading ? "heading" : "paragraph",
       ...(heading ? { level: decision.level } : {}),
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the
