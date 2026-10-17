@@ -168,6 +168,19 @@ documents:
     golden: syn-n2-en-columns.golden.json
     visibility: public
 
+  - id: syn-n2-en-lists
+    level: N2
+    lang: en
+    title: "The Workshop Shelf (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-17"
+    generated: true
+    pages: 2
+    sha256: "1b08fcb8522d07d15a4a1e88cc1a7ded84d8748073444ad1595f6a108a09c6ad"
+    features: [synthetic, lists, captions]
+    golden: syn-n2-en-lists.golden.json
+    visibility: public
+
   - id: syn-n2-pt-estilos
     level: N2
     lang: pt

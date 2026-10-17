@@ -374,6 +374,136 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
     ],
   },
   {
+    // E5-T05: marked and numbered lists (the marker is printed in the text,
+    // the items sit in a shallow indent) and figure/table captions (label +
+    // separator, set smaller than the body) — the ground truth for the
+    // `list_item` and `caption` kinds of `block_kind_f1`.
+    id: "syn-n2-en-lists",
+    level: "N2",
+    lang: "en",
+    title: "The Workshop Shelf (synthetic)",
+    features: ["synthetic", "lists", "captions"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        runs: [{ text: "The Workshop Shelf" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "Every tool in the shelf has a place,\n" +
+              "and every place has a rule that keeps\n" +
+              "the shelf usable after a long week\n" +
+              "of sawdust, oil and sudden repairs.",
+          },
+        ],
+      },
+      {
+        kind: "list_item",
+        page: 1,
+        indent: 12,
+        runs: [
+          {
+            text: "* Keep the morning tools dry\neven after a rush of work.",
+          },
+        ],
+      },
+      {
+        kind: "list_item",
+        page: 1,
+        indent: 12,
+        runs: [
+          {
+            text: "* Oil the hinge of the blue door\nevery month without exception.",
+          },
+        ],
+      },
+      {
+        kind: "list_item",
+        page: 1,
+        indent: 12,
+        runs: [
+          {
+            text: "1. Sweep the boards at noon,\nbefore the dust settles again.",
+          },
+        ],
+      },
+      {
+        kind: "list_item",
+        page: 1,
+        indent: 12,
+        runs: [
+          {
+            text: "2. Close the window before rain\nand latch it from the inside.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A shelf that follows these lines\n" +
+              "needs no inventory: the eye reads\n" +
+              "the order before the mind does,\n" +
+              "and the hand finds the tool alone.",
+          },
+        ],
+      },
+      {
+        kind: "heading",
+        level: 2,
+        page: 2,
+        runs: [{ text: "Plates and Tables" }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "The lamp above the old door has\n" +
+              "two hours of light on summer nights\n" +
+              "and almost none in the wet months,\n" +
+              "when the wind keeps everyone in.",
+          },
+        ],
+      },
+      {
+        kind: "caption",
+        page: 2,
+        size: 9,
+        runs: [{ text: "Fig. 1 - The lamp above the old door." }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "The table below counts those hours\n" +
+              "the way the grandmother counted them:\n" +
+              "on fingers first, then on the wall\n" +
+              "of the pantry, in pencil.",
+          },
+        ],
+      },
+      {
+        kind: "caption",
+        page: 2,
+        size: 9,
+        runs: [{ text: "Table 2 - Hours of light, by month." }],
+      },
+    ],
+  },
+  {
     id: "syn-n3-en-footnotes",
     level: "N3",
     lang: "en",

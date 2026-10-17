@@ -7,7 +7,7 @@
 import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
 import { buildBook } from "./book";
-import { detectHeadings, pageMeasureOf } from "./headings";
+import { pageMeasureOf } from "./headings";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import {

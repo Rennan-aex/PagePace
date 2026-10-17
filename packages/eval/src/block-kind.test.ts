@@ -84,3 +84,35 @@ describe("E5-T04: N3 block kind detection against the golden", () => {
     );
   }
 });
+
+// E5-T05 acceptance: the list/caption documents — the N2 spec written for
+// this task (marked and numbered lists, figure/table captions) and the N2
+// styles spec whose `list_item` blocks were the remaining baseline gap —
+// must score the same target. The other N2 golden (`syn-n2-en-columns`)
+// belongs to E6 and is not gated here.
+const E5_T05_IDS = ["syn-n2-en-lists", "syn-n2-pt-estilos"];
+
+describe("E5-T05: block kinds of the list and caption documents", () => {
+  for (const id of E5_T05_IDS) {
+    const found = corpus.entries.find((entry) => entry.id === id);
+    it.skipIf(found === undefined || !existsSync(found.path))(
+      `${id}: block_kind_f1 >= ${BLOCK_KIND_F1_TARGET_N3}`,
+      async () => {
+        const entry = found as CorpusEntry;
+        const golden = readGolden(entry);
+        expect(golden, `${id}: the golden must exist for the acceptance`).not.toBeNull();
+        const document = await readDocument(entry);
+        const result = blockKindDetection(golden as Golden, document);
+        const errors: string[] = [];
+        for (const [kind, score] of result.byKind) {
+          const invented = score.falsePositives.map((block) => `${kind}:${short(block.text)}`);
+          const missed = score.falseNegatives.map((block) => `${kind}:${short(block.text)}`);
+          if (invented.length > 0) errors.push(`invented ${invented.join(", ")}`);
+          if (missed.length > 0) errors.push(`missed ${missed.join(", ")}`);
+        }
+        const context = errors.length === 0 ? "no kind errors" : `${id}: ${errors.join("; ")}`;
+        expect(result.f1, context).toBeGreaterThanOrEqual(BLOCK_KIND_F1_TARGET_N3);
+      },
+    );
+  }
+});

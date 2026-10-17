@@ -182,6 +182,22 @@ describe("detectHeadings", () => {
     expect(decisions[1]?.heading).toBe(false);
   });
 
+  it("keeps a centered list marker as a list item, not a heading", () => {
+    // E5-T05: a bullet block can sit on the measure's centre by accident
+    // (the Helvetica widths of a synthetic item did) and the layout never
+    // outweighs the printed marker — only size or weight do.
+    const width = 50 * CHAR;
+    const text = "1. First point";
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...[item(text, MARGIN + (width - text.length * CHAR) / 2, 155, BODY)],
+        ...BODY_LONG(180),
+      ]),
+    ]);
+    expect(decisions[1]?.heading).toBe(false);
+  });
+
   it("keeps an italic-dominant line as an epigraph, not a heading", () => {
     const decisions = decisionsOf([
       page([

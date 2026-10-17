@@ -237,12 +237,15 @@ function isHeading(features: HeadingFeatures, context: HeadingContext): boolean 
   if (features.italicShare > HEADING_ITALIC_MAX_SHARE) return false;
   if (HEADING_CAPTION_MARKER.test(features.text)) return false;
   // A line that opens like a list item (`1.`, `•`) only becomes a heading
-  // when the type itself says so — size or weight, never "short and alone".
+  // when the type itself says so — size or weight, never "short and alone"
+  // and never "centered" (E5-T05: a bullet block can sit on the measure's
+  // centre by accident — the Helvetica widths of a synthetic item did — and
+  // must stay a list item).
   const listed = HEADING_LIST_MARKER.test(features.text);
   return (
     features.fontSize >= body * HEADING_SIZE_FACTOR ||
     features.boldShare >= HEADING_BOLD_SHARE ||
-    centered ||
+    (!listed && centered) ||
     (!listed && isNumbered(features.text)) ||
     (!listed && isShortIsolated(features))
   );

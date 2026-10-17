@@ -1,0 +1,153 @@
+{
+  "id": "syn-n2-en-lists",
+  "schemaVersion": "1.1.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "The Workshop Shelf"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Every tool in the shelf has a place,\nand every place has a rule that keeps\nthe shelf usable after a long week\nof sawdust, oil and sudden repairs."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "* Keep the morning tools dry\neven after a rush of work."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "* Oil the hinge of the blue door\nevery month without exception."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "1. Sweep the boards at noon,\nbefore the dust settles again."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "list_item",
+      "runs": [
+        {
+          "text": "2. Close the window before rain\nand latch it from the inside."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A shelf that follows these lines\nneeds no inventory: the eye reads\nthe order before the mind does,\nand the hand finds the tool alone."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Plates and Tables"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The lamp above the old door has\ntwo hours of light on summer nights\nand almost none in the wet months,\nwhen the wind keeps everyone in."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "caption",
+      "runs": [
+        {
+          "text": "Fig. 1 - The lamp above the old door."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The table below counts those hours\nthe way the grandmother counted them:\non fingers first, then on the wall\nof the pantry, in pencil."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "caption",
+      "runs": [
+        {
+          "text": "Table 2 - Hours of light, by month."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

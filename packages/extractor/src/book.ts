@@ -1,6 +1,7 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import { CAPTION_UNCERTAIN_CONFIDENCE, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
 import { detectEndnotes } from "./endnotes";
 import {
   detectFootnotes,
@@ -10,6 +11,7 @@ import {
 import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
+import { detectLists, LIST_UNCERTAIN_CONFIDENCE, UNCERTAIN_LIST_FLAG } from "./lists";
 import { buildMetadata } from "./metadata";
 import {
   CALL_WITHOUT_NOTE_FLAG,
@@ -140,6 +142,18 @@ import { normalizeForReader } from "./unicode";
  * complementary (a note is smaller than `FOOTNOTE_MAX_SIZE_FACTOR`, a
  * heading is flush left).
  *
+ * Lists and captions (E5-T05 — layer 4): a paragraph that opens with a
+ * bullet or a number (`1.`, `*`) is a `list_item`, and so is a block whose
+ * every line sits in the shallow indent below the block-quote gate
+ * (`detectLists`, `flags: ["uncertain-list"]` when the indent is the only
+ * signal). A paragraph that opens like a printed figure/table label (`Fig.
+ * 3 - …`, `Table 2: …`) is a `caption` (`detectCaptions`,
+ * `flags: ["uncertain-caption"]` when the type size and the line count do
+ * not agree). Kind priority inside the loop: footnote > heading > caption >
+ * marked list > quote > indent-only list > paragraph — a marked item
+ * outranks a quote (a bullet inside an indented quote is still a list
+ * item) while an indent-only item never claims a quote's indent.
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
  * still read as text, the single column
@@ -204,10 +218,11 @@ export function buildBook(document: RawDocument): Book {
   const bodyFontSize = stats?.bodyFontSize ?? 0;
   const pages = groupDocumentParagraphs(stripped.document);
   const paragraphs = joinCrossPageParagraphs(pages, bodyFontSize);
+  const measures = pages.map((page) => pageMeasureOf(page.flat()));
   const headings = detectHeadings(paragraphs, {
     bodyFontSize,
     lineHeight: stats?.lineHeight ?? 0,
-    measures: pages.map((page) => pageMeasureOf(page.flat())),
+    measures,
   });
   // E5-T01: the notes are read off the pages the paragraphs came from — every
   // signal (region, size, marker, rule) is a fact of that page alone.
@@ -226,8 +241,12 @@ export function buildBook(document: RawDocument): Book {
   const quotes = detectQuotes(paragraphs, {
     bodyFontSize,
     lineHeight: stats?.lineHeight ?? 0,
-    measures: pages.map((page) => pageMeasureOf(page.flat())),
+    measures,
   });
+  // E5-T05: lists and captions too — the marker the typesetter printed, the
+  // shallow indent below the quote gate, and the figure/table label.
+  const lists = detectLists(paragraphs, { measures });
+  const captions = detectCaptions(paragraphs, { bodyFontSize });
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
@@ -274,10 +293,35 @@ export function buildBook(document: RawDocument): Book {
       flags.push(UNCERTAIN_QUOTE_FLAG);
       blockConfidence = Math.min(blockConfidence, QUOTE_UNCERTAIN_CONFIDENCE);
     }
+    // E5-T05: the printed label of a figure or a table outranks quotes and
+    // lists (a caption may sit indented under its figure); a marked item
+    // outranks a quote (a bullet inside an indented quote is still an
+    // item); an indent-only item never claims a quote's indent.
+    const caption = !footnote && !heading ? captions[index] : undefined;
+    const list = !footnote && !heading ? lists[index] : undefined;
+    const isCaption = caption?.caption === true;
+    const markedList = list?.marked === true;
+    const indentList = !isCaption && !markedList && list?.list === true;
+    if (isCaption && caption?.uncertain === true) {
+      flags.push(UNCERTAIN_CAPTION_FLAG);
+      blockConfidence = Math.min(blockConfidence, CAPTION_UNCERTAIN_CONFIDENCE);
+    }
+    if (indentList && list?.uncertain === true) {
+      flags.push(UNCERTAIN_LIST_FLAG);
+      blockConfidence = Math.min(blockConfidence, LIST_UNCERTAIN_CONFIDENCE);
+    }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: footnote ? "footnote" : heading ? "heading" : (quoteKind ?? "paragraph"),
+      kind: footnote
+        ? "footnote"
+        : heading
+          ? "heading"
+          : isCaption
+            ? "caption"
+            : markedList
+              ? "list_item"
+              : (quoteKind ?? (indentList ? "list_item" : "paragraph")),
       ...(heading ? { level: decision.level } : {}),
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the

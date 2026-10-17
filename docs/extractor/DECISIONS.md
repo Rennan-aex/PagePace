@@ -67,6 +67,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-060 | Ligação nota↔chamada por label + `noteRef` no golden 1.1.0 | accepted |
 | ADR-061 | Endnotes reutilizam o `kind` "footnote" e ligam por label em ordem de leitura | accepted |
 | ADR-062 | Citações: recuo ≥ 1,8 em porta; métrica `block_kind_f1` (macro-média por tipo) | accepted |
+| ADR-063 | Listas e legendas: marcador/numeração + recuo raso; legenda = rótulo impresso | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -533,3 +534,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Decisão:** B — `detectQuotes` (`quotes.ts`, camada 4, pura): porta = todas as linhas ≥ `QUOTE_MIN_INDENT_EM` 1,8 em; epígrafo = ≤ 4 linhas + (itálico ≥ 0,6 ou fonte < 0,95 × corpo); blockquote = recuo sozinho basta; prioridade `footnote` > `heading` > `quote` > `paragraph`; flag `uncertain-quote` + conf 0,7. `blockKindF1` = macro-média dos F1 por tipo (casamento por texto normalizado multiconjunto, como `heading_f1`); dois lados vazios = 1; tipos presentes em qualquer lado entram na média. `syn-n3-en-quotes` cobre os dois kinds (atribuição usa `--` porque o minipdf só grava ASCII).
 
 **Consequências:** `block_kind_f1` na baseline como *maior é melhor*; `syn-n2-pt-estilos` mede 0,6667 (2 `list_item` viram paragraph — alvo E5-T05); `syn-n2-en-columns` mede 0,0667 (alvo E6); nenhum outro regrediu (`text_cer`/`heading_f1` intocados). Sem mudança de esquema: os kinds já existiam.
+
+### ADR-063 · Listas e legendas: marcador/numeração + recuo raso; legenda = rótulo impresso · accepted · 2026-10-17
+**Contexto:** E5-T05: `syn-n2-pt-estilos` perdia os 2 `list_item` (`block_kind_f1` 0,6667) e nenhum documento exercitava `caption`; o schema já tinha os kinds, faltava a camada 4.
+**Alternativas:** A) recuo sozinho decide lista (falsos positivos altos em citações e blocos centrados) · B) marcador/numeração decide; recuo raso (≥ 0,8 e < 1,8 em, faixa logo abaixo do gate do quote) só com flag `uncertain-list`; legenda exige rótulo impresso (`Fig. 3 -`, `Table 2:`) + (fonte menor ou ≤ 3 linhas).
+**Decisão:** B — prioridade footnote > heading > caption > lista marcada > quote > lista por recuo > paragraph; a lista marcada vence o quote (bolinha dentro de citação recuada é item); `lists.ts` e `captions.ts` puros e determinísticos; fix no gate de heading: linha com marcador de lista nunca vira heading por centralização (o comentário da E4-T02 já dizia "size or weight").
+**Consequências:** baseline atualizado sem regressão — `syn-n2-pt-estilos` 1,0000; sintético novo `syn-n2-en-lists` (marcada, numerada, legendas) 1,0000. Revisar quando houver PDF real com gabarito ou quando a E10 ligar `caption` a figuras de verdade (hoje a proximidade é invisível).
