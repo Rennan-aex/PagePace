@@ -21,12 +21,18 @@ import { FOOTNOTE_BARE_MARKER, FOOTNOTE_MARKER } from "./footnotes";
  *   ordinals (`21st`) outside the footnote machinery stay untouched.
  *
  * Both flags carry `NOTE_LINK_UNCERTAIN_CONFIDENCE` (the ARCHITECTURE
- * decision 6 pattern). Limits, on purpose: a note whose first line has no
- * parseable marker (the rule-only uncertain note) is neither linked nor
- * flagged — nothing names its call; an OCR text layer (`styles: false`)
- * never gets the pass, because without `sup` it could only invent flags;
- * and a call whose block spans a page boundary searches each of its pages.
- * Deterministic: same blocks, same decisions.
+ * decision 6 pattern). An endnote (E5-T03) is the exception to the same-page
+ * rule: its section stands at the end of the book or of the chapter, so a
+ * call that finds no note of its page falls back to the endnote list — the
+ * first still-unclaimed endnote **after** the call, in reading order, whose
+ * label matches (the same page first, then the nearest one). A page of
+ * endnotes is never evidence of a missing note, so it never raises
+ * `call-without-note` on its own exponents. Limits, on purpose: a note whose
+ * first line has no parseable marker (the rule-only uncertain note) is neither
+ * linked nor flagged — nothing names its call; an OCR text layer (`styles:
+ * false`) never gets the pass, because without `sup` it could only invent
+ * flags; and a call whose block spans a page boundary searches each of its
+ * pages. Deterministic: same blocks, same decisions.
  */
 
 /** Flag of a note whose page has no call pointing at it. */
@@ -63,6 +69,35 @@ export function callLabel(text: string): string | null {
   return normalizeLabel(trimmed);
 }
 
+/** A label-carrying endnote, by its position in reading order. */
+interface EndnoteEntry {
+  index: number;
+  label: string;
+  pageFrom: number;
+}
+
+/**
+ * The first endnote after the call in reading order that carries its label and
+ * nobody claimed yet — the same page first, then the nearest one. An endnote
+ * list numbers its notes in the order the calls appear, so a call can only
+ * reach forward.
+ */
+function endnoteAfter(
+  endnotes: readonly EndnoteEntry[],
+  label: string,
+  callIndex: number,
+  page: number,
+  called: ReadonlySet<number>,
+): number | undefined {
+  let nearest: number | undefined;
+  for (const entry of endnotes) {
+    if (entry.index <= callIndex || entry.label !== label || called.has(entry.index)) continue;
+    if (entry.pageFrom === page) return entry.index;
+    nearest ??= entry.index;
+  }
+  return nearest;
+}
+
 /** What the linking pass needs from a block (the `Book` blocks, narrowed). */
 export interface NoteCallBlock {
   id: string;
@@ -70,6 +105,11 @@ export interface NoteCallBlock {
   pageFrom: number;
   pageTo: number;
   runs: readonly { text: string; sup?: boolean }[];
+  /**
+   * The block came from an endnote section (E5-T03): its note stands wherever
+   * the section printed it, so a call may link to it across pages by label.
+   */
+  endnote?: boolean;
 }
 
 /** One decision per input block, in the same order. */
@@ -111,12 +151,19 @@ export function linkFootnoteCalls(blocks: readonly NoteCallBlock[]): NoteLinkDec
   // a later one with the same label on the same page is simply not callable.
   const notesByPage = new Map<number, Map<string, number>>();
   const pagesWithNotes = new Set<number>();
+  // E5-T03: an endnote keeps its label in the page index (a call on the notes
+  // page still matches) and also in this list, so a call on an earlier page
+  // reaches it by label in reading order.
+  const endnotes: EndnoteEntry[] = [];
   blocks.forEach((block, index) => {
     if (block.kind !== "footnote") return;
     const text = block.runs.map((run) => run.text).join("");
     const label = noteMarkerLabel(text);
     if (label === null) return;
-    pagesWithNotes.add(block.pageFrom);
+    // A page of endnotes is not evidence of a missing note: the section
+    // stands there, so an exponent of its own text means nothing.
+    if (block.endnote !== true) pagesWithNotes.add(block.pageFrom);
+    else endnotes.push({ index, label, pageFrom: block.pageFrom });
     const byLabel = notesByPage.get(block.pageFrom) ?? new Map<string, number>();
     if (!byLabel.has(label)) byLabel.set(label, index);
     notesByPage.set(block.pageFrom, byLabel);
@@ -135,6 +182,11 @@ export function linkFootnoteCalls(blocks: readonly NoteCallBlock[]): NoteLinkDec
       for (let page = block.pageFrom; page <= block.pageTo; page += 1) {
         noteIndex = notesByPage.get(page)?.get(label);
         if (noteIndex !== undefined) break;
+      }
+      // E5-T03: an endnote of the label after the call, still unclaimed — the
+      // call is what names it, wherever the section printed it.
+      if (noteIndex === undefined) {
+        noteIndex = endnoteAfter(endnotes, label, index, block.pageFrom, called);
       }
       if (noteIndex === undefined) {
         // A page without notes cannot tell a call from an exponent: only a

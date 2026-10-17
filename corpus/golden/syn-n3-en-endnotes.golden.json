@@ -1,0 +1,89 @@
+{
+  "id": "syn-n3-en-endnotes",
+  "schemaVersion": "1.1.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "The Shape of a Note"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A note is a second voice that speaks from the edge of the page.\nIt does not interrupt the sentence it belongs to; it waits until\nthe line has ended, then says what the line could not say without\nstopping. A reader who ignores it loses nothing of the argument,\nand a reader who follows it finds a smaller one running beside it."
+        },
+        {
+          "text": "1",
+          "noteRef": "1"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The margin is where the two voices agree to live apart. One keeps\nthe claim moving forward, the other keeps the claim honest, and\nneither pretends to be the other. A book that prints its notes at\nthe end simply walks to the other room for the second voice and\ncomes back with it under the arm, numbered in the order called."
+        },
+        {
+          "text": "2",
+          "noteRef": "2"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Notes"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "footnote",
+      "runs": [
+        {
+          "text": "1. The second voice is older than the argument it serves: the\nfirst printers set it in smaller type so the reader could choose\nbetween the two without losing the thread of either."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "footnote",
+      "runs": [
+        {
+          "text": "2. A note printed at the end keeps the page clean and asks more\nof the reader, who must carry the number across the book and back,\nthe way this document asks you to do right now."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

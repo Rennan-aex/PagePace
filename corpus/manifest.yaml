@@ -194,6 +194,19 @@ documents:
     golden: syn-n3-en-footnotes.golden.json
     visibility: public
 
+  - id: syn-n3-en-endnotes
+    level: N3
+    lang: en
+    title: "The Shape of a Note (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-17"
+    generated: true
+    pages: 2
+    sha256: "8a1bf4c2972d81755f02afda735d1fbf9a250c363ece65abe10e6b753131fa7f"
+    features: [synthetic, endnotes]
+    golden: syn-n3-en-endnotes.golden.json
+    visibility: public
+
 # Necessidades de cobertura (ver docs/extractor/CORPUS.md):
 #   N1: 2 pt, 2 en   N2: 2 en, 1 pt   N3: 3 pt, 3 en   N4: 1 pt, 2 en   N5: 2 mistos
 # Metas da E0-T01b (PO, 2026-10-04) — todas cumpridas com estes 4 PDFs (10,5 MB no total):

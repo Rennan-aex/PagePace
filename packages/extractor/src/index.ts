@@ -21,6 +21,8 @@ export {
   isSuspectCodePoint,
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";
+export type { EndnoteContext, EndnoteDecision } from "./endnotes";
+export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeEndnoteTitle } from "./endnotes";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
 export type { FootnoteContext, FootnoteDecision } from "./footnotes";
@@ -35,6 +37,7 @@ export {
   FOOTNOTE_REGION_TOP_SHARE,
   FOOTNOTE_RULE_MIN_CHARS,
   FOOTNOTE_UNCERTAIN_CONFIDENCE,
+  opensWithNoteMarker,
   UNCERTAIN_FOOTNOTE_FLAG,
 } from "./footnotes";
 export type { HeadingContext, HeadingDecision, PageMeasure } from "./headings";

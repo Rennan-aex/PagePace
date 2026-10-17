@@ -1,6 +1,7 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import { detectEndnotes } from "./endnotes";
 import {
   detectFootnotes,
   FOOTNOTE_UNCERTAIN_CONFIDENCE,
@@ -120,6 +121,15 @@ import { normalizeForReader } from "./unicode";
  * `NOTE_LINK_UNCERTAIN_CONFIDENCE`. An OCR text layer never gets the pass:
  * without `Run.sup` it could only invent flags (ADR-060).
  *
+ * Endnotes (E5-T03 — REQ-EXT-08): a paragraph of a notes section becomes a
+ * `footnote` block too, wherever the section stands (`detectEndnotes`: a
+ * section title plus a run of marker-led paragraphs — the layout signals of
+ * E5-T01 cannot see them, they are body-sized). The schema already carries
+ * the concept, so nothing else changes (ADR-061). Their calls live on
+ * earlier pages, so `linkFootnoteCalls` falls back to the endnote list by
+ * label in reading order, and a page of endnotes never raises
+ * `call-without-note`.
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
  * still read as text, the single column
@@ -196,10 +206,17 @@ export function buildBook(document: RawDocument): Book {
     pages.map((page) => page.flat()),
     { bodyFontSize },
   );
+  // E5-T03: the endnote section is read off the same paragraph list — a
+  // section title and the marker-led run that follows it. The notes keep the
+  // `footnote` kind and are linked to their calls across pages by the
+  // fallback of `linkFootnoteCalls` (ADR-061: no schema change).
+  const endnotes = detectEndnotes(paragraphs, { headings });
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
+  // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote pass.
+  const endnoteBlocks: boolean[] = [];
   let brokenBlocks = 0;
   const ordinals = new Map<number, number>();
   for (const [index, paragraph] of paragraphs.entries()) {
@@ -224,7 +241,10 @@ export function buildBook(document: RawDocument): Book {
       flags.push(UNCERTAIN_FOOTNOTE_FLAG);
       blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
     }
-    const footnote = footnotes[index]?.footnote === true;
+    // E5-T03: a paragraph of the endnote section is a note like any other —
+    // the section is what the layout could not say (body size, mid page).
+    const endnote = endnotes[index]?.endnote === true;
+    const footnote = footnotes[index]?.footnote === true || endnote;
     const decision = headings[index];
     // A note and a heading can not be the same paragraph (the size gates are
     // complementary), but the kind of the note wins if they ever disagree.
@@ -246,6 +266,7 @@ export function buildBook(document: RawDocument): Book {
       confidence: blockConfidence,
       flags,
     });
+    endnoteBlocks.push(endnote);
   }
 
   if (blocks.length === 0) {
@@ -258,12 +279,13 @@ export function buildBook(document: RawDocument): Book {
   // only invent flags (ADR-060).
   if (!fromOcr) {
     const links = linkFootnoteCalls(
-      blocks.map((block) => ({
+      blocks.map((block, blockIndex) => ({
         id: block.id,
         kind: block.kind,
         pageFrom: block.origin.pageFrom,
         pageTo: block.origin.pageTo,
         runs: block.runs,
+        endnote: endnoteBlocks[blockIndex] === true,
       })),
     );
     for (const [index, decision] of links.entries()) {

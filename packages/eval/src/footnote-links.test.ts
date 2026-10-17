@@ -1,9 +1,11 @@
-// E5-T02 acceptance: on N3 the note→call links the `Book` builder emits must
-// be the ones the golden declares — `footnote_link_acc` >= 0.90 — and the
-// synthetic document, whose every artefact is generated from its
-// specification, must score exactly 1. The report of the acceptance lists
-// the invented links and the missed ones per document, because the criterion
-// asks for exactly that.
+// E5-T02/E5-T03 acceptance: on N3 the note→call links the `Book` builder
+// emits must be the ones the golden declares — `footnote_link_acc` >= 0.90 —
+// and the synthetic documents, whose every artefact is generated from its
+// specification, must score exactly 1: `syn-n3-en-footnotes` links the
+// foot-region notes (E5-T02) and `syn-n3-en-endnotes` links the notes of the
+// endnote section standing on another page (E5-T03). The report of the
+// acceptance lists the invented links and the missed ones per document,
+// because the criterion asks for exactly that.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ingestPdfjs } from "@pagepace/extractor";
@@ -75,16 +77,20 @@ describe("E5-T02: N3 footnote call links against the golden", () => {
     );
   }
 
-  const synthetic = measured.find(({ entry }) => entry.id === "syn-n3-en-footnotes");
-  it.skipIf(synthetic === undefined || !existsSync(synthetic.entry.path))(
-    "syn-n3-en-footnotes: every declared call is linked (footnote_link_acc === 1)",
-    async () => {
-      if (synthetic === undefined) return;
-      const document = await readDocument(synthetic.entry);
-      const links = footnoteLinks(synthetic.golden, document);
-      expect(links.falsePositives).toEqual([]);
-      expect(links.falseNegatives).toEqual([]);
-      expect(links.acc).toBe(1);
-    },
-  );
+  // E5-T02 (foot-region notes) and E5-T03 (endnote section): the synthetic
+  // note documents must score exactly 1 — every call linked to its note.
+  for (const id of ["syn-n3-en-footnotes", "syn-n3-en-endnotes"]) {
+    const synthetic = measured.find(({ entry }) => entry.id === id);
+    it.skipIf(synthetic === undefined || !existsSync(synthetic.entry.path))(
+      `${id}: every declared call is linked (footnote_link_acc === 1)`,
+      async () => {
+        if (synthetic === undefined) return;
+        const document = await readDocument(synthetic.entry);
+        const links = footnoteLinks(synthetic.golden, document);
+        expect(links.falsePositives).toEqual([]);
+        expect(links.falseNegatives).toEqual([]);
+        expect(links.acc).toBe(1);
+      },
+    );
+  }
 });

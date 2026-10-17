@@ -122,6 +122,23 @@ function isPrintedLabel(text: string): boolean {
 }
 
 /**
+ * Whether the text opens with a note marker: the punctuated shape
+ * (`FOOTNOTE_MARKER`) or the bare SciELO number (`FOOTNOTE_BARE_MARKER`,
+ * which needs prose after the digits and a line that is not a printed
+ * label). The endnote section (E5-T03) reuses exactly this test, so the two
+ * passes can never disagree on what a marker is; the page-furniture gate
+ * stays in `footnoteOf`, the only pass that reads the lines of a page.
+ */
+export function opensWithNoteMarker(text: string): boolean {
+  if (FOOTNOTE_MARKER.test(text)) return true;
+  return (
+    FOOTNOTE_BARE_MARKER.test(text) &&
+    FOOTNOTE_PROSE.test(text.replace(FOOTNOTE_BARE_MARKER, "")) &&
+    !isPrintedLabel(text)
+  );
+}
+
+/**
  * Page furniture: lines whose digits-hidden text repeats on
  * `FOOTNOTE_FURNITURE_MIN_PAGES` pages at (about) one baseline. E3-T02 already
  * removes the footers whose words never change; a footer that names the
@@ -218,12 +235,7 @@ function footnoteOf(
   // A bare number is half a marker: it needs prose after it, and the line has
   // to be the note's own — not a printed label in capitals, and not a running
   // foot the strip pass left behind.
-  if (
-    FOOTNOTE_BARE_MARKER.test(text) &&
-    FOOTNOTE_PROSE.test(text.replace(FOOTNOTE_BARE_MARKER, "")) &&
-    !isPrintedLabel(text) &&
-    !furniture.has(maskedText(markerLine))
-  ) {
+  if (opensWithNoteMarker(text) && !furniture.has(maskedText(markerLine))) {
     return { footnote: true, uncertain: false };
   }
   if (!separator) return NOT_A_FOOTNOTE;

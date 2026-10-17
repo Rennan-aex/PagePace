@@ -471,6 +471,89 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
     ],
   },
   {
+    // E5-T03: the calls stand on page 1 and the notes at the end of page 2,
+    // set in the BODY size inside the flow — the foot-region signals of
+    // E5-T01 cannot see them, only the section title can. `footnote_link_acc`
+    // scores (call page, label) pairs, so the notes living on another page
+    // do not change it; `noteRef` is the ground truth of the link.
+    id: "syn-n3-en-endnotes",
+    level: "N3",
+    lang: "en",
+    title: "The Shape of a Note (synthetic)",
+    features: ["synthetic", "endnotes"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        size: 18,
+        runs: [{ text: "The Shape of a Note" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A note is a second voice that speaks from the edge of the page.\n" +
+              "It does not interrupt the sentence it belongs to; it waits until\n" +
+              "the line has ended, then says what the line could not say without\n" +
+              "stopping. A reader who ignores it loses nothing of the argument,\n" +
+              "and a reader who follows it finds a smaller one running beside it.",
+          },
+          { text: "1", style: "sup", noteRef: "1" },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "The margin is where the two voices agree to live apart. One keeps\n" +
+              "the claim moving forward, the other keeps the claim honest, and\n" +
+              "neither pretends to be the other. A book that prints its notes at\n" +
+              "the end simply walks to the other room for the second voice and\n" +
+              "comes back with it under the arm, numbered in the order called.",
+          },
+          { text: "2", style: "sup", noteRef: "2" },
+        ],
+      },
+      {
+        kind: "heading",
+        level: 2,
+        page: 2,
+        size: 16,
+        runs: [{ text: "Notes" }],
+      },
+      {
+        kind: "footnote",
+        page: 2,
+        runs: [
+          {
+            text:
+              "1. The second voice is older than the argument it serves: the\n" +
+              "first printers set it in smaller type so the reader could choose\n" +
+              "between the two without losing the thread of either.",
+          },
+        ],
+      },
+      {
+        kind: "footnote",
+        page: 2,
+        runs: [
+          {
+            text:
+              "2. A note printed at the end keeps the page clean and asks more\n" +
+              "of the reader, who must carry the number across the book and back,\n" +
+              "the way this document asks you to do right now.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     // E3-T02: a running head on the last three pages, a numbered foot on
     // every page, and a chapter title bigger than the body that must survive
     // all of it. The regions are printed in the PDF and never in the golden.

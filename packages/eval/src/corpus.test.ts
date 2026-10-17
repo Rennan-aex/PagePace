@@ -132,7 +132,7 @@ describe("resolveCorpusPrivateDir", () => {
 });
 
 describe("parseManifest", () => {
-  it("reads the real public manifest (4 downloaded + 7 synthetic entries)", () => {
+  it("reads the real public manifest (4 downloaded + 8 synthetic entries)", () => {
     const text = readFileSync(path.join(REPO_ROOT, "corpus", "manifest.yaml"), "utf8");
     const entries = parseManifest(text, "corpus/manifest.yaml");
 
@@ -148,6 +148,7 @@ describe("parseManifest", () => {
       "syn-n2-en-columns",
       "syn-n2-pt-estilos",
       "syn-n3-en-footnotes",
+      "syn-n3-en-endnotes",
     ]);
     expect(entries.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256 ?? ""))).toBe(true);
     const phobos = entries[0];
@@ -174,7 +175,7 @@ describe("parseManifest", () => {
     expect(entries[0]?.fallbackUrls).toEqual([]);
     // ADR-037: the synthetic documents are generated, never downloaded.
     const synthetic = entries.slice(4);
-    expect(synthetic).toHaveLength(7);
+    expect(synthetic).toHaveLength(8);
     expect(synthetic.every((entry) => entry.generated)).toBe(true);
     expect(synthetic.every((entry) => entry.sourceUrl === null)).toBe(true);
     expect(synthetic.every((entry) => entry.golden === `${entry.id}.golden.json`)).toBe(true);
@@ -184,6 +185,8 @@ describe("parseManifest", () => {
     expect(synthetic[3]?.golden).toBe("syn-n1-pt-hifenizacao.golden.json");
     expect(synthetic[6]?.features).toEqual(["synthetic", "footnotes"]);
     expect(synthetic[6]?.golden).toBe("syn-n3-en-footnotes.golden.json");
+    expect(synthetic[7]?.features).toEqual(["synthetic", "endnotes"]);
+    expect(synthetic[7]?.golden).toBe("syn-n3-en-endnotes.golden.json");
   });
 
   it("reads generated: true, generated: false and rejects anything else", () => {
@@ -443,7 +446,7 @@ describe("loadCorpus", () => {
   it("loads the real repository manifest", () => {
     const corpus = loadCorpus({ repoRoot: REPO_ROOT, env: {} });
 
-    expect(corpus.publicEntries).toHaveLength(11);
+    expect(corpus.publicEntries).toHaveLength(12);
     expect(corpus.publicEntries.map((entry) => entry.id)).toContain("n1-en-rebus-philosophy-mind");
     for (const entry of corpus.publicEntries) {
       expect(entry.path.startsWith(corpus.publicDir)).toBe(true);

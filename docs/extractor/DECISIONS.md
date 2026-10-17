@@ -65,6 +65,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-058 | Título não herda o negrito do estilo de título como bold de run | accepted |
 | ADR-059 | Nota com marcador numérico sem pontuação | accepted |
 | ADR-060 | Ligação nota↔chamada por label + `noteRef` no golden 1.1.0 | accepted |
+| ADR-061 | Endnotes reutilizam o `kind` "footnote" e ligam por label em ordem de leitura | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -511,3 +512,13 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Decisão:** (a) label — determinístico, imune a renumeração de blocos, o mesmo contrato da métrica. (b) `anchor` no decision da **nota** (`noteRef` fica no run da chamada), porque a âncora do app deve levar o leitor até a nota. (c) nota sem marcador parseável **não liga e não flaga** (flagdiria toda régua impressa legítima); OCR pula a passada inteira (`fromOcr`). Formato do golden 1.0.0 → **1.1.0** (`GoldenRun.noteRef`, label; só é válido com `style: "sup"` no sintético).
 
 **Consequências:** `notelinks.ts` no núcleo (puro); `footnote_link_acc` = F1 dos pares `(página, label)` (dois lados vazios = 1); baseline ganhou a métrica nos 7 medidos; `write-golden-test` documenta a convenção `noteRef`; `block_anchor`/`Run.noteRef` do schema seguem intactos — se um dia o app consumir `noteRef` direto, revisar se label basta.
+
+### ADR-061 · Endnotes reutilizam o `kind` "footnote" e ligam por label em ordem de leitura · accepted · 2026-10-17
+
+**Contexto:** E5-T03 — a seção de notas ao fim do livro não serve aos sinais da E5-T01 (fonte de corpo, meio da página); só o título da seção e a sequência de parágrafos que abrem com marcador a identificam. A chamada vive em páginas anteriores, então o casamento por (página, label) da E5-T02 falharia.
+
+**Alternativas:** A) `kind` novo `endnote` (diz ao app onde a nota está, mas exige bump de esquema + migração) · B) reutilizar `kind: "footnote"` (sem mudança de esquema; a localização já está em `origin.pageFrom`).
+
+**Decisão:** B — `detectEndnotes` (`endnotes.ts`) marca os parágrafos da seção (título exato no léxico en/pt + run de marcadores, para na 1ª decisão `heading`); `book.ts` faz a união footnotes ∪ endnotes; `linkFootnoteCalls` ganha o fallback `endnoteAfter` (label, ordem de leitura, mesma página primeiro) e a página de endnotes não levanta `call-without-note`. A métrica `footnote_link_acc` compara (página da chamada, label), então notas noutra página não a pioram.
+
+**Consequências:** sem bump de esquema; limites conhecidos: o título tem de ser exato no léxico ("Notes on Light" não é seção), nota sem marcador parseável fica fora e `call-without-note` continua só para notas de rodapé; revisar se o app precisar distinguir endnotes na interface (aí sim um `kind` próprio).
