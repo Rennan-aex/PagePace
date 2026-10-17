@@ -828,6 +828,118 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
       },
     ],
   },
+  {
+    // E5-T04: an epigraph that opens the chapter (short, indented, italic,
+    // with the attribution line) and a block quote inside the flow (indented
+    // on every line, set smaller with a tighter leading). `block_kind_f1`
+    // scores the kinds; the golden is the ground truth.
+    id: "syn-n3-en-quotes",
+    level: "N3",
+    lang: "en",
+    title: "The Space of a Quote (synthetic)",
+    features: ["synthetic", "quotes"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        size: 18,
+        runs: [{ text: "The Space of a Quote" }],
+      },
+      {
+        kind: "epigraph",
+        page: 1,
+        indent: 36,
+        size: 9,
+        runs: [
+          {
+            text:
+              "A quotation is a room built inside another room:\n" +
+              "smaller, quieter, and entered on purpose.\n" +
+              "-- A Reader",
+            style: "italic",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "Every page carries at least two voices: the one that argues and\n" +
+              "the one that answers. The second voice often lives in the margin,\n" +
+              "set smaller than the body so the eye can choose which line to\n" +
+              "follow. A book that hides the second voice pretends the argument\n" +
+              "was always alone, and a book that enlarges it drowns the first.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "The typesetter knows this trade-off well. A footnote is a whisper\n" +
+              "at the foot of the page; a block quote is a pause in the middle of\n" +
+              "the claim, and an epigraph is the door left ajar before the chapter\n" +
+              "begins. Each one asks the reader to slow down without asking the\n" +
+              "reader to stop.",
+          },
+        ],
+      },
+      {
+        kind: "heading",
+        level: 2,
+        page: 2,
+        size: 14,
+        runs: [{ text: "On Slowness" }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "To read slowly is not to read less. It is to let each sentence\n" +
+              "finish its work before the next one starts, and to notice when a\n" +
+              "quotation has been set apart from the claim it serves.",
+          },
+        ],
+      },
+      {
+        kind: "blockquote",
+        page: 2,
+        indent: 24,
+        size: 10,
+        leading: 14,
+        runs: [
+          {
+            text:
+              "The margin is where the two voices agree to\n" +
+              "live apart. One keeps the claim moving forward,\n" +
+              "the other keeps the claim honest, and neither\n" +
+              "pretends to be the other. A reader who skips\n" +
+              "the margin loses the argument the margin saved.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "When the quote ends, the body returns at the same size it left,\n" +
+              "and the argument picks up the thread. Nothing was lost in the\n" +
+              "detour; something was proved by it.",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Looks one specification up by document id. */

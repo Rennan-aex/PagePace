@@ -134,6 +134,18 @@ export {
   PARAGRAPH_MEASURE_TOLERANCE,
   paragraphText,
 } from "./paragraphs";
+export type { QuoteContext, QuoteDecision } from "./quotes";
+export {
+  detectQuotes,
+  QUOTE_ATTRIBUTION,
+  QUOTE_EPIGRAPH_MAX_LINES,
+  QUOTE_ITALIC_SHARE,
+  QUOTE_LEADING_TOLERANCE,
+  QUOTE_MAX_SIZE_FACTOR,
+  QUOTE_MIN_INDENT_EM,
+  QUOTE_UNCERTAIN_CONFIDENCE,
+  UNCERTAIN_QUOTE_FLAG,
+} from "./quotes";
 export type {
   RepeatedBand,
   RepeatedOccurrence,

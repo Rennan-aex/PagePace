@@ -36,6 +36,9 @@ import {
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import {
+  type BlockKindF1Result,
+  type BlockKindLike,
+  blockKindF1,
   type FootnoteLinkResult,
   footnoteLinkAcc,
   type HeaderFooterResult,
@@ -92,6 +95,9 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
   footnote_link_acc F1 of the note-to-call links the Book builder emits
                     against the ones the golden declares (E5-T02), 1 = every
                     note linked to its call
+  block_kind_f1     macro-average of the per-kind F1s over the kinds the
+                    Book builder emits against the ones the golden declares
+                    (E5-T04), 1 = every block at the right kind
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -164,6 +170,8 @@ export interface DocumentResult {
   headings: HeadingDetectionResult | null;
   /** Footnote call links (E5-T02), `null` when not measured. */
   footnotes: FootnoteLinkResult | null;
+  /** Block kind F1 (E5-T04), `null` when not measured. */
+  blockKinds: BlockKindF1Result | null;
   error: string | null;
 }
 
@@ -233,6 +241,10 @@ function formatHeading(value: HeadingDetectionResult | null): string {
 
 function formatFootnote(value: FootnoteLinkResult | null): string {
   return value === null ? "-" : value.acc.toFixed(4);
+}
+
+function formatBlockKind(value: BlockKindF1Result | null): string {
+  return value === null ? "-" : value.f1.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -331,6 +343,7 @@ async function measure(
     styles: blockStyleF1(golden, document, coverage),
     headings: blockHeadingDetection(golden, document, coverage),
     footnotes: footnoteLinks(golden, document, coverage),
+    blockKinds: blockKindDetection(golden, document, coverage),
     error: null,
   };
 }
@@ -519,6 +532,35 @@ export function footnoteLinks(
     }
   }
   return footnoteLinkAcc(reference, hypothesis);
+}
+
+/**
+ * `block_kind_f1` of one document (E5-T04): the kinds of the golden blocks
+ * against the kinds the `Book` builder emits for the covered pages. Both
+ * sides carry every block with its `kind` and its text, matched per kind on
+ * the normalized text (a multiset). The acceptance test calls the very
+ * function the runner measures with.
+ *
+ * Reference: every golden block. Hypothesis: every extracted block, cropped
+ * by `coverage.pages` exactly like `blockReadingOrder`. A paragraph the
+ * builder wrongly emits as a blockquote is a false positive for `blockquote`
+ * and a false negative for `paragraph` — the two counts are the report.
+ */
+export function blockKindDetection(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): BlockKindF1Result {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const text = (runs: readonly { text: string }[]): string => runs.map((run) => run.text).join("");
+  const reference: BlockKindLike[] = golden.blocks.map((block) => ({
+    text: text(block.runs),
+    kind: block.kind,
+  }));
+  const hypothesis: BlockKindLike[] = buildBook(document)
+    .blocks.filter((block) => wanted === null || wanted.has(block.origin.pageFrom + 1))
+    .map((block) => ({ text: text(block.runs), kind: block.kind }));
+  return blockKindF1(reference, hypothesis);
 }
 
 /**
@@ -713,6 +755,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         styles: null,
         headings: null,
         footnotes: null,
+        blockKinds: null,
         error: messageOf(error),
       });
       errors++;
@@ -734,6 +777,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         styles: null,
         headings: null,
         footnotes: null,
+        blockKinds: null,
         error: null,
       });
       continue;
@@ -775,6 +819,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         styles: null,
         headings: null,
         footnotes: null,
+        blockKinds: null,
         error: messageOf(error),
       });
       errors++;
@@ -859,6 +904,7 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const styles = document.styles;
     const headings = document.headings;
     const footnotes = document.footnotes;
+    const blockKinds = document.blockKinds;
     if (
       document.status !== "measured" ||
       document.cer === null ||
@@ -868,11 +914,13 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       hyphens === null ||
       styles === null ||
       headings === null ||
-      footnotes === null
+      footnotes === null ||
+      blockKinds === null
     ) {
       continue;
     }
     metrics[document.id] = {
+      block_kind_f1: blockKinds.f1,
       footnote_link_acc: footnotes.acc,
       header_footer_f1: headerFooter.f1,
       heading_f1: headings.f1,
@@ -1070,6 +1118,7 @@ function renderReport(
     formatStyle(document.styles),
     formatHeading(document.headings),
     formatFootnote(document.footnotes),
+    formatBlockKind(document.blockKinds),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -1087,6 +1136,7 @@ function renderReport(
       { name: "style_f1", align: "right" },
       { name: "heading_f1", align: "right" },
       { name: "footnote_link_acc", align: "right" },
+      { name: "block_kind_f1", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -1242,7 +1292,45 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}\n`;
+  // The acceptance of E5-T04 asks for the block-kind errors by document: the
+  // kinds the extraction invented and the kinds the golden declares it missed,
+  // with the per-kind F1s when they are not 1.
+  const kindErrors = documents.filter(
+    (document): document is DocumentResult & { blockKinds: BlockKindF1Result } =>
+      document.blockKinds !== null &&
+      [...document.blockKinds.byKind.values()].some(
+        (score) => score.falsePositives.length > 0 || score.falseNegatives.length > 0,
+      ),
+  );
+  const kindSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nBlock kind detection (invented / missed):\n${
+          kindErrors.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : kindErrors
+                .map(
+                  (document) =>
+                    `  ${document.id}: ` +
+                    `block_kind_f1 ${document.blockKinds.f1.toFixed(4)}; ` +
+                    `errors ${kindList(document.blockKinds)}`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}${kindSection}\n`;
+}
+
+/** `"none"` or the per-kind invented/missed counts, kept short for one report line. */
+function kindList(result: BlockKindF1Result): string {
+  const parts: string[] = [];
+  for (const [kind, score] of result.byKind) {
+    const invented = score.falsePositives.length;
+    const missed = score.falseNegatives.length;
+    if (invented === 0 && missed === 0) continue;
+    parts.push(`${kind} (${invented} invented, ${missed} missed)`);
+  }
+  return parts.length === 0 ? "none" : parts.join("; ");
 }
 
 /** `"none"` or the `page:label` pairs of the links, kept short for one report line. */

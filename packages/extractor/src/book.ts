@@ -19,6 +19,7 @@ import {
 } from "./notelinks";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
+import { detectQuotes, QUOTE_UNCERTAIN_CONFIDENCE, UNCERTAIN_QUOTE_FLAG } from "./quotes";
 import { stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
 import { documentStats } from "./stats";
@@ -130,6 +131,15 @@ import { normalizeForReader } from "./unicode";
  * label in reading order, and a page of endnotes never raises
  * `call-without-note`.
  *
+ * Block quotes and epigraphs (E5-T04 — REQ-EXT-09): a paragraph whose every
+ * line sits inside the measure becomes `blockquote`, or `epigraph` when it
+ * is short, indented and italic-dominant or smaller than the body
+ * (`detectQuotes`). A quote accepted by the indent rule alone carries
+ * `flags: ["uncertain-quote"]` and the reduced `QUOTE_UNCERTAIN_CONFIDENCE`.
+ * A footnote or a heading is never a quote: the size gates are
+ * complementary (a note is smaller than `FOOTNOTE_MAX_SIZE_FACTOR`, a
+ * heading is flush left).
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
  * still read as text, the single column
@@ -211,6 +221,13 @@ export function buildBook(document: RawDocument): Book {
   // `footnote` kind and are linked to their calls across pages by the
   // fallback of `linkFootnoteCalls` (ADR-061: no schema change).
   const endnotes = detectEndnotes(paragraphs, { headings });
+  // E5-T04: quotes are read off the same paragraph list — the indent of
+  // every line against the page's measure, the face and the leading.
+  const quotes = detectQuotes(paragraphs, {
+    bodyFontSize,
+    lineHeight: stats?.lineHeight ?? 0,
+    measures: pages.map((page) => pageMeasureOf(page.flat())),
+  });
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
@@ -249,10 +266,18 @@ export function buildBook(document: RawDocument): Book {
     // A note and a heading can not be the same paragraph (the size gates are
     // complementary), but the kind of the note wins if they ever disagree.
     const heading = !footnote && decision?.heading === true;
+    // E5-T04: a quote never wins over a note or a title — the gates are
+    // complementary (indented vs flush left, mid page vs foot region).
+    const quote = !footnote && !heading ? quotes[index] : undefined;
+    const quoteKind = quote?.quote === true ? quote.kind : undefined;
+    if (quote?.quote === true && quote.uncertain === true) {
+      flags.push(UNCERTAIN_QUOTE_FLAG);
+      blockConfidence = Math.min(blockConfidence, QUOTE_UNCERTAIN_CONFIDENCE);
+    }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: footnote ? "footnote" : heading ? "heading" : "paragraph",
+      kind: footnote ? "footnote" : heading ? "heading" : (quoteKind ?? "paragraph"),
       ...(heading ? { level: decision.level } : {}),
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the

@@ -39,6 +39,7 @@ export {
 } from "./corpus";
 
 export {
+  blockKindDetection,
   blockReadingOrder,
   type DocumentResult,
   type DocumentStatus,
@@ -75,6 +76,10 @@ export {
 } from "./golden";
 
 export {
+  type BlockKindF1Result,
+  type BlockKindLike,
+  type BlockKindScore,
+  blockKindF1,
   type CerOptions,
   type CerResult,
   type HeaderFooterResult,

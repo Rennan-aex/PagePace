@@ -3,6 +3,7 @@
   "tolerance": 0.002,
   "documents": {
     "syn-n1-en-paragraphs": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -14,6 +15,7 @@
       "text_cer": 0
     },
     "syn-n1-pt-acentos": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -25,6 +27,7 @@
       "text_cer": 0
     },
     "syn-n1-pt-cabecalhos": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -36,6 +39,7 @@
       "text_cer": 0
     },
     "syn-n1-pt-hifenizacao": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -47,6 +51,7 @@
       "text_cer": 0
     },
     "syn-n2-en-columns": {
+      "block_kind_f1": 0.06666666666666667,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 0,
@@ -58,6 +63,7 @@
       "text_cer": 0
     },
     "syn-n2-pt-estilos": {
+      "block_kind_f1": 0.6666666666666666,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -69,6 +75,7 @@
       "text_cer": 0
     },
     "syn-n3-en-endnotes": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -80,6 +87,7 @@
       "text_cer": 0
     },
     "syn-n3-en-footnotes": {
+      "block_kind_f1": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -88,6 +96,18 @@
       "para_boundary_f1": 1,
       "reading_order": 1,
       "style_f1": 1,
+      "text_cer": 0
+    },
+    "syn-n3-en-quotes": {
+      "block_kind_f1": 1,
+      "footnote_link_acc": 1,
+      "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
+      "hyphen_join_acc": 1,
+      "para_boundary_f1": 1,
+      "reading_order": 1,
+      "style_f1": 0.995049504950495,
       "text_cer": 0
     }
   }

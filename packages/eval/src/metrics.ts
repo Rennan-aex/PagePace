@@ -684,3 +684,92 @@ export function footnoteLinkAcc(
   const acc = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return { acc, precision, recall, truePositives, falsePositives, falseNegatives };
 }
+
+/** One block of either side of the block-kind comparison. */
+export interface BlockKindLike {
+  text: string;
+  kind: string;
+}
+
+/** F1 of a single block kind. */
+export interface BlockKindScore {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side has this kind. */
+  f1: number;
+  precision: number;
+  recall: number;
+  truePositives: number;
+  falsePositives: BlockKindLike[];
+  falseNegatives: BlockKindLike[];
+}
+
+export interface BlockKindF1Result {
+  /** Macro-average of the per-kind F1s over the kinds present on either side, 1 when neither side has blocks. */
+  f1: number;
+  /** F1 per block kind (heading, paragraph, blockquote, epigraph, footnote, endnote, list_item). */
+  byKind: Map<string, BlockKindScore>;
+}
+
+/**
+ * Block kind F1 (E5-T04, `block_kind_f1`): per-kind precision and recall over
+ * the blocks of each side, matched on their normalized text (a multiset — the
+ * same text twice on both sides matches twice). A block the extraction emitted
+ * under a kind the golden does not declare is a false positive for that kind;
+ * a golden block under a kind the extraction never emits is a missed one. The
+ * metric is the **macro-average** of the per-kind F1s over the kinds present
+ * on either side, so a single hard kind is not drowned by the easy ones. Two
+ * empty sides score 1 (nothing to find, nothing invented). Deterministic:
+ * same blocks, same numbers.
+ */
+export function blockKindF1(
+  reference: readonly BlockKindLike[],
+  hypothesis: readonly BlockKindLike[],
+): BlockKindF1Result {
+  const byKind = new Map<string, BlockKindScore>();
+  const kinds = new Set<string>();
+  for (const block of reference) kinds.add(block.kind);
+  for (const block of hypothesis) kinds.add(block.kind);
+
+  for (const kind of kinds) {
+    const golden = reference.filter((block) => block.kind === kind);
+    const extracted = hypothesis.filter((block) => block.kind === kind);
+    const unmatched = new Map<string, number>();
+    for (const block of golden) {
+      const key = normalizeText(block.text);
+      unmatched.set(key, (unmatched.get(key) ?? 0) + 1);
+    }
+
+    const falsePositives: BlockKindLike[] = [];
+    const falseNegatives: BlockKindLike[] = [];
+    let truePositives = 0;
+    for (const block of extracted) {
+      const key = normalizeText(block.text);
+      const count = unmatched.get(key) ?? 0;
+      if (count > 0) {
+        truePositives++;
+        unmatched.set(key, count - 1);
+      } else {
+        falsePositives.push(block);
+      }
+    }
+    for (const [key, count] of unmatched) {
+      for (let index = 0; index < count; index++) {
+        falseNegatives.push({ text: key, kind });
+      }
+    }
+
+    const precision = extracted.length === 0 ? 1 : truePositives / extracted.length;
+    const recall = golden.length === 0 ? 1 : truePositives / golden.length;
+    const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+    byKind.set(kind, { f1, precision, recall, truePositives, falsePositives, falseNegatives });
+  }
+
+  let f1: number;
+  if (byKind.size === 0) {
+    f1 = 1;
+  } else {
+    let sum = 0;
+    for (const score of byKind.values()) sum += score.f1;
+    f1 = sum / byKind.size;
+  }
+  return { f1, byKind };
+}

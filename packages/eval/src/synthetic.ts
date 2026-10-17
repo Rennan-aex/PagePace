@@ -78,6 +78,11 @@ export interface SyntheticBlockSpec {
   /** Font size of the block (footnotes use a smaller one). */
   size?: number;
   /**
+   * Baseline to baseline distance inside this block (E5-T04: a quote often
+   * sets a tighter or looser leading than the body). Defaults to `LEADING`.
+   */
+  leading?: number;
+  /**
    * A repeated region (E3-T02): printed in the PDF, never in the golden.
    * `header` opens its page (and cannot be a bottom block); `footer` needs
    * `position: "bottom"`.
@@ -258,6 +263,10 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
     if (!Number.isInteger(size) || size < 6 || size > 72) {
       fail(spec, `${where}.size must be an integer between 6 and 72 (got ${String(size)})`);
     }
+    const leading = block.leading ?? LEADING;
+    if (!Number.isInteger(leading) || leading < 6 || leading > 40) {
+      fail(spec, `${where}.leading must be an integer between 6 and 40 (got ${String(leading)})`);
+    }
     const lines = toLines(block.runs, size);
     const key = `${block.page}:${columnIndex}`;
     const column = columns[columnIndex] as { x: number; width: number };
@@ -294,7 +303,7 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
       }
       bottomUsed.add(key);
       const count = Math.max(lines.length, 1);
-      start = MARGIN + size + (count - 1) * LEADING;
+      start = MARGIN + size + (count - 1) * leading;
     } else {
       if (bottomUsed.has(key)) {
         fail(
@@ -304,7 +313,7 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
         );
       }
       start = cursorAt(block.page, columnIndex);
-      const lastBaseline = start - (lines.length - 1) * LEADING;
+      const lastBaseline = start - (lines.length - 1) * leading;
       if (lastBaseline < MARGIN + size) {
         fail(
           spec,
@@ -312,7 +321,7 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
             `(${lines.length} line(s), last baseline ${Math.round(lastBaseline)}pt)`,
         );
       }
-      cursors.set(key, start - lines.length * LEADING - BLOCK_GAP);
+      cursors.set(key, start - lines.length * leading - BLOCK_GAP);
     }
 
     pagesWithBlocks.add(block.page);
@@ -322,7 +331,7 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
       parts.push(
         lineStream(line, {
           x: column.x + inset,
-          y: start - lineIndex * LEADING,
+          y: start - lineIndex * leading,
           size,
         }),
       );

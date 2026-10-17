@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blockKindF1,
   footnoteLinkAcc,
   headingDetection,
   hyphenJoinAcc,
@@ -533,5 +534,85 @@ describe("footnoteLinkAcc", () => {
     const golden = [{ page: 2, label: "1" }];
     const extracted = [{ page: 2, label: "2" }];
     expect(footnoteLinkAcc(golden, extracted)).toEqual(footnoteLinkAcc(golden, extracted));
+  });
+});
+
+describe("blockKindF1", () => {
+  it("scores 1 when both sides declare the same blocks under the same kinds", () => {
+    const blocks = [
+      { text: "Chapter 1", kind: "heading" },
+      { text: "Body text.", kind: "paragraph" },
+    ];
+    const result = blockKindF1(blocks, blocks);
+    expect(result.f1).toBe(1);
+    expect(result.byKind.get("heading")).toMatchObject({ f1: 1, truePositives: 1 });
+    expect(result.byKind.get("paragraph")).toMatchObject({ f1: 1, truePositives: 1 });
+  });
+
+  it("scores 1 when neither side has any block", () => {
+    expect(blockKindF1([], [])).toMatchObject({ f1: 1 });
+  });
+
+  it("counts a block the extraction emitted under a kind the golden does not declare", () => {
+    const golden = [{ text: "Body text.", kind: "paragraph" }];
+    const extracted = [{ text: "Body text.", kind: "blockquote" }];
+    const result = blockKindF1(golden, extracted);
+    expect(result.f1).toBe(0);
+    expect(result.byKind.get("blockquote")).toMatchObject({
+      f1: 0,
+      falsePositives: [{ text: "Body text.", kind: "blockquote" }],
+    });
+    expect(result.byKind.get("paragraph")).toMatchObject({
+      f1: 0,
+      falseNegatives: [{ text: "Body text.", kind: "paragraph" }],
+    });
+  });
+
+  it("counts a golden block the extraction emitted under a different kind as both FP and FN", () => {
+    const golden = [{ text: "  A quote.  ", kind: "blockquote" }];
+    const extracted = [{ text: "A quote.", kind: "paragraph" }];
+    const result = blockKindF1(golden, extracted);
+    // Both sides normalize to the same text, but the kinds disagree: one
+    // false positive for paragraph, one false negative for blockquote.
+    expect(result.byKind.get("paragraph")?.falsePositives).toHaveLength(1);
+    expect(result.byKind.get("blockquote")?.falseNegatives).toHaveLength(1);
+  });
+
+  it("macro-averages the per-kind F1s over the kinds present on either side", () => {
+    // paragraph: 1/1 = 1. blockquote: 0/1 = 0. heading: 0/1 = 0.
+    const golden = [
+      { text: "Body.", kind: "paragraph" },
+      { text: "Quote.", kind: "blockquote" },
+    ];
+    const extracted = [{ text: "Body.", kind: "paragraph" }];
+    const result = blockKindF1(golden, extracted);
+    // kinds present: paragraph (f1=1), blockquote (f1=0) -> mean 0.5
+    expect(result.f1).toBeCloseTo(0.5, 10);
+  });
+
+  it("normalizes text before matching, like the other metrics", () => {
+    const golden = [{ text: "  Hello   world  ", kind: "paragraph" }];
+    const extracted = [{ text: "Hello world", kind: "paragraph" }];
+    expect(blockKindF1(golden, extracted).f1).toBe(1);
+  });
+
+  it("matches a repeated text as a multiset, not as a set", () => {
+    const golden = [
+      { text: "Repeated.", kind: "paragraph" },
+      { text: "Repeated.", kind: "paragraph" },
+    ];
+    const extracted = [{ text: "Repeated.", kind: "paragraph" }];
+    const result = blockKindF1(golden, extracted);
+    expect(result.byKind.get("paragraph")?.truePositives).toBe(1);
+    expect(result.byKind.get("paragraph")?.falseNegatives).toHaveLength(1);
+  });
+
+  it("is deterministic: the same blocks always give the same numbers", () => {
+    const golden = [
+      { text: "A", kind: "paragraph" },
+      { text: "B", kind: "blockquote" },
+    ];
+    const extracted = [{ text: "A", kind: "paragraph" }];
+    expect(blockKindF1(golden, extracted)).toEqual(blockKindF1(golden, extracted));
   });
 });

@@ -1,0 +1,207 @@
+import { classifyFontName } from "./fontstyle";
+import type { PageMeasure } from "./headings";
+import type { TextLine } from "./lines";
+import type { JoinedParagraph } from "./pagejoin";
+
+/**
+ * Block quotes and epigraphs (E5-T04 — REQ-EXT-09, layer 4 "semântica").
+ *
+ * A paragraph is a **blockquote** when the whole block sits inside the
+ * measure — every line starts to the right of the page's left edge by at
+ * least `QUOTE_MIN_INDENT_EM` (the "recuo" of a quote, as opposed to the
+ * first-line-only indent of a body paragraph). The optional second inset on
+ * the right ("recuo duplo") is recognised but not required: many typesetters
+ * indent only the left edge.
+ *
+ * An **epigraph** is the display quote that opens a chapter: short, usually
+ * italic (`QUOTE_ITALIC_SHARE`, the same weight the heading gate uses to
+ * keep epigraphs out of titles) or set smaller than the body, indented, and
+ * often closed by an attribution line (`— Author`). When a block could be
+ * either, the epigraph rules win.
+ *
+ * Corroborating signals — a smaller face (`QUOTE_MAX_SIZE_FACTOR`), a
+ * leading that differs from the body's (`QUOTE_LEADING_TOLERANCE`) and the
+ * attribution pattern — raise confidence but are not all required: the
+ * layout of real books varies too much for a rigid conjunction. A doubtful
+ * case becomes a flag plus the reduced `QUOTE_UNCERTAIN_CONFIDENCE`
+ * (ARCHITECTURE decision 6).
+ *
+ * Priority in `buildBook`: a footnote or a heading never becomes a quote —
+ * the size gates of those passes are complementary (a note is smaller than
+ * `FOOTNOTE_MAX_SIZE_FACTOR`, a heading is flush left and not
+ * italic-dominant).
+ *
+ * Known limits: a quote that starts with a list marker (`1.`, `•`) is not
+ * recognised yet (E5-T05 will reclassify those paragraphs), a quotation
+ * mark alone (`"`, `“`) is not a signal (too many false positives in body
+ * dialogue), and a centred epigraph is only caught by the italic/size
+ * rules — the indent rule assumes a left-aligned block.
+ */
+
+/** Minimum left inset (fraction of the font size) that marks a block quote. */
+export const QUOTE_MIN_INDENT_EM = 1.8;
+/** Italic share above which a short indented block reads as an epigraph. */
+export const QUOTE_ITALIC_SHARE = 0.6;
+/** A face below this fraction of the body size corroborates a quote. */
+export const QUOTE_MAX_SIZE_FACTOR = 0.95;
+/** Lines above which a block is never an epigraph (a long quotation). */
+export const QUOTE_EPIGRAPH_MAX_LINES = 4;
+/** Leading (fraction of the body's) that counts as a different spacing. */
+export const QUOTE_LEADING_TOLERANCE = 0.12;
+/** Flag of a quote accepted by the indent rule alone. */
+export const UNCERTAIN_QUOTE_FLAG = "uncertain-quote";
+/** Reduced confidence of a block carrying `UNCERTAIN_QUOTE_FLAG`. */
+export const QUOTE_UNCERTAIN_CONFIDENCE = 0.7;
+
+/** Attribution line of an epigraph: `— Author`, `- Author`, `– Author`. */
+export const QUOTE_ATTRIBUTION = /(?:^|\n)\s*[—–-]\s*\S/;
+
+/** One decision per input paragraph, in the same order. */
+export interface QuoteDecision {
+  quote: boolean;
+  /** Only when `quote` is true. */
+  kind?: "blockquote" | "epigraph";
+  /** Only when `quote` is true: accepted by the indent rule alone. */
+  uncertain?: boolean;
+}
+
+/** Everything the decision needs from the document, measured once. */
+export interface QuoteContext {
+  /** Body font size of the document (`documentStats().bodyFontSize`). */
+  bodyFontSize: number;
+  /** Typical line spacing of the document (`documentStats().lineHeight`). */
+  lineHeight: number;
+  /** Text area of each page, indexed by the 0-based page number. */
+  measures: readonly PageMeasure[];
+}
+
+const NOT_A_QUOTE: QuoteDecision = { quote: false };
+
+/** Share of the non-space characters of the lines carrying a font style. */
+function styleShare(lines: readonly TextLine[], style: "bold" | "italic"): number {
+  let styled = 0;
+  let total = 0;
+  for (const line of lines) {
+    for (const item of line.items) {
+      const chars = item.text.replace(/\s+/g, "").length;
+      if (chars === 0) continue;
+      total += chars;
+      const font = classifyFontName(item.fontName);
+      const flagged =
+        style === "bold"
+          ? font.bold === true || item.fontFlags?.bold === true
+          : font.italic === true || item.fontFlags?.italic === true;
+      if (flagged) styled += chars;
+    }
+  }
+  return total === 0 ? 0 : styled / total;
+}
+
+interface QuoteFeatures {
+  lines: readonly TextLine[];
+  /** Largest font size of the block, in points. */
+  fontSize: number;
+  italicShare: number;
+  text: string;
+  /** Smallest left inset of the lines, in em (fraction of the font size). */
+  minIndentEm: number;
+  /** Widest line as a fraction of the measure. */
+  widthShare: number;
+  /** Mean leading of the block as a fraction of the body's leading. */
+  leadingShare: number | null;
+}
+
+function baselineOf(line: TextLine): number {
+  return line.bottom;
+}
+
+function featuresOf(paragraph: JoinedParagraph, context: QuoteContext): QuoteFeatures {
+  const lines = paragraph.lines;
+  const first = lines[0] as TextLine;
+  const measure = context.measures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 };
+  const fontSize = Math.max(...lines.map((line) => line.fontSize));
+  const widthShare =
+    measure.width > 0 ? Math.max(...lines.map((line) => line.width)) / measure.width : 1;
+  let minIndentEm = Number.POSITIVE_INFINITY;
+  for (const line of lines) {
+    if (line.fontSize <= 0) continue;
+    minIndentEm = Math.min(minIndentEm, (line.x - measure.left) / line.fontSize);
+  }
+  if (!Number.isFinite(minIndentEm)) minIndentEm = 0;
+  let leadingShare: number | null = null;
+  if (lines.length >= 2 && context.lineHeight > 0 && first.fontSize > 0) {
+    let total = 0;
+    for (let index = 1; index < lines.length; index++) {
+      total += baselineOf(lines[index] as TextLine) - baselineOf(lines[index - 1] as TextLine);
+    }
+    leadingShare = total / (lines.length - 1) / context.lineHeight;
+  }
+  return {
+    lines,
+    fontSize,
+    italicShare: styleShare(lines, "italic"),
+    text: lines.map((line) => line.items.map((item) => item.text).join("")).join("\n"),
+    minIndentEm,
+    widthShare,
+    leadingShare,
+  };
+}
+
+/** A block is indented when **every** line starts inside the measure. */
+function isIndented(features: QuoteFeatures): boolean {
+  return features.minIndentEm >= QUOTE_MIN_INDENT_EM;
+}
+
+/** The leading differs from the body's by more than the tolerance. */
+function leadingDiffers(features: QuoteFeatures, context: QuoteContext): boolean {
+  if (features.leadingShare === null || context.lineHeight <= 0) return false;
+  return Math.abs(features.leadingShare - 1) >= QUOTE_LEADING_TOLERANCE;
+}
+
+function isEpigraph(features: QuoteFeatures, context: QuoteContext): boolean {
+  if (features.lines.length > QUOTE_EPIGRAPH_MAX_LINES) return false;
+  if (!isIndented(features)) return false;
+  const smaller =
+    context.bodyFontSize > 0 && features.fontSize < context.bodyFontSize * QUOTE_MAX_SIZE_FACTOR;
+  const italic = features.italicShare >= QUOTE_ITALIC_SHARE;
+  if (!italic && !smaller) return false;
+  // Short, indented, italic or smaller: an epigraph. The attribution line
+  // (`— Author`) and isolation corroborate but are not required.
+  return true;
+}
+
+function isBlockquote(features: QuoteFeatures, context: QuoteContext): boolean {
+  if (!isIndented(features)) return false;
+  const smaller =
+    context.bodyFontSize > 0 && features.fontSize < context.bodyFontSize * QUOTE_MAX_SIZE_FACTOR;
+  const spaced = leadingDiffers(features, context);
+  // Indent alone is enough for a block quote (the "recuo" of E5-T04); the
+  // smaller face or a different leading only raise confidence.
+  return smaller || spaced || features.minIndentEm >= QUOTE_MIN_INDENT_EM;
+}
+
+/**
+ * One decision per paragraph: which paragraphs are block quotes or
+ * epigraphs. Deterministic — same paragraphs and context, same decisions.
+ */
+export function detectQuotes(
+  paragraphs: readonly JoinedParagraph[],
+  context: QuoteContext,
+): QuoteDecision[] {
+  const measured = paragraphs.map((paragraph) => featuresOf(paragraph, context));
+
+  return measured.map((features) => {
+    if (isEpigraph(features, context)) {
+      return { quote: true, kind: "epigraph" as const, uncertain: false };
+    }
+    if (isBlockquote(features, context)) {
+      const corroborated =
+        (context.bodyFontSize > 0 &&
+          features.fontSize < context.bodyFontSize * QUOTE_MAX_SIZE_FACTOR) ||
+        leadingDiffers(features, context) ||
+        QUOTE_ATTRIBUTION.test(features.text);
+      return { quote: true, kind: "blockquote" as const, uncertain: !corroborated };
+    }
+    return NOT_A_QUOTE;
+  });
+}

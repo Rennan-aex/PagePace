@@ -207,6 +207,19 @@ documents:
     golden: syn-n3-en-endnotes.golden.json
     visibility: public
 
+  - id: syn-n3-en-quotes
+    level: N3
+    lang: en
+    title: "The Space of a Quote (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-17"
+    generated: true
+    pages: 2
+    sha256: "0ace143f07489b1e0aebc6ef0c8c3562ff0655efc2d859cb904b4edde523df53"
+    features: [synthetic, quotes]
+    golden: syn-n3-en-quotes.golden.json
+    visibility: public
+
 # Necessidades de cobertura (ver docs/extractor/CORPUS.md):
 #   N1: 2 pt, 2 en   N2: 2 en, 1 pt   N3: 3 pt, 3 en   N4: 1 pt, 2 en   N5: 2 mistos
 # Metas da E0-T01b (PO, 2026-10-04) — todas cumpridas com estes 4 PDFs (10,5 MB no total):

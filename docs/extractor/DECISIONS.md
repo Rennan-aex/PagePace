@@ -66,6 +66,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-059 | Nota com marcador numérico sem pontuação | accepted |
 | ADR-060 | Ligação nota↔chamada por label + `noteRef` no golden 1.1.0 | accepted |
 | ADR-061 | Endnotes reutilizam o `kind` "footnote" e ligam por label em ordem de leitura | accepted |
+| ADR-062 | Citações: recuo ≥ 1,8 em porta; métrica `block_kind_f1` (macro-média por tipo) | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -522,3 +523,13 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Decisão:** B — `detectEndnotes` (`endnotes.ts`) marca os parágrafos da seção (título exato no léxico en/pt + run de marcadores, para na 1ª decisão `heading`); `book.ts` faz a união footnotes ∪ endnotes; `linkFootnoteCalls` ganha o fallback `endnoteAfter` (label, ordem de leitura, mesma página primeiro) e a página de endnotes não levanta `call-without-note`. A métrica `footnote_link_acc` compara (página da chamada, label), então notas noutra página não a pioram.
 
 **Consequências:** sem bump de esquema; limites conhecidos: o título tem de ser exato no léxico ("Notes on Light" não é seção), nota sem marcador parseável fica fora e `call-without-note` continua só para notas de rodapé; revisar se o app precisar distinguir endnotes na interface (aí sim um `kind` próprio).
+
+### ADR-062 · Citações: recuo ≥ 1,8 em porta; métrica `block_kind_f1` (macro-média por tipo) · accepted · 2026-10-17
+
+**Contexto:** E5-T04 — o esquema já tem `blockquote`/`epigraph` desde 1.0.0, mas nenhum sinal os emitia; a métrica nova `block_kind_f1` precisa comparar tipos de bloco sem que um tipo fácil (paragraph) dilua o difícil (blockquote).
+
+**Alternativas:** A) recuo + (menor fonte **ou** itálico **ou** entrelinha diferente) como porta obrigatória (perde citações de corpo no recuo) · B) recuo ≥ 1,8 em como porta, sinais de estilo só corroboram (incerto + conf 0,7 quando só o indenção concorda); `block_kind_f1` = macro-média dos F1 por tipo.
+
+**Decisão:** B — `detectQuotes` (`quotes.ts`, camada 4, pura): porta = todas as linhas ≥ `QUOTE_MIN_INDENT_EM` 1,8 em; epígrafo = ≤ 4 linhas + (itálico ≥ 0,6 ou fonte < 0,95 × corpo); blockquote = recuo sozinho basta; prioridade `footnote` > `heading` > `quote` > `paragraph`; flag `uncertain-quote` + conf 0,7. `blockKindF1` = macro-média dos F1 por tipo (casamento por texto normalizado multiconjunto, como `heading_f1`); dois lados vazios = 1; tipos presentes em qualquer lado entram na média. `syn-n3-en-quotes` cobre os dois kinds (atribuição usa `--` porque o minipdf só grava ASCII).
+
+**Consequências:** `block_kind_f1` na baseline como *maior é melhor*; `syn-n2-pt-estilos` mede 0,6667 (2 `list_item` viram paragraph — alvo E5-T05); `syn-n2-en-columns` mede 0,0667 (alvo E6); nenhum outro regrediu (`text_cer`/`heading_f1` intocados). Sem mudança de esquema: os kinds já existiam.

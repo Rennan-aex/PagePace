@@ -1,0 +1,106 @@
+{
+  "id": "syn-n3-en-quotes",
+  "schemaVersion": "1.1.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "The Space of a Quote"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "epigraph",
+      "runs": [
+        {
+          "text": "A quotation is a room built inside another room:\nsmaller, quieter, and entered on purpose.\n-- A Reader",
+          "italic": true
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Every page carries at least two voices: the one that argues and\nthe one that answers. The second voice often lives in the margin,\nset smaller than the body so the eye can choose which line to\nfollow. A book that hides the second voice pretends the argument\nwas always alone, and a book that enlarges it drowns the first."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The typesetter knows this trade-off well. A footnote is a whisper\nat the foot of the page; a block quote is a pause in the middle of\nthe claim, and an epigraph is the door left ajar before the chapter\nbegins. Each one asks the reader to slow down without asking the\nreader to stop."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "On Slowness"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "To read slowly is not to read less. It is to let each sentence\nfinish its work before the next one starts, and to notice when a\nquotation has been set apart from the claim it serves."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "blockquote",
+      "runs": [
+        {
+          "text": "The margin is where the two voices agree to\nlive apart. One keeps the claim moving forward,\nthe other keeps the claim honest, and neither\npretends to be the other. A reader who skips\nthe margin loses the argument the margin saved."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "When the quote ends, the body returns at the same size it left,\nand the argument picks up the thread. Nothing was lost in the\ndetour; something was proved by it."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

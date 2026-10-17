@@ -446,12 +446,17 @@ describe("baseline and CI gate", () => {
     // `heading_f1`/`heading_level_acc` are 1 because the golden declares no
     // heading and the extraction finds none (E4-T02). And
     // `footnote_link_acc` is 1 because neither side declares a note call
-    // (E5-T02), two empty sides score 1.
+    // (E5-T02), two empty sides score 1. And `block_kind_f1` is 0 here on
+    // purpose: the golden is a single paragraph block for the whole 20-page
+    // document while the extraction emits one paragraph per page, so the
+    // per-kind matching on normalized text never finds a hit (E5-T04). This
+    // fixture exercises the gate, not the metric.
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
       documents: {
         "n1-en-sample": {
+          block_kind_f1: 0,
           footnote_link_acc: 1,
           header_footer_f1: 1,
           heading_f1: 1,
