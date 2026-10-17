@@ -177,5 +177,6 @@ describe("METRIC_DIRECTIONS", () => {
   it("defines the direction of every metric", () => {
     expect(METRIC_DIRECTIONS.text_cer).toBe("lower");
     expect(METRIC_DIRECTIONS.para_boundary_f1).toBe("higher");
+    expect(METRIC_DIRECTIONS.footnote_link_acc).toBe("higher");
   });
 });

@@ -435,6 +435,10 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
               "ourselves. The witness who hesitates may be the only\n" +
               "honest one in the room.",
           },
+          // E5-T02: the superscript call of the note at the foot of this
+          // page. The golden holds the label (`noteRef: "1"`), the PDF is
+          // typeset with a text rise the extractor reads back as `sup`.
+          { text: "1", style: "sup", noteRef: "1" },
         ],
       },
       {

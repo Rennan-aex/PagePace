@@ -67,6 +67,14 @@ export interface LineRun {
   text: string;
   /** Font resource of this run. Defaults to `F1`. */
   font?: string;
+  /** Per-run font size (pt). Defaults to the line's `size`. */
+  size?: number;
+  /**
+   * Text rise (`Ts`, E5-T02): lifts the baseline of this run above the
+   * line's, which is how a superscript call is typeset in real PDFs. The
+   * extractor reads the rise back as `Run.sup`.
+   */
+  rise?: number;
 }
 
 export interface LineStreamOptions {
@@ -87,9 +95,15 @@ export function lineStream(runs: readonly LineRun[], options: LineStreamOptions 
   const body = runs
     .map((run, index) => {
       const text = `(${escapeLiteral(run.text)}) Tj`;
+      const runSize = run.size ?? size;
+      // Text rise (E5-T02): only a run that asks for it emits `Ts`, and the
+      // line baseline is restored right after its `Tj` — a line without
+      // `rise`/`size` runs come out byte-identical to the old writer.
+      const rise = run.rise === undefined ? "" : `${run.rise} Ts `;
+      const reset = run.rise === undefined ? "" : " 0 Ts";
       return index === 0
-        ? `/${run.font ?? "F1"} ${size} Tf ${x} ${y} Td ${text}`
-        : ` /${run.font ?? "F1"} ${size} Tf ${text}`;
+        ? `/${run.font ?? "F1"} ${runSize} Tf ${rise}${x} ${y} Td ${text}${reset}`
+        : ` /${run.font ?? "F1"} ${runSize} Tf ${rise}${text}${reset}`;
     })
     .join("");
   return `BT ${body} ET`;

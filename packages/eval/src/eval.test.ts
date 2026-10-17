@@ -444,12 +444,15 @@ describe("baseline and CI gate", () => {
     // decides nothing and an empty hypothesis scores 1 (E3-T03). And
     // `style_f1` is 1 because neither side flags any character (E4-T01). And
     // `heading_f1`/`heading_level_acc` are 1 because the golden declares no
-    // heading and the extraction finds none (E4-T02).
+    // heading and the extraction finds none (E4-T02). And
+    // `footnote_link_acc` is 1 because neither side declares a note call
+    // (E5-T02), two empty sides score 1.
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
       documents: {
         "n1-en-sample": {
+          footnote_link_acc: 1,
           header_footer_f1: 1,
           heading_f1: 1,
           heading_level_acc: 1,

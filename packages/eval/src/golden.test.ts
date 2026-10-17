@@ -71,7 +71,7 @@ describe("parseGolden", () => {
   });
 
   it("pins schemaVersion to the golden format major", () => {
-    expect(GOLDEN_FORMAT_VERSION).toBe("1.0.0");
+    expect(GOLDEN_FORMAT_VERSION).toBe("1.1.0");
     expect(() => parse({ ...VALID, schemaVersion: "1.x.x" })).toThrow(/schemaVersion/);
     expect(() => parse({ ...VALID, schemaVersion: "2.0.0" })).toThrow(
       /schemaVersion must be 1\.x\.x/,
@@ -120,6 +120,26 @@ describe("parseGolden", () => {
     expect(() =>
       parse({ ...VALID, blocks: [{ kind: "paragraph", runs: [{ text: "x", bold: "yes" }] }] }),
     ).toThrow(/bold must be a boolean/);
+  });
+
+  it("accepts the noteRef label of a call run and rejects other values (E5-T02)", () => {
+    const golden = parse({
+      ...VALID,
+      blocks: [
+        {
+          kind: "paragraph",
+          runs: [{ text: "in the room." }, { text: "1", noteRef: "1" }],
+          origin: { pageFrom: 1, pageTo: 1 },
+        },
+      ],
+    });
+    expect(golden.blocks[0]?.runs[1]).toEqual({ text: "1", noteRef: "1" });
+    expect(() =>
+      parse({ ...VALID, blocks: [{ kind: "paragraph", runs: [{ text: "x", noteRef: 7 }] }] }),
+    ).toThrow(/noteRef must be a non-empty string/);
+    expect(() =>
+      parse({ ...VALID, blocks: [{ kind: "paragraph", runs: [{ text: "x", noteRef: "" }] }] }),
+    ).toThrow(/noteRef must be a non-empty string/);
   });
 
   it("rejects broken coverage page lists", () => {

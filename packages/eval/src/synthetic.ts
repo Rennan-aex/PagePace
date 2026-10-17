@@ -34,6 +34,15 @@ export const BLOCK_GAP = 10;
  */
 export const SOFT_HYPHEN = "\u00AD";
 
+/**
+ * Superscript (E5-T02): a `style: "sup"` run is typeset at
+ * `floor(blockSize · SUP_SIZE_SHARE)` with its baseline lifted
+ * `ceil(size · SUP_RISE_SHARE)` points — both inside the window the
+ * extractor reads back as `Run.sup` (`runs.ts`).
+ */
+export const SUP_SIZE_SHARE = 0.75;
+export const SUP_RISE_SHARE = 0.3;
+
 /** Resource name → standard-14 `BaseFont`, non-embedded (ADR-020). */
 export const SYNTHETIC_FONTS: Record<string, string> = {
   F1: "Helvetica",
@@ -44,8 +53,14 @@ const STYLE_FONT = { bold: "F2", italic: "F3" } as const;
 
 export interface SyntheticRunSpec {
   text: string;
-  /** `undefined` = regular. Bold and italic map to real PDF fonts. */
-  style?: "bold" | "italic";
+  /** `undefined` = regular. Bold/italic map to real PDF fonts, sup to a rise. */
+  style?: "bold" | "italic" | "sup";
+  /**
+   * Footnote call (E5-T02): the label of the note this run points to. Only
+   * meaningful on a `style: "sup"` run; written to the golden as
+   * `GoldenRun.noteRef` (ground truth for `footnote_link_acc`).
+   */
+  noteRef?: string;
 }
 
 export interface SyntheticBlockSpec {
@@ -126,18 +141,24 @@ function columnsOf(spec: SyntheticSpec): { x: number; width: number }[] {
  * golden (`goldenOf` strips it), so the spec writes both the broken PDF and
  * the reader's text in one string.
  */
-function toLines(runs: readonly SyntheticRunSpec[]): LineRun[][] {
+function toLines(runs: readonly SyntheticRunSpec[], size: number): LineRun[][] {
   const lines: LineRun[][] = [[]];
-  let currentFont = "F1";
+  let current: { font: string; size?: number; rise?: number } = { font: "F1" };
+  const styled = (text: string): LineRun => ({
+    text,
+    font: current.font,
+    ...(current.size === undefined ? {} : { size: current.size }),
+    ...(current.rise === undefined ? {} : { rise: current.rise }),
+  });
   const pushText = (text: string): void => {
     if (text === "") return;
-    (lines[lines.length - 1] as LineRun[]).push({ text, font: currentFont });
+    (lines[lines.length - 1] as LineRun[]).push(styled(text));
   };
   const closeAtBreak = (): void => {
     const closed = lines[lines.length - 1] as LineRun[];
     const last = closed[closed.length - 1];
     if (last === undefined) {
-      closed.push({ text: "-", font: currentFont });
+      closed.push(styled("-"));
     } else if (!last.text.endsWith("-")) {
       last.text = `${last.text}-`;
     }
@@ -145,7 +166,18 @@ function toLines(runs: readonly SyntheticRunSpec[]): LineRun[][] {
     lines.push([]);
   };
   for (const run of runs) {
-    currentFont = run.style ? STYLE_FONT[run.style] : "F1";
+    if (run.style === "sup") {
+      const supSize = Math.max(6, Math.floor(size * SUP_SIZE_SHARE));
+      current = {
+        font: "F1",
+        size: supSize,
+        rise: Math.max(2, Math.ceil(supSize * SUP_RISE_SHARE)),
+      };
+    } else if (run.style === undefined) {
+      current = { font: "F1" };
+    } else {
+      current = { font: STYLE_FONT[run.style] };
+    }
     const pieces = run.text.split("\n");
     pieces.forEach((piece, index) => {
       if (index > 0) lines.push([]);
@@ -217,13 +249,16 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
     if (block.runs.length === 0) fail(spec, `${where} has no runs`);
     for (const [runIndex, run] of block.runs.entries()) {
       if (run.text === "") fail(spec, `${where}.runs[${runIndex}] has an empty text`);
+      if (run.noteRef !== undefined && run.style !== "sup") {
+        fail(spec, `${where}.runs[${runIndex}]: noteRef needs style "sup"`);
+      }
     }
 
     const size = block.size ?? FONT_SIZE;
     if (!Number.isInteger(size) || size < 6 || size > 72) {
       fail(spec, `${where}.size must be an integer between 6 and 72 (got ${String(size)})`);
     }
-    const lines = toLines(block.runs);
+    const lines = toLines(block.runs, size);
     const key = `${block.page}:${columnIndex}`;
     const column = columns[columnIndex] as { x: number; width: number };
     const inset = block.indent ?? 0;
@@ -327,6 +362,9 @@ export function goldenOf(spec: SyntheticSpec): Golden {
         text: run.text.split(SOFT_HYPHEN).join(""),
         ...(run.style === "bold" ? { bold: true } : {}),
         ...(run.style === "italic" ? { italic: true } : {}),
+        // Footnote call (E5-T02): the label the note opens with, ground
+        // truth for `footnote_link_acc`.
+        ...(run.noteRef !== undefined ? { noteRef: run.noteRef } : {}),
       })),
       origin: { pageFrom: block.page, pageTo: block.page },
     }));

@@ -21,6 +21,7 @@ import {
   type FootnoteDecision,
   UNCERTAIN_FOOTNOTE_FLAG,
 } from "./footnotes";
+import { NOTE_LINK_UNCERTAIN_CONFIDENCE, NOTE_WITHOUT_CALL_FLAG } from "./notelinks";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { documentStats } from "./stats";
@@ -267,12 +268,25 @@ describe("detectFootnotes", () => {
     expect(decisions[2]?.uncertain).toBe(true);
   });
 
-  it("keeps a paragraph that crosses pages as body text (the join is E3-T04)", () => {
+  it("keeps a body paragraph that crosses pages as body text", () => {
+    // The join glues the foot of page one to the head of page two, but both
+    // halves are body-sized: the size gate keeps the join a paragraph.
     const decisions = decisionsOf([
-      page([...bodyAt(100), ...noteAt(700, ["1. A note that runs"])]),
+      page([...bodyAt(100), ...bodyAt(700)]),
       page([item("onto the next page without a stop.", MARGIN, 100, BODY)], 1),
     ]);
     expect(decisions.map((decision) => decision.footnote)).toEqual([false, false]);
+  });
+
+  it("finds a note that continues on the next page (E5-T02)", () => {
+    // The note runs out of room at the foot of page one and resumes at the
+    // head of page two inside the note font (the E3-T04 join): judged by the
+    // page it starts on, it is still a note.
+    const decisions = decisionsOf([
+      page([...bodyAt(100), ...noteAt(700, ["1. A note that runs"])]),
+      page([...noteAt(100, ["onto the next page without a stop."])], 1),
+    ]);
+    expect(decisions.map((decision) => decision.footnote)).toEqual([false, true]);
   });
 
   it("finds notes whose numbering restarts on every page", () => {
@@ -326,8 +340,8 @@ describe("detectFootnotes", () => {
   });
 });
 
-describe("buildBook with footnotes (E5-T01)", () => {
-  it("emits the note as a footnote block with its origin", () => {
+describe("buildBook with footnotes (E5-T01 + E5-T02)", () => {
+  it("emits the note as a footnote block, flagged for its missing call", () => {
     const book = buildBook(
       doc([page([...bodyAt(100), ...noteAt(700, ["1. A note that explains the line above."])])]),
     );
@@ -335,9 +349,12 @@ describe("buildBook with footnotes (E5-T01)", () => {
     const note = book.blocks[1];
     expect(note?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
     expect(note?.runs.map((run) => run.text)).toEqual(["1. A note that explains the line above."]);
-    expect(note?.flags).toEqual([]);
-    expect(note?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
-    expect(book.extraction.avgConfidence).toBe(BOOK_BLOCK_CONFIDENCE);
+    // E5-T02: nobody called the note, so the linking pass flags it and
+    // floors its confidence (the block keeps no `anchor`).
+    expect(note?.flags).toEqual([NOTE_WITHOUT_CALL_FLAG]);
+    expect(note?.confidence).toBe(NOTE_LINK_UNCERTAIN_CONFIDENCE);
+    expect(note?.anchor).toBeUndefined();
+    expect(book.extraction.avgConfidence).toBeLessThan(BOOK_BLOCK_CONFIDENCE);
   });
 
   it("flags a note accepted by the rule alone and lowers its confidence", () => {
@@ -351,6 +368,8 @@ describe("buildBook with footnotes (E5-T01)", () => {
       ]),
     );
     const note = book.blocks.find((block) => block.kind === "footnote");
+    // The rule-only note has no parseable marker, so E5-T02 neither links
+    // nor flags it — `uncertain-footnote` already carries the doubt.
     expect(note?.flags).toEqual([UNCERTAIN_FOOTNOTE_FLAG]);
     expect(note?.confidence).toBe(FOOTNOTE_UNCERTAIN_CONFIDENCE);
     expect(note?.origin).toEqual({ pageFrom: 0, pageTo: 0 });

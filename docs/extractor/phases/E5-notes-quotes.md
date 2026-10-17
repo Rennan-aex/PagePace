@@ -7,9 +7,10 @@
 - Região inferior com fonte menor e marcador numérico/símbolo; separador horizontal quando existir.
 - **Aceite:** blocos `footnote` com `origin`; testes com numeração reiniciando por capítulo e por página.
 - **Resultado (2026-10-16):** `packages/extractor/src/footnotes.ts` (camada 4) — `detectFootnotes` por página: região inferior (≥ 0,5 da altura de texto), fonte < 0,95 × body, marcador (`1.`/`1)`/`(1)`/`[4]`/`*`/`††`, e o número cru do estilo SciELO com guarda de prosa, de capitulares e de mobiliário de página — **ADR-059**) ou régua impressa (confiança baixa + flag). 21 `testes` verdes, `pnpm eval --ci` = 0 (nenhuma métrica mudou), corpus: **218 blocos `footnote`** (eram 76) em 10 documentos; FP residuais de lista/referência em **BACKLOG 2026-10-16** (P2, E5-T05/E5-T06).
-### E5-T02 · Notas: ligação à chamada
+### E5-T02 · Notas: ligação à chamada — **concluída 2026-10-16**
 - Encontrar a chamada (sobrescrito/número no texto), ligar `noteRef` no `run` e `anchor` na nota; tratar nota que continua na página seguinte.
 - **Aceite:** `footnote_link_acc` ≥ meta; chamadas sem nota e notas sem chamada viram `flags` e baixam confiança.
+- **Resultado (2026-10-16):** `packages/extractor/src/notelinks.ts` (camada 4) — `linkFootnoteCalls`: casamento por **label + página** (sup = baseline menor), `noteRef` no run da chamada, `anchor` na **nota**, flags `note-without-call`/`call-without-note` (conf 0,7); nota sem marcador parseável não liga nem flaga; OCR pula a passada; cross-page via guarda de tamanho removida em `footnotes.ts`. Métrica **`footnote_link_acc`** (F1 por `(página, label)`) em `metrics.ts` + runner/coluna/seção/baseline (`higher`). Golden **1.0.0 → 1.1.0** com `noteRef` (label); sintético `syn-n3-en-footnotes` ganhou run `style: "sup"` (`rise`/`size` no minipdf; y top-down). Testes: 15 `notelinks` + 22 `footnotes` + 8 `footnoteLinkAcc` + aceite `footnote-links.test.ts` (N3 ≥ 0,90, sintético === 1); `pnpm eval --ci` exit 0, baseline atualizada (7 × 1,0000). **ADR-060**.
 ### E5-T03 · Notas de fim (endnotes)
 - Seção de notas ao fim de capítulo/livro ligada às chamadas por número. **Aceite:** teste em fixture sintética.
 ### E5-T04 · Citações em bloco e epígrafes

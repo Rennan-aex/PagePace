@@ -5,8 +5,8 @@ import { lineText } from "./spaces";
 /**
  * Footnotes (E5-T01 — REQ-EXT-08, layer 4 "semântica").
  *
- * A paragraph is a note when three layout signals agree: it is a **single
- * page** block that **starts in the bottom half** of the page's own text block
+ * A paragraph is a note when three layout signals agree: it **starts in the
+ * bottom half** of the page's own text block
  * (`FOOTNOTE_REGION_TOP_SHARE` of the height its lines span), it is set
  * **smaller than the body** (`FOOTNOTE_MAX_SIZE_FACTOR` — the mirror of the
  * heading gate, so the two can never claim the same paragraph) and its first
@@ -36,8 +36,10 @@ import { lineText } from "./spaces";
  * roman `iv.` notes are not recognized yet), a note whose first line has no
  * marker and no rule above it stays a paragraph, a rule drawn as a vector
  * (the usual PDF) is invisible to the text layer so only printed rules count,
- * a note that continues on the next page is a cross-page join and is left to
- * E5-T02, the region is the page's real text height — a note taking more than
+ * a note continuing on the next page (an E3-T04 join) is judged by the page
+ * it starts on — its continuation has to keep the note font, or the size
+ * gate reads the join as body text —, the region is the page's real text
+ * height — a note taking more than
  * half of the page can start above the line — and a numbered list item or a
  * reference fragment set smaller than the body can still read as a note
  * (E5-T05 and E5-T06 reclassify those paragraphs, and E5-T02 flags a note
@@ -185,9 +187,11 @@ function footnoteOf(
   furniture: ReadonlySet<string>,
 ): FootnoteDecision {
   if (bodyFontSize <= 0) return NOT_A_FOOTNOTE;
-  // A note lives on one page: a paragraph that crosses the page boundary is
-  // body text running out of room (E3-T04) or a note continuing below (E5-T02).
-  if (paragraph.pageFrom !== paragraph.pageTo) return NOT_A_FOOTNOTE;
+  // Every signal below is measured against the page the paragraph STARTS on,
+  // so a note that ran out of room at the foot and continues on the next
+  // page (an E3-T04 join, E5-T02) is judged here as well. Body text crossing
+  // the boundary is still kept out: its continuation is body-sized and the
+  // size gate rejects the join.
   const layout = layouts[paragraph.pageFrom] ?? null;
   if (layout === null) return NOT_A_FOOTNOTE;
 

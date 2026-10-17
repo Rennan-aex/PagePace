@@ -24,8 +24,12 @@ export class GoldenError extends Error {
  * Version of the golden file format itself. `schemaVersion` in a golden is
  * this value; a golden declaring another major version is rejected (minors
  * and patches are forward compatible — unknown fields are always rejected).
+ *
+ * History: 1.0.0 closed the format (ADR-036); 1.1.0 (E5-T02) adds the
+ * optional `noteRef` of a run — the **label** (`"1"`, `"*"`) of the footnote
+ * the run calls, ground truth for `footnote_link_acc`.
  */
-export const GOLDEN_FORMAT_VERSION = "1.0.0";
+export const GOLDEN_FORMAT_VERSION = "1.1.0";
 
 export interface GoldenRun {
   text: string;
@@ -33,6 +37,12 @@ export interface GoldenRun {
   bold?: boolean;
   /** Mirrors `Run.italic` of `@pagepace/schema` (ground truth for `style_f1`). */
   italic?: boolean;
+  /**
+   * Label of the footnote this run calls (E5-T02, ground truth for
+   * `footnote_link_acc`). It is the marker the note opens with — `"1"`,
+   * `"*"` — never the id of the note block, which differs per extraction.
+   */
+  noteRef?: string;
 }
 
 export interface GoldenOrigin {
@@ -69,7 +79,7 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const FORMAT_MAJOR = GOLDEN_FORMAT_VERSION.split(".")[0];
 const TOP_LEVEL_KEYS = new Set(["id", "schemaVersion", "source", "coverage", "blocks"]);
 const BLOCK_KEYS = new Set(["kind", "level", "runs", "origin"]);
-const RUN_KEYS = new Set(["text", "bold", "italic"]);
+const RUN_KEYS = new Set(["text", "bold", "italic", "noteRef"]);
 
 function fail(source: string, message: string): never {
   throw new GoldenError(`${source}: ${message}`);
@@ -188,6 +198,9 @@ export function parseGolden(text: string, source: string): Golden {
         if (typeof value !== "boolean") fail(source, `${runWhere}.${flag} must be a boolean`);
         parsed[flag] = value;
       }
+      if (run.noteRef !== undefined && run.noteRef !== null) {
+        parsed.noteRef = expectString(run.noteRef, source, `${runWhere}.noteRef`);
+      }
       return parsed;
     });
 
@@ -295,6 +308,7 @@ export function serializeGolden(golden: Golden): string {
         text: run.text,
         ...(run.bold !== undefined ? { bold: run.bold } : {}),
         ...(run.italic !== undefined ? { italic: run.italic } : {}),
+        ...(run.noteRef !== undefined ? { noteRef: run.noteRef } : {}),
       })),
       origin: block.origin,
     })),

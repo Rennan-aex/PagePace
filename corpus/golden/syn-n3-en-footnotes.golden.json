@@ -1,6 +1,6 @@
 {
   "id": "syn-n3-en-footnotes",
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "source": "synthetic",
   "coverage": {
     "pages": [
@@ -26,6 +26,10 @@
       "runs": [
         {
           "text": "If memory repaints, then accuracy is not fidelity to\nthe first day but loyalty to the later ones. We keep\nwhat we have agreed to keep, and we call the result\nourselves. The witness who hesitates may be the only\nhonest one in the room."
+        },
+        {
+          "text": "1",
+          "noteRef": "1"
         }
       ],
       "origin": {

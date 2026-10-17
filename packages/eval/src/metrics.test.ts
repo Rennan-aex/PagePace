@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  footnoteLinkAcc,
   headingDetection,
   hyphenJoinAcc,
   MAX_CER_CELLS,
@@ -472,5 +473,65 @@ describe("headingDetection", () => {
     const golden = [{ text: "Chapter 1", level: 1 }];
     const extracted = [{ text: "Chapter 1", level: 2 }];
     expect(headingDetection(golden, extracted)).toEqual(headingDetection(golden, extracted));
+  });
+});
+
+describe("footnoteLinkAcc", () => {
+  it("scores 1 when the two sides declare the same links on the same pages", () => {
+    const links = [
+      { page: 2, label: "1" },
+      { page: 2, label: "*" },
+    ];
+    const result = footnoteLinkAcc(links, links);
+    expect(result).toMatchObject({ acc: 1, precision: 1, recall: 1 });
+    expect(result.truePositives).toBe(2);
+    expect(result.falsePositives).toEqual([]);
+    expect(result.falseNegatives).toEqual([]);
+  });
+
+  it("scores 1 when neither side has a link", () => {
+    expect(footnoteLinkAcc([], [])).toMatchObject({ acc: 1, precision: 1, recall: 1 });
+  });
+
+  it("matches on (page, label), so a link on the wrong page is an error", () => {
+    const result = footnoteLinkAcc([{ page: 2, label: "1" }], [{ page: 3, label: "1" }]);
+    expect(result.truePositives).toBe(0);
+    expect(result.falsePositives).toEqual([{ page: 3, label: "1" }]);
+    expect(result.falseNegatives).toEqual([{ page: 2, label: "1" }]);
+    expect(result).toMatchObject({ acc: 0 });
+  });
+
+  it("counts a link only the extraction emits as a false positive", () => {
+    const result = footnoteLinkAcc([], [{ page: 2, label: "1" }]);
+    expect(result).toMatchObject({ precision: 0, recall: 1, acc: 0 });
+    expect(result.falsePositives).toEqual([{ page: 2, label: "1" }]);
+  });
+
+  it("counts a golden link the extraction missed as a false negative", () => {
+    const result = footnoteLinkAcc([{ page: 2, label: "1" }], []);
+    expect(result).toMatchObject({ precision: 1, recall: 0, acc: 0 });
+    expect(result.falseNegatives).toEqual([{ page: 2, label: "1" }]);
+  });
+
+  it("matches a repeated label as a multiset, not as a set", () => {
+    const result = footnoteLinkAcc(
+      [
+        { page: 2, label: "1" },
+        { page: 2, label: "1" },
+      ],
+      [{ page: 2, label: "1" }],
+    );
+    expect(result.truePositives).toBe(1);
+    expect(result.falseNegatives).toEqual([{ page: 2, label: "1" }]);
+  });
+
+  it("normalizes the label like the other metrics normalize text", () => {
+    expect(footnoteLinkAcc([{ page: 2, label: " 1 " }], [{ page: 2, label: "1" }]).acc).toBe(1);
+  });
+
+  it("is deterministic: the same links always give the same numbers", () => {
+    const golden = [{ page: 2, label: "1" }];
+    const extracted = [{ page: 2, label: "2" }];
+    expect(footnoteLinkAcc(golden, extracted)).toEqual(footnoteLinkAcc(golden, extracted));
   });
 });

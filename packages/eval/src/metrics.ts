@@ -623,3 +623,64 @@ export function headingDetection(
     levelMismatches,
   };
 }
+
+/** One note call of either side of the comparison (golden or extraction). */
+export interface NoteLinkLike {
+  /** 1-based page the calling block starts on. */
+  page: number;
+  /** Label of the note the run calls (`"1"`, `"*"`). */
+  label: string;
+}
+
+export interface FootnoteLinkResult {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side has links. */
+  acc: number;
+  /** Links found ÷ links the extraction emitted. */
+  precision: number;
+  /** Links found ÷ links the golden declares. */
+  recall: number;
+  /** Links both sides declare, matched on (page, label). */
+  truePositives: number;
+  /** Links only the extraction emitted (invented or mislabelled). */
+  falsePositives: NoteLinkLike[];
+  /** Links only the golden declares (missed links). */
+  falseNegatives: NoteLinkLike[];
+}
+
+/**
+ * Footnote call links (E5-T02, `footnote_link_acc`): precision and recall
+ * over the note→call pairs of each side, matched on their key
+ * `"<1-based page>:<label>"` — a multiset, so the same label twice on one
+ * page counts twice when both sides agree. A link the extraction invented is
+ * a false positive, one the golden declares is missed (the note was detected
+ * but not linked, or linked to the wrong page or label). Two empty sides
+ * score 1 — a document without notes has nothing to link and nothing was
+ * invented. Deterministic: same pairs, same numbers.
+ */
+export function footnoteLinkAcc(
+  reference: readonly NoteLinkLike[],
+  hypothesis: readonly NoteLinkLike[],
+): FootnoteLinkResult {
+  const key = (link: NoteLinkLike): string => `${link.page}:${normalizeText(link.label)}`;
+  const unmatched = new Map<string, NoteLinkLike[]>();
+  for (const link of reference) {
+    const bucket = unmatched.get(key(link));
+    if (bucket === undefined) unmatched.set(key(link), [link]);
+    else bucket.push(link);
+  }
+
+  const falsePositives: NoteLinkLike[] = [];
+  const falseNegatives: NoteLinkLike[] = [];
+  let truePositives = 0;
+  for (const link of hypothesis) {
+    const match = unmatched.get(key(link))?.shift();
+    if (match === undefined) falsePositives.push(link);
+    else truePositives++;
+  }
+  for (const bucket of unmatched.values()) falseNegatives.push(...bucket);
+
+  const precision = hypothesis.length === 0 ? 1 : truePositives / hypothesis.length;
+  const recall = reference.length === 0 ? 1 : truePositives / reference.length;
+  const acc = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  return { acc, precision, recall, truePositives, falsePositives, falseNegatives };
+}

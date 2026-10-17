@@ -10,6 +10,12 @@ import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import { buildMetadata } from "./metadata";
+import {
+  CALL_WITHOUT_NOTE_FLAG,
+  linkFootnoteCalls,
+  NOTE_LINK_UNCERTAIN_CONFIDENCE,
+  NOTE_WITHOUT_CALL_FLAG,
+} from "./notelinks";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { stripRepeatedRegions } from "./repeated";
@@ -102,8 +108,17 @@ import { normalizeForReader } from "./unicode";
  * the kind does, and a note accepted by the rule alone carries
  * `flags: ["uncertain-footnote"]` with the reduced
  * `FOOTNOTE_UNCERTAIN_CONFIDENCE`. Notes restart their numbering by page and
- * by chapter, so the decisions are per page and never compare neighbours;
- * linking a note to its call is E5-T02.
+ * by chapter, so the decisions are per page and never compare neighbours. A
+ * note that ran out of room at the foot and continues on the next page is
+ * one block (the E3-T04 join) and is judged by the page it starts on.
+ *
+ * Footnote calls (E5-T02 — REQ-EXT-08): after the blocks are built, every
+ * note is linked to the call pointing at it (`linkFootnoteCalls`): the call
+ * run carries `noteRef` (the note's id), the note carries `anchor`, and the
+ * orphans — a note without a call, a call without a note — become the flags
+ * `note-without-call` / `call-without-note` with the reduced
+ * `NOTE_LINK_UNCERTAIN_CONFIDENCE`. An OCR text layer never gets the pass:
+ * without `Run.sup` it could only invent flags (ADR-060).
  *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
@@ -185,7 +200,6 @@ export function buildBook(document: RawDocument): Book {
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
-  const confidences: number[] = [];
   let brokenBlocks = 0;
   const ordinals = new Map<number, number>();
   for (const [index, paragraph] of paragraphs.entries()) {
@@ -210,7 +224,6 @@ export function buildBook(document: RawDocument): Book {
       flags.push(UNCERTAIN_FOOTNOTE_FLAG);
       blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
     }
-    confidences.push(blockConfidence);
     const footnote = footnotes[index]?.footnote === true;
     const decision = headings[index];
     // A note and a heading can not be the same paragraph (the size gates are
@@ -239,6 +252,39 @@ export function buildBook(document: RawDocument): Book {
     throw new BookError("documento sem texto: nenhum bloco para gerar o Book");
   }
 
+  // E5-T02: link each note to its call — the call run gets `noteRef`, the
+  // note gets `anchor`, and the orphans become flags with the reduced
+  // confidence. An OCR layer never gets the pass: without `Run.sup` it could
+  // only invent flags (ADR-060).
+  if (!fromOcr) {
+    const links = linkFootnoteCalls(
+      blocks.map((block) => ({
+        id: block.id,
+        kind: block.kind,
+        pageFrom: block.origin.pageFrom,
+        pageTo: block.origin.pageTo,
+        runs: block.runs,
+      })),
+    );
+    for (const [index, decision] of links.entries()) {
+      const block = blocks[index];
+      if (block === undefined) continue;
+      for (const [runIndex, noteId] of decision.noteRefs) {
+        const run = block.runs[runIndex];
+        if (run !== undefined) run.noteRef = noteId;
+      }
+      if (decision.anchor !== null) block.anchor = decision.anchor;
+      if (decision.withoutCall) {
+        block.flags.push(NOTE_WITHOUT_CALL_FLAG);
+        block.confidence = Math.min(block.confidence, NOTE_LINK_UNCERTAIN_CONFIDENCE);
+      }
+      if (decision.orphanCall) {
+        block.flags.push(CALL_WITHOUT_NOTE_FLAG);
+        block.confidence = Math.min(block.confidence, NOTE_LINK_UNCERTAIN_CONFIDENCE);
+      }
+    }
+  }
+
   // E4-T03: the table of contents, and the levels the bookmarks settle.
   const toc = buildToc(blocks, document.outline);
   for (const block of blocks) {
@@ -260,7 +306,7 @@ export function buildBook(document: RawDocument): Book {
     extraction: {
       tool: EXTRACTOR_TOOL,
       version: EXTRACTOR_VERSION,
-      avgConfidence: averageConfidence(confidences),
+      avgConfidence: averageConfidence(blocks.map((block) => block.confidence)),
       warnings,
     },
   });

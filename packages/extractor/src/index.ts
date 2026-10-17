@@ -110,6 +110,16 @@ export {
   splitPdfAuthors,
   TITLE_MAX_CHARS,
 } from "./metadata";
+export type { NoteCallBlock, NoteLinkDecision } from "./notelinks";
+export {
+  CALL_WITHOUT_NOTE_FLAG,
+  callLabel,
+  linkFootnoteCalls,
+  NOTE_CALL_TEXT,
+  NOTE_LINK_UNCERTAIN_CONFIDENCE,
+  NOTE_WITHOUT_CALL_FLAG,
+  noteMarkerLabel,
+} from "./notelinks";
 export type { JoinedParagraph } from "./pagejoin";
 export { endsSentence, joinCrossPageParagraphs, PAGE_JOIN_TITLE_FONT_FACTOR } from "./pagejoin";
 export {

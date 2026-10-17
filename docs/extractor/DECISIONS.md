@@ -64,6 +64,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-057 | Metadados do livro: léxico de stopwords + alegações do PDF | accepted |
 | ADR-058 | Título não herda o negrito do estilo de título como bold de run | accepted |
 | ADR-059 | Nota com marcador numérico sem pontuação | accepted |
+| ADR-060 | Ligação nota↔chamada por label + `noteRef` no golden 1.1.0 | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -500,3 +501,13 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) manter só o marcador pontuado (recall zero nos SciELO; precisão estável) · B) aceitar o número cru com guarda-chuva: prosa depois do número, sem capitulares, sem repetição em ≥3 páginas com a mesma linha e a mesma baseline.
 **Decisão:** B — três constantes nomeadas (`FOOTNOTE_PROSE_MIN_LETTERS`, `FOOTNOTE_FURNITURE_MIN_PAGES`, `FOOTNOTE_FURNITURE_BASELINE_TOLERANCE`) que só recusam, nunca classificam; `pnpm eval --ci` saiu 0, nenhuma métrica mudou.
 **Consequências:** 218 blocos `footnote` no corpus (eram 76). Restam FP conhecidos — item de lista numerado com fonte quase-do-corpo e linha de referência (`641 [arXiv:…]`); anotados no BACKLOG para E5-T05/E5-T06 e para o flag de "nota sem chamada" da E5-T02. Revisar quando `block_kind_f1` passar a medir.
+
+### ADR-060 · Ligação nota↔chamada por label + `noteRef` no golden 1.1.0 · accepted · 2026-10-16
+
+**Contexto:** a E5-T02 precisa ligar cada nota de rodapé à sua chamada sem depender de IDs do schema (`Run.noteRef` e `Block.anchor` já existem, sem bump) e medir isso com `footnote_link_acc`. Três escolhas em aberto: (a) o que o `noteRef` do golden aponta (id de bloco volátil × label estável); (b) onde gravar o `anchor` (bloco de chamada × bloco de nota); (c) o que fazer com nota sem marcador parseável (ligar por heurística × deixar órfã).
+
+**Alternativas:** (a) id de bloco × **label** (texto do marcador, ex. `"1"`), casamento por `(página, label)`. (b) na chamada × **na nota** (o app pula direto para a nota). (c) ligar no escuro × **não ligar nem flagar** (sem marcador não há como saber quem chamou).
+
+**Decisão:** (a) label — determinístico, imune a renumeração de blocos, o mesmo contrato da métrica. (b) `anchor` no decision da **nota** (`noteRef` fica no run da chamada), porque a âncora do app deve levar o leitor até a nota. (c) nota sem marcador parseável **não liga e não flaga** (flagdiria toda régua impressa legítima); OCR pula a passada inteira (`fromOcr`). Formato do golden 1.0.0 → **1.1.0** (`GoldenRun.noteRef`, label; só é válido com `style: "sup"` no sintético).
+
+**Consequências:** `notelinks.ts` no núcleo (puro); `footnote_link_acc` = F1 dos pares `(página, label)` (dois lados vazios = 1); baseline ganhou a métrica nos 7 medidos; `write-golden-test` documenta a convenção `noteRef`; `block_anchor`/`Run.noteRef` do schema seguem intactos — se um dia o app consumir `noteRef` direto, revisar se label basta.

@@ -15,6 +15,7 @@ import {
   documentParagraphs,
   ingestPdfjs,
   lineText,
+  noteMarkerLabel,
   paragraphHyphenText,
   paragraphText,
   ScannedPdfError,
@@ -35,6 +36,8 @@ import {
 import { type CorpusEntry, CorpusError, loadCorpus, REPO_ROOT } from "./corpus";
 import { type Golden, GoldenError, goldenText, parseGolden, resolveGoldenPath } from "./golden";
 import {
+  type FootnoteLinkResult,
+  footnoteLinkAcc,
   type HeaderFooterResult,
   type HeadingDetectionResult,
   type HeadingLike,
@@ -42,6 +45,7 @@ import {
   headerFooterF1,
   headingDetection,
   hyphenJoinAcc,
+  type NoteLinkLike,
   normalizeText,
   type ParaBoundaryResult,
   paraBoundaryF1,
@@ -85,6 +89,9 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
                     ones the golden declares (E4-T02), 1 = same headings
   heading_level_acc share of the matched headings whose level (1..6) also
                     agreed (E4-T02), 1 = every heading at the right depth
+  footnote_link_acc F1 of the note-to-call links the Book builder emits
+                    against the ones the golden declares (E5-T02), 1 = every
+                    note linked to its call
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -155,6 +162,8 @@ export interface DocumentResult {
   styles: StyleF1Result | null;
   /** Heading detection and levels (E4-T02), `null` when not measured. */
   headings: HeadingDetectionResult | null;
+  /** Footnote call links (E5-T02), `null` when not measured. */
+  footnotes: FootnoteLinkResult | null;
   error: string | null;
 }
 
@@ -220,6 +229,10 @@ function formatStyle(value: StyleF1Result | null): string {
 
 function formatHeading(value: HeadingDetectionResult | null): string {
   return value === null ? "-" : value.f1.toFixed(4);
+}
+
+function formatFootnote(value: FootnoteLinkResult | null): string {
+  return value === null ? "-" : value.acc.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -317,6 +330,7 @@ async function measure(
     hyphens: hyphenJoinAccuracy(golden, document, coverage),
     styles: blockStyleF1(golden, document, coverage),
     headings: blockHeadingDetection(golden, document, coverage),
+    footnotes: footnoteLinks(golden, document, coverage),
     error: null,
   };
 }
@@ -458,6 +472,53 @@ export function blockHeadingDetection(
       .map((block) => headingOf(block.runs.map((run) => run.text).join(""), block.level)),
     extracted,
   );
+}
+
+/**
+ * `footnote_link_acc` of one document (E5-T02): the note→call links the
+ * golden declares against the links the `Book` builder emits for the covered
+ * pages. The acceptance test calls the very function the runner measures
+ * with.
+ *
+ * Reference: every golden run carrying `noteRef` — the pair is the block's
+ * 1-based page and the label the run points at. Hypothesis: every extracted
+ * run carrying `noteRef` (the id of a note block) — the pair is the calling
+ * block's page and the label of the marker its target note opens with
+ * (`noteMarkerLabel`); a target the coverage crop removed keeps the raw id
+ * as its label, which never matches a golden label and counts as invented.
+ */
+export function footnoteLinks(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): FootnoteLinkResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const blocks = buildBook(document).blocks.filter(
+    (block) => wanted === null || wanted.has(block.origin.pageFrom + 1),
+  );
+  const byId = new Map(blocks.map((block) => [block.id, block]));
+  const hypothesis: NoteLinkLike[] = [];
+  for (const block of blocks) {
+    for (const run of block.runs) {
+      if (run.noteRef === undefined) continue;
+      const note = byId.get(run.noteRef);
+      const label =
+        note === undefined
+          ? run.noteRef
+          : (noteMarkerLabel(note.runs.map((inner) => inner.text).join("")) ?? run.noteRef);
+      hypothesis.push({ page: block.origin.pageFrom + 1, label });
+    }
+  }
+  const reference: NoteLinkLike[] = [];
+  for (const block of golden.blocks) {
+    if (block.origin === null) continue;
+    for (const run of block.runs) {
+      if (run.noteRef !== undefined) {
+        reference.push({ page: block.origin.pageFrom, label: run.noteRef });
+      }
+    }
+  }
+  return footnoteLinkAcc(reference, hypothesis);
 }
 
 /**
@@ -651,6 +712,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hyphens: null,
         styles: null,
         headings: null,
+        footnotes: null,
         error: messageOf(error),
       });
       errors++;
@@ -671,6 +733,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hyphens: null,
         styles: null,
         headings: null,
+        footnotes: null,
         error: null,
       });
       continue;
@@ -711,6 +774,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         hyphens: null,
         styles: null,
         headings: null,
+        footnotes: null,
         error: messageOf(error),
       });
       errors++;
@@ -794,6 +858,7 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const hyphens = document.hyphens;
     const styles = document.styles;
     const headings = document.headings;
+    const footnotes = document.footnotes;
     if (
       document.status !== "measured" ||
       document.cer === null ||
@@ -802,11 +867,13 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       headerFooter === null ||
       hyphens === null ||
       styles === null ||
-      headings === null
+      headings === null ||
+      footnotes === null
     ) {
       continue;
     }
     metrics[document.id] = {
+      footnote_link_acc: footnotes.acc,
       header_footer_f1: headerFooter.f1,
       heading_f1: headings.f1,
       heading_level_acc: headings.levelAcc,
@@ -1002,6 +1069,7 @@ function renderReport(
     formatHyphen(document.hyphens),
     formatStyle(document.styles),
     formatHeading(document.headings),
+    formatFootnote(document.footnotes),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -1018,6 +1086,7 @@ function renderReport(
       { name: "hyphen_join_acc", align: "right" },
       { name: "style_f1", align: "right" },
       { name: "heading_f1", align: "right" },
+      { name: "footnote_link_acc", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -1147,7 +1216,39 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}\n`;
+  // The acceptance of E5-T02 asks for the footnote link errors by document:
+  // the calls the extraction invented and the links the golden declares it
+  // missed (the note was detected but never linked, or linked elsewhere).
+  const linkErrors = documents.filter(
+    (document): document is DocumentResult & { footnotes: FootnoteLinkResult } =>
+      document.footnotes !== null &&
+      (document.footnotes.falsePositives.length > 0 ||
+        document.footnotes.falseNegatives.length > 0),
+  );
+  const linkSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nFootnote call links (invented / missed):\n${
+          linkErrors.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : linkErrors
+                .map(
+                  (document) =>
+                    `  ${document.id}: ` +
+                    `footnote_link_acc ${document.footnotes.acc.toFixed(4)}; ` +
+                    `invented ${linkList(document.footnotes.falsePositives)}; ` +
+                    `missed ${linkList(document.footnotes.falseNegatives)}`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}\n`;
+}
+
+/** `"none"` or the `page:label` pairs of the links, kept short for one report line. */
+function linkList(entries: readonly NoteLinkLike[]): string {
+  if (entries.length === 0) return "none";
+  return entries.map((entry) => `${entry.page}:${entry.label}`).join(", ");
 }
 
 /** `"none"` or the offending texts, shortened so one report line stays readable. */
