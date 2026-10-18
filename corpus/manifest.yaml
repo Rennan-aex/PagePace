@@ -181,6 +181,19 @@ documents:
     golden: syn-n2-en-lists.golden.json
     visibility: public
 
+  - id: syn-n2-en-marginrefs
+    level: N2
+    lang: en
+    title: "On the Old Editions (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-18"
+    generated: true
+    pages: 2
+    sha256: "a91b4085990d8f61453f3aa37314829e0cd94f9bb674b14227c3ce53fc306f0c"
+    features: [synthetic, margin-refs]
+    golden: syn-n2-en-marginrefs.golden.json
+    visibility: public
+
   - id: syn-n2-en-references
     level: N2
     lang: en

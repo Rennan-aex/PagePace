@@ -1180,6 +1180,119 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
       },
     ],
   },
+  {
+    // Margin numbering (E5-T07): printed Bekker/Stephanus numbers in the
+    // outer margin. Every number is a one-line paragraph that the heading
+    // pass would take for a short isolated title (E4-T02) — the kind
+    // priority is the ground truth. The "42." guard on page 2 sits inside
+    // the column and ends a sentence: it stays a paragraph, proving the
+    // shape (digits + letter) is what carries the kind, not "short and
+    // alone". Left and right margins both appear.
+    id: "syn-n2-en-marginrefs",
+    level: "N2",
+    lang: "en",
+    title: "On the Old Editions (synthetic)",
+    features: ["synthetic", "margin-refs"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        size: 14,
+        runs: [{ text: "On the Old Editions" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "The old editions printed their numbering in the margin, level\n" +
+              "with the line it marked, so a reader could cite a page without\n" +
+              "counting lines. The numbers belong to the book, not to the text:\n" +
+              "skip them and the argument still runs.",
+          },
+        ],
+      },
+      {
+        kind: "margin_ref",
+        page: 1,
+        margin: "left",
+        runs: [{ text: "1094a" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "The commentaries grew around those numbers the way ivy grows\n" +
+              "around a fence the gardener planted elsewhere. A line of Plato\n" +
+              "became a place, and the place outlived the commentaries that\n" +
+              "crowded it, edition after edition.",
+          },
+        ],
+      },
+      {
+        kind: "margin_ref",
+        page: 1,
+        margin: "left",
+        runs: [{ text: "1094b" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "A typesetter who feared the margin would set the number flush\n" +
+              "with the body, where it reads as a list item or a title. A\n" +
+              "typesetter who loved the margin set it clear of the column,\n" +
+              "where the eye finds it without losing the line.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "The second page keeps the same trade. The body runs on and the\n" +
+              "numbers stand aside, and the reader who cites them cites the\n" +
+              "book rather than the page the printer happened to fill.",
+          },
+        ],
+      },
+      {
+        kind: "margin_ref",
+        page: 2,
+        margin: "right",
+        runs: [{ text: "327b" }],
+      },
+      {
+        // The guard: prose that ends in a bare number, inside the column —
+        // it must stay a paragraph, not a margin_ref and not a heading.
+        kind: "paragraph",
+        page: 2,
+        runs: [{ text: "The sequence ran to 42." }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "When the editions closed, the numbering stayed. Scholars still\n" +
+              "argue in its alphabet, and a page without the margin numbers\n" +
+              "now looks like a page that lost its index, its argument intact\n" +
+              "but its address gone.",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Looks one specification up by document id. */

@@ -74,6 +74,18 @@
       "style_f1": 1,
       "text_cer": 0
     },
+    "syn-n2-en-marginrefs": {
+      "block_kind_f1": 1,
+      "footnote_link_acc": 1,
+      "header_footer_f1": 1,
+      "heading_f1": 1,
+      "heading_level_acc": 1,
+      "hyphen_join_acc": 1,
+      "para_boundary_f1": 1,
+      "reading_order": 1,
+      "style_f1": 1,
+      "text_cer": 0
+    },
     "syn-n2-en-references": {
       "block_kind_f1": 1,
       "footnote_link_acc": 1,

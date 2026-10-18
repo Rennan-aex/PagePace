@@ -11,7 +11,9 @@ import {
 import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
+import type { TextLine } from "./lines";
 import { detectLists, LIST_UNCERTAIN_CONFIDENCE, UNCERTAIN_LIST_FLAG } from "./lists";
+import { bodyMeasures, detectMarginRefs } from "./marginrefs";
 import { buildMetadata } from "./metadata";
 import {
   CALL_WITHOUT_NOTE_FLAG,
@@ -150,10 +152,11 @@ import { normalizeForReader } from "./unicode";
  * signal). A paragraph that opens like a printed figure/table label (`Fig.
  * 3 - …`, `Table 2: …`) is a `caption` (`detectCaptions`,
  * `flags: ["uncertain-caption"]` when the type size and the line count do
- * not agree). Kind priority inside the loop: reference > footnote > heading >
- * caption > marked list > quote > indent-only list > paragraph — a marked
- * item outranks a quote (a bullet inside an indented quote is still a list
- * item) while an indent-only item never claims a quote's indent.
+ * not agree). Kind priority inside the loop: margin_ref > reference >
+ * footnote > heading > caption > marked list > quote > indent-only list >
+ * paragraph — a marked item outranks a quote (a bullet inside an indented
+ * quote is still a list item) while an indent-only item never claims a
+ * quote's indent.
  *
  * References (E5-T06 — layer 4): the paragraphs of a titled bibliography
  * section become `reference` blocks (`detectReferences`: an exact lexicon
@@ -162,6 +165,19 @@ import { normalizeForReader } from "./unicode";
  * the kind outranks every other one, including the foot note of E5-T01: a
  * numbered entry set smaller in the page foot is still a reference. The
  * schema already carries the concept, so nothing else changes (ADR-064).
+ *
+ * Margin numbering (E5-T07 — REQ-EXT-19 — layer 4): a one-line paragraph
+ * that carries a Bekker/Stephanus number (`1094a`, `327b`) outside the
+ * body's text area becomes `kind: "margin_ref"` (`detectMarginRefs`, two
+ * gates: text shape and position against a measure taken with the
+ * candidates excluded). The block stays in `blocks` at its y position —
+ * out of the reading flow by kind, not by removal — and its
+ * `origin.bbox` records where the number sits so the reader app can place
+ * it beside the text it marks. The kind outranks every other one: the
+ * short isolated number would otherwise read as a heading, and the foot
+ * of a Stephanus page would read as a footnote. `repeated.ts` never
+ * strips the lettered shape, so a Bekker sequence cannot leave the flow
+ * as a folio before this pass sees it (ADR-065).
  *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
@@ -227,7 +243,20 @@ export function buildBook(document: RawDocument): Book {
   const bodyFontSize = stats?.bodyFontSize ?? 0;
   const pages = groupDocumentParagraphs(stripped.document);
   const paragraphs = joinCrossPageParagraphs(pages, bodyFontSize);
-  const measures = pages.map((page) => pageMeasureOf(page.flat()));
+  // E5-T07: margin numbers first — the position gate needs the body measured
+  // with the candidates excluded, and every other pass then measures the page
+  // without the confirmed numbers (a printed number in the left margin would
+  // otherwise pull the measure's left edge out and read the whole page as
+  // indented — a wall of blockquotes).
+  const marginRefs = detectMarginRefs(paragraphs, { measures: bodyMeasures(pages, paragraphs) });
+  const marginRefLines = new Set(
+    paragraphs
+      .filter((_, index) => marginRefs[index]?.marginRef === true)
+      .map((paragraph) => paragraph.lines[0]),
+  );
+  const measures = pages.map((page) =>
+    pageMeasureOf(page.flat().filter((line) => !marginRefLines.has(line))),
+  );
   const headings = detectHeadings(paragraphs, {
     bodyFontSize,
     lineHeight: stats?.lineHeight ?? 0,
@@ -285,25 +314,29 @@ export function buildBook(document: RawDocument): Book {
       blockConfidence = Math.min(blockConfidence, BROKEN_FONT_CONFIDENCE);
       brokenBlocks += 1;
     }
+    // E5-T07: a margin number outranks every kind — the short isolated
+    // shape would read as a heading (E4-T02) and the foot of a Stephanus
+    // page as a footnote (E5-T01).
+    const marginRef = marginRefs[index]?.marginRef === true;
     // E5-T06: the section title is the evidence, so a reference outranks
     // every other kind — including the note of the page foot (a numbered
     // entry set smaller reads as a footnote to E5-T01).
-    const reference = references[index]?.reference === true;
-    if (footnotes[index]?.uncertain === true && !reference) {
+    const reference = !marginRef && references[index]?.reference === true;
+    if (footnotes[index]?.uncertain === true && !reference && !marginRef) {
       flags.push(UNCERTAIN_FOOTNOTE_FLAG);
       blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
     }
     const endnote = endnotes[index]?.endnote === true;
     // E5-T03: a paragraph of the endnote section is a note like any other —
     // the section is what the layout could not say (body size, mid page).
-    const footnote = !reference && (footnotes[index]?.footnote === true || endnote);
+    const footnote = !reference && !marginRef && (footnotes[index]?.footnote === true || endnote);
     const decision = headings[index];
     // A note and a heading can not be the same paragraph (the size gates are
     // complementary), but the kind of the note wins if they ever disagree.
-    const heading = !footnote && decision?.heading === true;
+    const heading = !footnote && !marginRef && decision?.heading === true;
     // E5-T04: a quote never wins over a note or a title — the gates are
     // complementary (indented vs flush left, mid page vs foot region).
-    const quote = !footnote && !heading && !reference ? quotes[index] : undefined;
+    const quote = !footnote && !heading && !reference && !marginRef ? quotes[index] : undefined;
     const quoteKind = quote?.quote === true ? quote.kind : undefined;
     if (quote?.quote === true && quote.uncertain === true) {
       flags.push(UNCERTAIN_QUOTE_FLAG);
@@ -313,8 +346,8 @@ export function buildBook(document: RawDocument): Book {
     // lists (a caption may sit indented under its figure); a marked item
     // outranks a quote (a bullet inside an indented quote is still an
     // item); an indent-only item never claims a quote's indent.
-    const caption = !footnote && !heading && !reference ? captions[index] : undefined;
-    const list = !footnote && !heading && !reference ? lists[index] : undefined;
+    const caption = !footnote && !heading && !reference && !marginRef ? captions[index] : undefined;
+    const list = !footnote && !heading && !reference && !marginRef ? lists[index] : undefined;
     const isCaption = caption?.caption === true;
     const markedList = list?.marked === true;
     const indentList = !isCaption && !markedList && list?.list === true;
@@ -327,19 +360,24 @@ export function buildBook(document: RawDocument): Book {
       blockConfidence = Math.min(blockConfidence, LIST_UNCERTAIN_CONFIDENCE);
     }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
+    // E5-T07: the box of the margin number itself (top-left page
+    // coordinates), the "posição relativa ao texto" of REQ-EXT-19.
+    const marginLine = marginRef ? (paragraph.lines[0] as TextLine) : undefined;
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: reference
-        ? "reference"
-        : footnote
-          ? "footnote"
-          : heading
-            ? "heading"
-            : isCaption
-              ? "caption"
-              : markedList
-                ? "list_item"
-                : (quoteKind ?? (indentList ? "list_item" : "paragraph")),
+      kind: marginRef
+        ? "margin_ref"
+        : reference
+          ? "reference"
+          : footnote
+            ? "footnote"
+            : heading
+              ? "heading"
+              : isCaption
+                ? "caption"
+                : markedList
+                  ? "list_item"
+                  : (quoteKind ?? (indentList ? "list_item" : "paragraph")),
       ...(heading ? { level: decision.level } : {}),
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the
@@ -349,6 +387,18 @@ export function buildBook(document: RawDocument): Book {
         pageFrom: paragraph.pageFrom,
         pageTo: paragraph.pageTo,
         ...(pageLabel === null || pageLabel === undefined ? {} : { originalPageLabel: pageLabel }),
+        ...(marginLine === undefined
+          ? {}
+          : {
+              bbox: [
+                {
+                  x: marginLine.x,
+                  y: marginLine.top,
+                  width: marginLine.width,
+                  height: marginLine.bottom - marginLine.top,
+                },
+              ],
+            }),
       },
       confidence: blockConfidence,
       flags,

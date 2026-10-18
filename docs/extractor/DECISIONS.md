@@ -69,6 +69,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-062 | Citações: recuo ≥ 1,8 em porta; métrica `block_kind_f1` (macro-média por tipo) | accepted |
 | ADR-063 | Listas e legendas: marcador/numeração + recuo raso; legenda = rótulo impresso | accepted |
 | ADR-064 | Referências: título de seção exato + forma de entrada; `reference` acima de tudo | accepted |
+| ADR-065 | Numeração de margem: `margin_ref` fora do fluxo com `origin.bbox` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -547,3 +548,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) recuo deslocado como porta (é o sinal do typeset, mas em PDF real a junção de linhas e as colunas quebram o recuo, e ele sozinho já é da lista/citação) · B) título de seção no léxico en/pt (igualdade exata, mesmo normalizador das endnotes) + forma de entrada (rótulo entre colchetes, ano ou inicial maiúscula), fechando na 1ª decisão `heading`.
 **Decisão:** B — `references.ts` (camada 4, puro); `normalizeEndnoteTitle` virou `normalizeSectionTitle` (compartilhado com as endnotes); prioridade no `book.ts`: reference > footnote > heading > caption > lista > quote (a evidência é a seção, não o layout); sem flag incerta (título + forma são dois sinais) e sem mudança de esquema.
 **Consequências:** baseline ganhou `syn-n2-en-references` (1,0000 em tudo) sem regressão em nenhum documento; corpus real: `n1-en-rebus-philosophy-mind` com 85 blocos `reference` e outros 5 documentos com 1–2; limites: prosa logo após o título vira `reference`, nota de pé dentro da seção vira `reference`, título fora do léxico não abre nada, e os 2 FPs residuais de `n2-en-astrofisica` são embaralhamento de coluna (alvo E6); revisar no primeiro PDF real com gabarito.
+
+### ADR-065 · Numeração de margem: `margin_ref` fora do fluxo com `origin.bbox` · accepted · 2026-10-18
+**Contexto:** E5-T07 — REQ-EXT-19 pede a numeração Bekker/Stephanus ("1094a") fora do fluxo de leitura mas com a posição relativa ao texto; a varredura do corpus (2026-10-18) achou só dígitos puros (datas, números de linha de edição crítica), nenhum PDF com a forma dígito+letra, então o aceite é o fixture sintético e a validação real fica no BACKLOG.
+**Alternativas:** A) só a forma do texto ("1 a 4 dígitos + letra a–e, ponto opcional") — marcaria número de linha no meio do fluxo; B) forma + posição (linha inteira fora da medida do corpo, medida **excluindo as candidatas**) — dois sinais independentes, sem flag incerta; C) mudar o esquema para ancorar a citação — desnecessário: o `origin.bbox` do schema 1.0.0 já serve.
+**Decisão:** B — `marginrefs.ts` (camada 4, puro); prioridade no `book.ts`: margin_ref > reference > footnote > heading; `origin.bbox` preenchido só nos margin_ref (coordenadas top-left); `repeated.ts` ignora a forma com letra (um Bekker crescente não vira folio flow); as medidas das outras passes excluem os margin_ref confirmados (senão o número puxa a medida esquerda e a página inteira vira blockquote).
+**Consequências:** baseline ganhou `syn-n2-en-marginrefs` (1,0000 em tudo) sem regressão; limites: número na mesma baseline une-se à linha, dígitos puros fora de escopo, página 2 colunas julgada por uma medida (E6); revisar quando o corpus ganhar um PDF real com a numeração (REQ-19).

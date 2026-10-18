@@ -1,0 +1,128 @@
+{
+  "id": "syn-n2-en-marginrefs",
+  "schemaVersion": "1.1.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "On the Old Editions"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The old editions printed their numbering in the margin, level\nwith the line it marked, so a reader could cite a page without\ncounting lines. The numbers belong to the book, not to the text:\nskip them and the argument still runs."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "margin_ref",
+      "runs": [
+        {
+          "text": "1094a"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The commentaries grew around those numbers the way ivy grows\naround a fence the gardener planted elsewhere. A line of Plato\nbecame a place, and the place outlived the commentaries that\ncrowded it, edition after edition."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "margin_ref",
+      "runs": [
+        {
+          "text": "1094b"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "A typesetter who feared the margin would set the number flush\nwith the body, where it reads as a list item or a title. A\ntypesetter who loved the margin set it clear of the column,\nwhere the eye finds it without losing the line."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The second page keeps the same trade. The body runs on and the\nnumbers stand aside, and the reader who cites them cites the\nbook rather than the page the printer happened to fill."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "margin_ref",
+      "runs": [
+        {
+          "text": "327b"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The sequence ran to 42."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "When the editions closed, the numbering stayed. Scholars still\nargue in its alphabet, and a page without the margin numbers\nnow looks like a page that lost its index, its argument intact\nbut its address gone."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

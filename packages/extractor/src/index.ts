@@ -97,6 +97,14 @@ export {
   LINE_BASELINE_TOLERANCE_FACTOR,
   LINE_OVERLAP_MIN_FACTOR,
 } from "./lines";
+export type { MarginRefContext, MarginRefDecision } from "./marginrefs";
+export {
+  bodyMeasures,
+  detectMarginRefs,
+  isMarginRefShaped,
+  isMarginRefText,
+  MARGIN_REF_TEXT,
+} from "./marginrefs";
 export {
   AUTHOR_MAX_COUNT,
   buildMetadata,

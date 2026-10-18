@@ -29,6 +29,15 @@ export const LEADING = 15;
 /** Extra gap added after each block (visual only, never part of the text). */
 export const BLOCK_GAP = 10;
 /**
+ * Margin numbering (E5-T07): x of a printed Bekker/Stephanus number. The
+ * left one ends its line before the body's left edge (72pt); the right one
+ * starts past the body's right edge (540pt). Both sit in the outer margin,
+ * never inside a column.
+ */
+export const MARGIN_REF_LEFT_X = 40;
+/** x of a printed margin number on the right side of the page (E5-T07). */
+export const MARGIN_REF_RIGHT_X = PAGE_WIDTH - MARGIN + 12;
+/**
  * Soft hyphen (E3-T03): in a spec's run text it marks a typesetting break —
  * the printed line ends with `-` and the reader must get one word back.
  */
@@ -88,6 +97,12 @@ export interface SyntheticBlockSpec {
    * `position: "bottom"`.
    */
   region?: "header" | "footer";
+  /**
+   * A printed margin number (E5-T07 — `kind: "margin_ref"`): the block sits
+   * in the page's outer margin (`MARGIN_REF_LEFT_X` / `MARGIN_REF_RIGHT_X`)
+   * instead of a column, and still advances the flow cursor.
+   */
+  margin?: "left" | "right";
   runs: SyntheticRunSpec[];
 }
 
@@ -258,6 +273,23 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
         fail(spec, `${where}.runs[${runIndex}]: noteRef needs style "sup"`);
       }
     }
+    if (block.margin !== undefined) {
+      if (block.margin !== "left" && block.margin !== "right") {
+        fail(spec, `${where}.margin must be "left" or "right"`);
+      }
+      if (block.indent !== undefined) {
+        fail(spec, `${where}: a margin number has no indent`);
+      }
+      if (block.region !== undefined) {
+        fail(spec, `${where}: a margin number is not a repeated region`);
+      }
+      if (block.position === "bottom") {
+        fail(spec, `${where}: a margin number flows with the page, it cannot sit at the foot`);
+      }
+      if (block.column !== undefined && block.column !== 1) {
+        fail(spec, `${where}: a margin number sits outside every column`);
+      }
+    }
 
     const size = block.size ?? FONT_SIZE;
     if (!Number.isInteger(size) || size < 6 || size > 72) {
@@ -325,12 +357,21 @@ export function layoutSynthetic(spec: SyntheticSpec): string[] {
     }
 
     pagesWithBlocks.add(block.page);
+    // E5-T07: a margin number prints in the outer margin, outside every
+    // column; the flow cursor still advanced above, so the body keeps its
+    // rhythm around it.
+    const lineX =
+      block.margin === "left"
+        ? MARGIN_REF_LEFT_X
+        : block.margin === "right"
+          ? MARGIN_REF_RIGHT_X
+          : column.x + inset;
     const parts: string[] = [];
     lines.forEach((line, lineIndex) => {
       if (line.length === 0) return;
       parts.push(
         lineStream(line, {
-          x: column.x + inset,
+          x: lineX,
           y: start - lineIndex * leading,
           size,
         }),

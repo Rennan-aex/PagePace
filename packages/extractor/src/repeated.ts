@@ -1,5 +1,6 @@
 import type { RawDocument, RawTextItem } from "@pagepace/schema";
 import { documentLines, type TextLine } from "./lines";
+import { isMarginRefText } from "./marginrefs";
 import { lineText } from "./spaces";
 import { documentStats } from "./stats";
 import { normalizeForReader } from "./unicode";
@@ -168,6 +169,9 @@ function candidatesOf(
       if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) continue;
       const text = contentOf(line);
       if (text.trim() === "") continue;
+      // E5-T07: a Bekker/Stephanus number ("1094a") is margin numbering, not
+      // furniture — a lettered sequence must never strip as a region.
+      if (isMarginRefText(text)) continue;
       const { signature, numbered } = signatureOf(text);
       candidates.push({ band, page, line, text, signature, numbered });
     }
@@ -176,6 +180,8 @@ function candidatesOf(
       if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) return;
       const text = contentOf(line);
       if (text.trim() === "") return;
+      // E5-T07: same guard as the edge pass — a margin number is content.
+      if (isMarginRefText(text)) return;
       const { signature, numbered } = signatureOf(text);
       if (!numbered) return;
       const above = line.top - (lines[index - 1] as TextLine).bottom;

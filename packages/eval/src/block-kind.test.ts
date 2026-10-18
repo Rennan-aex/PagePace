@@ -96,10 +96,21 @@ describe("E5-T04: N3 block kind detection against the golden", () => {
 // closes the section — must score it too: every `reference` of the golden
 // detected, no entry missed as `list_item`/`paragraph` and no prose of the
 // section invented as `reference`.
-const E5_T05_T06_IDS = ["syn-n2-en-lists", "syn-n2-pt-estilos", "syn-n2-en-references"];
+//
+// E5-T07 acceptance: the N2 margin-numbering document — printed Bekker/
+// Stephanus numbers in both outer margins, a heading that opens it and the
+// "42." guard — must score it too: every `margin_ref` of the golden detected
+// (no number missed as `heading`/`paragraph`), the guard left alone and the
+// body around the numbers kept as `paragraph`.
+const E5_T05_T06_T07_IDS = [
+  "syn-n2-en-lists",
+  "syn-n2-pt-estilos",
+  "syn-n2-en-references",
+  "syn-n2-en-marginrefs",
+];
 
-describe("E5-T05/T06: block kinds of the list, caption and bibliography documents", () => {
-  for (const id of E5_T05_T06_IDS) {
+describe("E5-T05/T06/T07: block kinds of the list, caption, bibliography and margin documents", () => {
+  for (const id of E5_T05_T06_T07_IDS) {
     const found = corpus.entries.find((entry) => entry.id === id);
     it.skipIf(found === undefined || !existsSync(found.path))(
       `${id}: block_kind_f1 >= ${BLOCK_KIND_F1_TARGET_N3}`,
