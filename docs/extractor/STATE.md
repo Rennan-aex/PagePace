@@ -3,20 +3,20 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E5 em andamento** — T01 concluída (PR #45); **T02 concluída (PR #46)**; **T03 concluída (PR #48)**; **T04 concluída (PR #50)**; **T05 concluída (PR #51)**; **T06 concluída (PR #52)**; **T07 concluída (PR #53)**; **T08 código pronto, PR a abrir**. E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
-- **Tarefa atual:** **E5-T08 — trechos em grego/latim** (detalhe em `phases/E5-notes-quotes.md`).
+- **Fase atual:** **E5 CONCLUÍDA** — T01 (PR #45); T02 (PR #46); T03 (PR #48); T04 (PR #50); T05 (PR #51); T06 (PR #52); T07 (PR #53); T08 (**PR #54**, mergeado 2026-10-18). Próximo marco: **E6 (colunas e ordem de leitura)**. E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
+- **Tarefa atual:** **E6-T01 — detecção de colunas** (detalhe em `phases/E6-columns.md`).
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (773 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (eval antes/depois idêntico — nenhuma métrica mudou).
-- **Última atualização:** 2026-10-18 (E5-T08 código + provas + docs prontos).
+- **Status:** `pnpm verify` verde (773 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (nenhuma métrica piorou com a E5-T08).
+- **Última atualização:** 2026-10-18 (E5-T08 mergeada; E5 fechada).
 
-## Tarefa atual — E5-T08 · Trechos em grego/latim (cópia de `phases/E5-notes-quotes.md`)
-- Preservar caracteres; marcar `lang` quando óbvio (bloco de caracteres gregos). **Aceite:** nenhum caractere perdido em PDF com grego.
+## Tarefa atual — E6-T01 · Detecção de colunas (cópia de `phases/E6-columns.md`)
+- Análise de vazios verticais (projeção) por página; 1, 2 ou 3 colunas; tratar títulos e figuras que atravessam colunas. **Aceite:** fixtures sintéticas de 1/2 colunas passam.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-18 — E5-T08 (grego/latim) — CÓDIGO PRONTO, PR A ABRIR** · branch `e5-t08-greek-latin` (código `5220b04` + docs commitados).
-- Feito: varredura do corpus (caracteres gregos já chegavam integros; `lang` nunca marcado); `greek.ts` (camada 5: `lang: "grc"` se todas as letras são grego e ≥ 3); wire no `book.ts`; `minipdf` + `/ToUnicode` para o sintético; aceitação E2E (Platão caractere a caractere + `n2-en-arxiv-phobos` público); ADR-066; fase + STATE.
-- `Run.lang` já existia no esquema 1.0.0 — **sem mudança de esquema, golden nem métrica**.
-- Próximo comando: `git push -u origin e5-t08-greek-latin` → abrir PR → checks → merge → limpar branch local → `report-to-po` (fim da E5, próximo marco = E6).
+- **Sessão 2026-10-18 — E5-T08 (grego/latim) — CONCLUÍDA (PR #54)** · merge `40a5f38` na `main`, branch remota apagada.
+- O que ficou: `greek.ts` (camada 5: `lang: "grc"` se todas as letras do run são grego e ≥ 3, latim nunca marcado); `tagGreekRuns` no fim de `book.ts`; `minipdf` + `/ToUnicode` para o sintético; aceitação E2E (citação de Platão caractere a caractere + `n2-en-arxiv-phobos` público); ADR-066. Sem mudança de esquema, golden nem métrica.
+- Próxima sessão: `pnpm verify` verde antes de mexer em algo → branch `e6-t01-columns` a partir de `main` → seguir `phases/E6-columns.md` (skill `start-session` + `add-heuristic`).
+- Armadilha conhecida da E6: `syn-n2-en-columns` está no baseline com `para_boundary_f1` 0,0000 e `block_kind_f1` 0,0667 — o objetivo da E6 é melhorar esses números sem piorar N1/N3.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
@@ -29,7 +29,7 @@
 | E2 | done (2026-10-08, PR #28; checklist manual concluído 2026-10-11) |
 | E3 | done (2026-10-11, PRs #29–#34; checklist manual concluído 2026-10-11) |
 | E4 | done (T01 PR #38, T02 PR #40, T03 PR #42, T04 PR #43, T05 PR #44) |
-| E5 | in progress (T01 PR #45; T02 PR #46; T03 PR #48; T04 PR #50; T05 PR #51; T06 PR #52; T07 PR #53; T08 PR a abrir) |
+| E5 | done (T01 PR #45; T02 PR #46; T03 PR #48; T04 PR #50; T05 PR #51; T06 PR #52; T07 PR #53; T08 PR #54 — fase fechada 2026-10-18) |
 | E6…E10, SEG | todo (E8 descarta `font.data`; E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
@@ -38,8 +38,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-18 · **E5-T08 (trechos em grego/latim) — CONCLUÍDO** · **PR #54** · `greek.ts` (lang "grc" por bloco óbvio de letras gregas; latim não marcado) + aceitação E2E (sintético `/ToUnicode` + `n2-en-arxiv-phobos` público) + **ADR-066**; **773 testes**; `pnpm eval --ci` exit 0 (sem mudança de métrica); **E5 fechada**.
 - 2026-10-18 · **E5-T07 (numeração marginal) — CONCLUÍDO** · **PR #53** · `marginrefs.ts` (forma + posição; `margin_ref` acima de tudo; `origin.bbox`) + sintético `syn-n2-en-marginrefs` (1,0000) + **ADR-065**; **769 testes**; `pnpm eval --ci` exit 0; REQ-19 → BACKLOG.
-- 2026-10-17 · **E5-T06 (referências bibliográficas) — CONCLUÍDO** · **PR #52** · `references.ts` (título de seção en/pt + forma de entrada; `reference` acima de tudo) + sintético `syn-n2-en-references` (1,0000) + **ADR-064**; **754 testes**; `pnpm eval --ci` exit 0.
-- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`.
+- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`.
 
 Histórico completo: docs/extractor/archive/
