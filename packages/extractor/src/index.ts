@@ -40,6 +40,8 @@ export {
   opensWithNoteMarker,
   UNCERTAIN_FOOTNOTE_FLAG,
 } from "./footnotes";
+export type { GreekSignal } from "./greek";
+export { GREEK_LANG, GREEK_MIN_LETTERS, greekScriptSignal, tagGreekRuns } from "./greek";
 export type { HeadingContext, HeadingDecision, PageMeasure } from "./headings";
 export {
   detectHeadings,

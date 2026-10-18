@@ -348,6 +348,18 @@ describe("buildBook", () => {
     expect(book.blocks[0]?.runs).toEqual([{ text: "Aviso importante." }]);
   });
 
+  it("tags an all-Greek run with lang grc and keeps every character (E5-T08)", () => {
+    const greek = page([
+      item("Σωκράτης λέγει περὶ τῆς ψυχῆς.", MARGIN, 100, BODY),
+      item("A frase em português fica sem lang.", MARGIN, 130, BODY),
+    ]);
+    const book = buildBook(doc([greek]));
+    expect(book.blocks[0]?.runs).toEqual([{ text: "Σωκράτης λέγει περὶ τῆς ψυχῆς.", lang: "grc" }]);
+    expect(book.blocks[1]?.runs).toEqual([{ text: "A frase em português fica sem lang." }]);
+    const text = book.blocks[0]?.runs.map((run) => run.text).join("") ?? "";
+    expect(text).toBe("Σωκράτης λέγει περὶ τῆς ψυχῆς.");
+  });
+
   it("fills metadata from the PDF claims and the stopword lexicons (E4-T04)", () => {
     const portuguese = page([
       item(

@@ -8,6 +8,7 @@ import {
   FOOTNOTE_UNCERTAIN_CONFIDENCE,
   UNCERTAIN_FOOTNOTE_FLAG,
 } from "./footnotes";
+import { tagGreekRuns } from "./greek";
 import { detectHeadings, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
@@ -178,6 +179,14 @@ import { normalizeForReader } from "./unicode";
  * of a Stephanus page would read as a footnote. `repeated.ts` never
  * strips the lettered shape, so a Bekker sequence cannot leave the flow
  * as a folio before this pass sees it (ADR-065).
+ *
+ * Greek snippets (E5-T08 — REQ-EXT-18): a run whose every letter is Greek
+ * script and has at least `GREEK_MIN_LETTERS` letters carries
+ * `lang: "grc"` (`tagGreekRuns`) — the obvious block of a foreign
+ * quotation. Latin is never tagged: at the character level it is
+ * indistinguishable from the document's own alphabet (ADR-066). The text
+ * of every run is untouched, so the character-preservation acceptance of
+ * the task (no Greek character lost) does not depend on this pass.
  *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
@@ -382,7 +391,9 @@ export function buildBook(document: RawDocument): Book {
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the
       // title-style share stays, as do italic/sup/sub.
-      runs: heading ? headingRuns(runs) : runs,
+      // E5-T08: a run whose every letter is Greek carries `lang: "grc"`
+      // (ADR-066) — an annotation only, the text never changes.
+      runs: tagGreekRuns(heading ? headingRuns(runs) : runs),
       origin: {
         pageFrom: paragraph.pageFrom,
         pageTo: paragraph.pageTo,

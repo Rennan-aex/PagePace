@@ -70,6 +70,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-063 | Listas e legendas: marcador/numeração + recuo raso; legenda = rótulo impresso | accepted |
 | ADR-064 | Referências: título de seção exato + forma de entrada; `reference` acima de tudo | accepted |
 | ADR-065 | Numeração de margem: `margin_ref` fora do fluxo com `origin.bbox` | accepted |
+| ADR-066 | Grego: `Run.lang = "grc"` por bloco óbvio de letras gregas; latim não marcado | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -554,3 +555,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) só a forma do texto ("1 a 4 dígitos + letra a–e, ponto opcional") — marcaria número de linha no meio do fluxo; B) forma + posição (linha inteira fora da medida do corpo, medida **excluindo as candidatas**) — dois sinais independentes, sem flag incerta; C) mudar o esquema para ancorar a citação — desnecessário: o `origin.bbox` do schema 1.0.0 já serve.
 **Decisão:** B — `marginrefs.ts` (camada 4, puro); prioridade no `book.ts`: margin_ref > reference > footnote > heading; `origin.bbox` preenchido só nos margin_ref (coordenadas top-left); `repeated.ts` ignora a forma com letra (um Bekker crescente não vira folio flow); as medidas das outras passes excluem os margin_ref confirmados (senão o número puxa a medida esquerda e a página inteira vira blockquote).
 **Consequências:** baseline ganhou `syn-n2-en-marginrefs` (1,0000 em tudo) sem regressão; limites: número na mesma baseline une-se à linha, dígitos puros fora de escopo, página 2 colunas julgada por uma medida (E6); revisar quando o corpus ganhar um PDF real com a numeração (REQ-19).
+
+### ADR-066 · Grego: `Run.lang = "grc"` por bloco óbvio de letras gregas; latim não marcado · accepted · 2026-10-18
+**Contexto:** E5-T08 — REQ-EXT-18 pede grego/latim preservados e o `lang` "quando óbvio"; a varredura do corpus (2026-10-18) provou que os caracteres gregos já chegam integros (`rawGreek == bookGreek` nos 7 documentos com grego, 0 U+FFFD), mas nenhum run tinha `lang`. Calibragem: citações gregas reais chegam como runs puros com ≥ 3 letras (10 em `n3-pt-filosofia2`); física traz letra solta de símbolo (ρ, π — abaixo do piso) e runs mistos diluídos.
+**Alternativas:** A) marcar qualquer letra grego isolada (falsos positivos em todo livro de física) · B) todas as letras do run são grego **e** ≥ `GREEK_MIN_LETTERS` (3) — "bloco óbvio" por construção, sem flag; latim nunca marcado (indistinguível do alfabeto pt/en por caractere).
+**Decisão:** B — `greek.ts` (camada 5, puro, `\p{Script=Greek}`, pontuação/dígitos não votam); `tagGreekRuns` no fim de `book.ts`; aceitação automatizada com PDF sintético (`minipdf` ganhou `/ToUnicode`) + `n2-en-arxiv-phobos` público; sem mudança de esquema, golden nem métrica.
+**Consequências:** eval antes/depois idêntico (regra de ouro); latim e mistos ficam sem `lang` (limites conscientes); revisar se o leitor precisar de `la` (exigirá léxico, não caractere).

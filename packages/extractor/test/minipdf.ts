@@ -34,6 +34,13 @@ export interface BuildPdfOptions {
   info?: { Title?: string; Author?: string };
   /** Catalog `/Lang` entry (E4-T04: free-form, e.g. `pt-BR`). */
   lang?: string;
+  /**
+   * `/ToUnicode` CMap per font resource (E5-T08): single-byte code → the
+   * Unicode text pdf.js must extract for it. Without the map the standard
+   * fonts answer WinAnsi and Greek never reaches the `RawDocument`; with it,
+   * a content stream written in private bytes delivers any script.
+   */
+  toUnicode?: Record<string, Record<number, string>>;
   mediaBox?: [number, number, number, number];
 }
 
@@ -52,6 +59,46 @@ export interface TextStreamOptions {
 
 const escapeLiteral = (value: string): string =>
   value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+
+/** Largest `beginbfchar` block the PDF spec allows in one operation. */
+const TOUNICODE_MAX_PER_BLOCK = 100;
+
+const hex2 = (value: number): string => value.toString(16).padStart(2, "0").toUpperCase();
+const hex4 = (value: number): string => value.toString(16).padStart(4, "0").toUpperCase();
+
+/** A minimal `/ToUnicode` CMap (bfchar only, one byte → one code point). */
+export function toUnicodeCMap(mapping: Record<number, string>): string {
+  const entries = Object.entries(mapping)
+    .map(([code, text]) => {
+      const codePoint = text.codePointAt(0);
+      if (codePoint === undefined) throw new Error("toUnicodeCMap: empty target text");
+      return `<${hex2(Number(code))}> <${hex4(codePoint)}>`;
+    })
+    .sort()
+    .join("\n");
+  const blocks: string[] = [];
+  const lines = entries.split("\n").filter((line) => line !== "");
+  for (let index = 0; index < lines.length; index += TOUNICODE_MAX_PER_BLOCK) {
+    const chunk = lines.slice(index, index + TOUNICODE_MAX_PER_BLOCK);
+    blocks.push(`${chunk.length} beginbfchar\n${chunk.join("\n")}\nendbfchar`);
+  }
+  return [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    "/CMapName /Adobe-Identity-UCS def",
+    "/CMapType 2 def",
+    "1 begincodespacerange",
+    "<00> <FF>",
+    "endcodespacerange",
+    ...blocks,
+    "endcmap",
+    "CMapName currentdict /CMap defineresource pop",
+    "end",
+    "end",
+  ].join("\n");
+}
 
 /** A `BT ... ET` content stream showing `text` at a baseline position. */
 export function textStream(text: string, options: TextStreamOptions = {}): string {
@@ -157,6 +204,7 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     outlines,
     info,
     lang,
+    toUnicode,
     mediaBox = [0, 0, 600, 800],
   } = options;
   const pageCount = contentStreams.length;
@@ -180,9 +228,18 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
   const fontEntries = Object.entries(fonts ?? { F1: baseFont });
   const fontNumbers = new Map<string, number>();
   for (const [resource, base] of fontEntries) {
+    const mapping = toUnicode?.[resource];
+    let toUnicodeRef = "";
+    if (mapping !== undefined) {
+      const cmap = toUnicodeCMap(mapping);
+      const streamNumber = push(`<< /Length ${cmap.length} >>\nstream\n${cmap}\nendstream`);
+      toUnicodeRef = ` /ToUnicode ${streamNumber} 0 R`;
+    }
     fontNumbers.set(
       resource,
-      push(`<< /Type /Font /Subtype /Type1 /BaseFont /${base} /Encoding /WinAnsiEncoding >>`),
+      push(
+        `<< /Type /Font /Subtype /Type1 /BaseFont /${base} /Encoding /WinAnsiEncoding${toUnicodeRef} >>`,
+      ),
     );
   }
   const fontResources = [...fontNumbers]
