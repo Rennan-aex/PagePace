@@ -68,6 +68,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-061 | Endnotes reutilizam o `kind` "footnote" e ligam por label em ordem de leitura | accepted |
 | ADR-062 | Citações: recuo ≥ 1,8 em porta; métrica `block_kind_f1` (macro-média por tipo) | accepted |
 | ADR-063 | Listas e legendas: marcador/numeração + recuo raso; legenda = rótulo impresso | accepted |
+| ADR-064 | Referências: título de seção exato + forma de entrada; `reference` acima de tudo | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -540,3 +541,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) recuo sozinho decide lista (falsos positivos altos em citações e blocos centrados) · B) marcador/numeração decide; recuo raso (≥ 0,8 e < 1,8 em, faixa logo abaixo do gate do quote) só com flag `uncertain-list`; legenda exige rótulo impresso (`Fig. 3 -`, `Table 2:`) + (fonte menor ou ≤ 3 linhas).
 **Decisão:** B — prioridade footnote > heading > caption > lista marcada > quote > lista por recuo > paragraph; a lista marcada vence o quote (bolinha dentro de citação recuada é item); `lists.ts` e `captions.ts` puros e determinísticos; fix no gate de heading: linha com marcador de lista nunca vira heading por centralização (o comentário da E4-T02 já dizia "size or weight").
 **Consequências:** baseline atualizado sem regressão — `syn-n2-pt-estilos` 1,0000; sintético novo `syn-n2-en-lists` (marcada, numerada, legendas) 1,0000. Revisar quando houver PDF real com gabarito ou quando a E10 ligar `caption` a figuras de verdade (hoje a proximidade é invisível).
+
+### ADR-064 · Referências: título de seção exato + forma de entrada; `reference` acima de tudo · accepted · 2026-10-17
+**Contexto:** E5-T06 — o `kind` "reference" existe no schema 1.0.0 mas nada o emitia; a auditoria da E5-T01 (BACKLOG 2026-10-16) mostrou itens de bibliografia virando `footnote` na região de pé, e o recuo da referência cairia na lista rasa da E5-T05.
+**Alternativas:** A) recuo deslocado como porta (é o sinal do typeset, mas em PDF real a junção de linhas e as colunas quebram o recuo, e ele sozinho já é da lista/citação) · B) título de seção no léxico en/pt (igualdade exata, mesmo normalizador das endnotes) + forma de entrada (rótulo entre colchetes, ano ou inicial maiúscula), fechando na 1ª decisão `heading`.
+**Decisão:** B — `references.ts` (camada 4, puro); `normalizeEndnoteTitle` virou `normalizeSectionTitle` (compartilhado com as endnotes); prioridade no `book.ts`: reference > footnote > heading > caption > lista > quote (a evidência é a seção, não o layout); sem flag incerta (título + forma são dois sinais) e sem mudança de esquema.
+**Consequências:** baseline ganhou `syn-n2-en-references` (1,0000 em tudo) sem regressão em nenhum documento; corpus real: `n1-en-rebus-philosophy-mind` com 85 blocos `reference` e outros 5 documentos com 1–2; limites: prosa logo após o título vira `reference`, nota de pé dentro da seção vira `reference`, título fora do léxico não abre nada, e os 2 FPs residuais de `n2-en-astrofisica` são embaralhamento de coluna (alvo E6); revisar no primeiro PDF real com gabarito.

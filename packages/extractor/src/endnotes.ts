@@ -54,11 +54,12 @@ export interface EndnoteContext {
 const NOT_AN_ENDNOTE: EndnoteDecision = { endnote: false };
 
 /**
- * Title of a notes section, normalized the way the reader compares text:
- * NFC, trimmed, internal spaces collapsed, a trailing colon or full stop
- * stripped (typesetters print "Notes:"), case folded.
+ * Title of a section, normalized the way the reader compares text: NFC,
+ * trimmed, internal spaces collapsed, a trailing colon or full stop stripped
+ * (typesetters print "Notes:"), case folded. Shared with the reference pass
+ * (E5-T06), which matches its own lexicon the same way.
  */
-export function normalizeEndnoteTitle(text: string): string {
+export function normalizeSectionTitle(text: string): string {
   return text
     .normalize("NFC")
     .trim()
@@ -70,7 +71,7 @@ export function normalizeEndnoteTitle(text: string): string {
 function isSectionTitle(paragraph: JoinedParagraph): boolean {
   const first = paragraph.lines[0];
   if (first === undefined) return false;
-  const title = normalizeEndnoteTitle(lineText(first.items));
+  const title = normalizeSectionTitle(lineText(first.items));
   return (ENDNOTE_SECTION_TITLES as readonly string[]).includes(title);
 }
 

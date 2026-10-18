@@ -22,6 +22,7 @@ import {
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { detectQuotes, QUOTE_UNCERTAIN_CONFIDENCE, UNCERTAIN_QUOTE_FLAG } from "./quotes";
+import { detectReferences } from "./references";
 import { stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
 import { documentStats } from "./stats";
@@ -149,10 +150,18 @@ import { normalizeForReader } from "./unicode";
  * signal). A paragraph that opens like a printed figure/table label (`Fig.
  * 3 - …`, `Table 2: …`) is a `caption` (`detectCaptions`,
  * `flags: ["uncertain-caption"]` when the type size and the line count do
- * not agree). Kind priority inside the loop: footnote > heading > caption >
- * marked list > quote > indent-only list > paragraph — a marked item
- * outranks a quote (a bullet inside an indented quote is still a list
+ * not agree). Kind priority inside the loop: reference > footnote > heading >
+ * caption > marked list > quote > indent-only list > paragraph — a marked
+ * item outranks a quote (a bullet inside an indented quote is still a list
  * item) while an indent-only item never claims a quote's indent.
+ *
+ * References (E5-T06 — layer 4): the paragraphs of a titled bibliography
+ * section become `reference` blocks (`detectReferences`: an exact lexicon
+ * title plus entry-shaped paragraphs — bracketed label, year or upper-case
+ * opening — until the next heading). The section title is the evidence, so
+ * the kind outranks every other one, including the foot note of E5-T01: a
+ * numbered entry set smaller in the page foot is still a reference. The
+ * schema already carries the concept, so nothing else changes (ADR-064).
  *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
@@ -247,6 +256,9 @@ export function buildBook(document: RawDocument): Book {
   // shallow indent below the quote gate, and the figure/table label.
   const lists = detectLists(paragraphs, { measures });
   const captions = detectCaptions(paragraphs, { bodyFontSize });
+  // E5-T06: the bibliography section — the exact title of the lexicon plus
+  // the entry-shaped paragraphs that follow it, until the next heading.
+  const references = detectReferences(paragraphs, { headings });
   const fromOcr = document.source.ocrTextLayer === true;
   const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
@@ -273,21 +285,25 @@ export function buildBook(document: RawDocument): Book {
       blockConfidence = Math.min(blockConfidence, BROKEN_FONT_CONFIDENCE);
       brokenBlocks += 1;
     }
-    if (footnotes[index]?.uncertain === true) {
+    // E5-T06: the section title is the evidence, so a reference outranks
+    // every other kind — including the note of the page foot (a numbered
+    // entry set smaller reads as a footnote to E5-T01).
+    const reference = references[index]?.reference === true;
+    if (footnotes[index]?.uncertain === true && !reference) {
       flags.push(UNCERTAIN_FOOTNOTE_FLAG);
       blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
     }
+    const endnote = endnotes[index]?.endnote === true;
     // E5-T03: a paragraph of the endnote section is a note like any other —
     // the section is what the layout could not say (body size, mid page).
-    const endnote = endnotes[index]?.endnote === true;
-    const footnote = footnotes[index]?.footnote === true || endnote;
+    const footnote = !reference && (footnotes[index]?.footnote === true || endnote);
     const decision = headings[index];
     // A note and a heading can not be the same paragraph (the size gates are
     // complementary), but the kind of the note wins if they ever disagree.
     const heading = !footnote && decision?.heading === true;
     // E5-T04: a quote never wins over a note or a title — the gates are
     // complementary (indented vs flush left, mid page vs foot region).
-    const quote = !footnote && !heading ? quotes[index] : undefined;
+    const quote = !footnote && !heading && !reference ? quotes[index] : undefined;
     const quoteKind = quote?.quote === true ? quote.kind : undefined;
     if (quote?.quote === true && quote.uncertain === true) {
       flags.push(UNCERTAIN_QUOTE_FLAG);
@@ -297,8 +313,8 @@ export function buildBook(document: RawDocument): Book {
     // lists (a caption may sit indented under its figure); a marked item
     // outranks a quote (a bullet inside an indented quote is still an
     // item); an indent-only item never claims a quote's indent.
-    const caption = !footnote && !heading ? captions[index] : undefined;
-    const list = !footnote && !heading ? lists[index] : undefined;
+    const caption = !footnote && !heading && !reference ? captions[index] : undefined;
+    const list = !footnote && !heading && !reference ? lists[index] : undefined;
     const isCaption = caption?.caption === true;
     const markedList = list?.marked === true;
     const indentList = !isCaption && !markedList && list?.list === true;
@@ -313,15 +329,17 @@ export function buildBook(document: RawDocument): Book {
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
-      kind: footnote
-        ? "footnote"
-        : heading
-          ? "heading"
-          : isCaption
-            ? "caption"
-            : markedList
-              ? "list_item"
-              : (quoteKind ?? (indentList ? "list_item" : "paragraph")),
+      kind: reference
+        ? "reference"
+        : footnote
+          ? "footnote"
+          : heading
+            ? "heading"
+            : isCaption
+              ? "caption"
+              : markedList
+                ? "list_item"
+                : (quoteKind ?? (indentList ? "list_item" : "paragraph")),
       ...(heading ? { level: decision.level } : {}),
       // E4-T05 (ADR-058): a heading never carries its title style as run
       // bold — `kind` + `level` already say it. Word-level bold below the
@@ -335,7 +353,9 @@ export function buildBook(document: RawDocument): Book {
       confidence: blockConfidence,
       flags,
     });
-    endnoteBlocks.push(endnote);
+    // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote
+    // pass — a block the reference kind won (E5-T06) is no longer a note.
+    endnoteBlocks.push(endnote && !reference);
   }
 
   if (blocks.length === 0) {

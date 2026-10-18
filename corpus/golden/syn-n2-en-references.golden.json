@@ -1,0 +1,130 @@
+{
+  "id": "syn-n2-en-references",
+  "schemaVersion": "1.1.0",
+  "source": "synthetic",
+  "blocks": [
+    {
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "A Field Guide to Rivers"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "Every river keeps two maps: the one the survey draws\nand the one the valley has been drawing since the rain.\nThis small guide follows the second map through the bends,\nthe fords and the ferry ropes of one county."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 2,
+      "runs": [
+        {
+          "text": "References"
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "reference",
+      "runs": [
+        {
+          "text": "Abrams, H. (2016). The bend of a river: field notes on\nmeanders. Harbor Press."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "reference",
+      "runs": [
+        {
+          "text": "Okonkwo, A. Rivers and roads: a study of paths.\nLagos Field Series 4. River House, 2018."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "reference",
+      "runs": [
+        {
+          "text": "Singh, P. On fords and ferries. Journal of Quiet\nGeography 12 (2019), 44-58."
+        }
+      ],
+      "origin": {
+        "pageFrom": 1,
+        "pageTo": 1
+      }
+    },
+    {
+      "kind": "reference",
+      "runs": [
+        {
+          "text": "Chen, L. Maps drawn by water. Harbor Press, 2020."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "reference",
+      "runs": [
+        {
+          "text": "[1] Duarte, M. The ferry rope that holds a village\ntogether. River House, 2021."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "heading",
+      "level": 3,
+      "runs": [
+        {
+          "text": "About the Guide"
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    },
+    {
+      "kind": "paragraph",
+      "runs": [
+        {
+          "text": "The notes above were written while walking the same\nten miles of river, season after season, and corrected\nonly where the water corrected them first."
+        }
+      ],
+      "origin": {
+        "pageFrom": 2,
+        "pageTo": 2
+      }
+    }
+  ]
+}

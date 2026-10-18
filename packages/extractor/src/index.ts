@@ -22,7 +22,7 @@ export {
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";
 export type { EndnoteContext, EndnoteDecision } from "./endnotes";
-export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeEndnoteTitle } from "./endnotes";
+export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeSectionTitle } from "./endnotes";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
 export type { FootnoteContext, FootnoteDecision } from "./footnotes";
@@ -146,6 +146,15 @@ export {
   QUOTE_UNCERTAIN_CONFIDENCE,
   UNCERTAIN_QUOTE_FLAG,
 } from "./quotes";
+export type { ReferenceContext, ReferenceDecision } from "./references";
+export {
+  detectReferences,
+  opensLikeReference,
+  REFERENCE_BRACKET_LABEL,
+  REFERENCE_OPENING,
+  REFERENCE_SECTION_TITLES,
+  REFERENCE_YEAR_OPENING,
+} from "./references";
 export type {
   RepeatedBand,
   RepeatedOccurrence,

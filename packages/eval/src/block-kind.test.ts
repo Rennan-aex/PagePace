@@ -90,10 +90,16 @@ describe("E5-T04: N3 block kind detection against the golden", () => {
 // styles spec whose `list_item` blocks were the remaining baseline gap —
 // must score the same target. The other N2 golden (`syn-n2-en-columns`)
 // belongs to E6 and is not gated here.
-const E5_T05_IDS = ["syn-n2-en-lists", "syn-n2-pt-estilos"];
+//
+// E5-T06 acceptance: the N2 bibliography document — the titled section with
+// its indented entries, the flush-left numbered entry and the heading that
+// closes the section — must score it too: every `reference` of the golden
+// detected, no entry missed as `list_item`/`paragraph` and no prose of the
+// section invented as `reference`.
+const E5_T05_T06_IDS = ["syn-n2-en-lists", "syn-n2-pt-estilos", "syn-n2-en-references"];
 
-describe("E5-T05: block kinds of the list and caption documents", () => {
-  for (const id of E5_T05_IDS) {
+describe("E5-T05/T06: block kinds of the list, caption and bibliography documents", () => {
+  for (const id of E5_T05_T06_IDS) {
     const found = corpus.entries.find((entry) => entry.id === id);
     it.skipIf(found === undefined || !existsSync(found.path))(
       `${id}: block_kind_f1 >= ${BLOCK_KIND_F1_TARGET_N3}`,

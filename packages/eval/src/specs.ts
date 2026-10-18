@@ -504,6 +504,116 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
     ],
   },
   {
+    // E5-T06: a bibliography section — the exact lexicon title opens it and
+    // the entries that follow carry the recuo of the typeset reference (the
+    // shallow indent E5-T05 reads as a list, which `reference` outranks),
+    // plus one flush-left numbered entry. The closing heading and the prose
+    // after it are ground truth for the rule that ends the section.
+    id: "syn-n2-en-references",
+    level: "N2",
+    lang: "en",
+    title: "A Field Guide to Rivers (synthetic)",
+    features: ["synthetic", "references"],
+    pages: 2,
+    blocks: [
+      {
+        kind: "heading",
+        level: 1,
+        page: 1,
+        runs: [{ text: "A Field Guide to Rivers" }],
+      },
+      {
+        kind: "paragraph",
+        page: 1,
+        runs: [
+          {
+            text:
+              "Every river keeps two maps: the one the survey draws\n" +
+              "and the one the valley has been drawing since the rain.\n" +
+              "This small guide follows the second map through the bends,\n" +
+              "the fords and the ferry ropes of one county.",
+          },
+        ],
+      },
+      {
+        kind: "heading",
+        level: 2,
+        page: 1,
+        runs: [{ text: "References" }],
+      },
+      {
+        kind: "reference",
+        page: 1,
+        indent: 18,
+        runs: [
+          {
+            text:
+              "Abrams, H. (2016). The bend of a river: field notes on\n" +
+              "meanders. Harbor Press.",
+          },
+        ],
+      },
+      {
+        kind: "reference",
+        page: 1,
+        indent: 18,
+        runs: [
+          {
+            text:
+              "Okonkwo, A. Rivers and roads: a study of paths.\n" +
+              "Lagos Field Series 4. River House, 2018.",
+          },
+        ],
+      },
+      {
+        kind: "reference",
+        page: 1,
+        indent: 18,
+        runs: [
+          {
+            text:
+              "Singh, P. On fords and ferries. Journal of Quiet\n" + "Geography 12 (2019), 44-58.",
+          },
+        ],
+      },
+      {
+        kind: "reference",
+        page: 2,
+        indent: 18,
+        runs: [{ text: "Chen, L. Maps drawn by water. Harbor Press, 2020." }],
+      },
+      {
+        kind: "reference",
+        page: 2,
+        runs: [
+          {
+            text:
+              "[1] Duarte, M. The ferry rope that holds a village\n" +
+              "together. River House, 2021.",
+          },
+        ],
+      },
+      {
+        kind: "heading",
+        level: 3,
+        page: 2,
+        runs: [{ text: "About the Guide" }],
+      },
+      {
+        kind: "paragraph",
+        page: 2,
+        runs: [
+          {
+            text:
+              "The notes above were written while walking the same\n" +
+              "ten miles of river, season after season, and corrected\n" +
+              "only where the water corrected them first.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: "syn-n3-en-footnotes",
     level: "N3",
     lang: "en",

@@ -181,6 +181,19 @@ documents:
     golden: syn-n2-en-lists.golden.json
     visibility: public
 
+  - id: syn-n2-en-references
+    level: N2
+    lang: en
+    title: "A Field Guide to Rivers (synthetic)"
+    license: "Texto original escrito para este repositório, sem conteúdo de terceiros"
+    verified_on: "2026-10-17"
+    generated: true
+    pages: 2
+    sha256: "a078875e7bd0b9dc8fd86bff85adf710ec43fc235052523afe4cee170bea8e25"
+    features: [synthetic, references]
+    golden: syn-n2-en-references.golden.json
+    visibility: public
+
   - id: syn-n2-pt-estilos
     level: N2
     lang: pt
