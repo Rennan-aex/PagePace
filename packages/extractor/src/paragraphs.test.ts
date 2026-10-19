@@ -263,6 +263,26 @@ describe("groupDocumentParagraphs: two-column pages (E6-T02)", () => {
     ]);
   });
 
+  it("reads a full-width block at the foot of the page after both columns (E6-T04)", () => {
+    // The footnote sits entirely below the lowest column baseline (y grows
+    // downward), spans the gutter and must come last — the cut a true
+    // XY-cut would make. One leading below the columns keeps the document
+    // leading at 15pt (a wider gap would move the median and merge the
+    // columns' paragraphs). Every line also carries its band.
+    const foot = item("A footnote line that spans the columns", MARGIN, 770, BODY, {
+      width: 468,
+    });
+    const [paragraphs] = documentParagraphs(doc([page([...twoColumns.items, foot])]));
+    expect(paragraphs?.map((paragraph) => paragraphText(paragraph))).toEqual([
+      "Left alpha one. Left alpha two.",
+      "Left beta one. Left beta two.",
+      "Right gamma one. Right gamma two.",
+      "Right delta one. Right delta two.",
+      "A footnote line that spans the columns",
+    ]);
+    expect(paragraphs?.map((paragraph) => paragraph[0]?.band)).toEqual([1, 1, 2, 2, 0]);
+  });
+
   it("keeps the trivial order on a single-column page", () => {
     const [paragraphs] = documentParagraphs(
       doc([

@@ -39,6 +39,13 @@ export interface TextLine {
   fontSize: number;
   /** The line belongs to a side region (E6-T03): out of the main flow, kept by `splitSideRegions`. */
   side?: true;
+  /**
+   * Band of the page the line belongs to when it has columns (E6-T04):
+   * `0` is the full-width spanning strip, `1..n` the detected columns left to
+   * right. Absent on a single-column page and on side-region lines — the
+   * measure of the band is what the E4/E5 gates judge the line against.
+   */
+  band?: number;
 }
 
 interface MutableLine extends LineBox {

@@ -71,7 +71,7 @@ export interface QuoteContext {
   bodyFontSize: number;
   /** Typical line spacing of the document (`documentStats().lineHeight`). */
   lineHeight: number;
-  /** Text area of each page, indexed by the 0-based page number. */
+  /** Text area each paragraph is judged against, in paragraph order (E6-T04): the band it starts in — a column of a two-column page or the full-width strip — or its page's text area. */
   measures: readonly PageMeasure[];
 }
 
@@ -115,10 +115,14 @@ function baselineOf(line: TextLine): number {
   return line.bottom;
 }
 
-function featuresOf(paragraph: JoinedParagraph, context: QuoteContext): QuoteFeatures {
+function featuresOf(
+  paragraph: JoinedParagraph,
+  index: number,
+  context: QuoteContext,
+): QuoteFeatures {
   const lines = paragraph.lines;
   const first = lines[0] as TextLine;
-  const measure = context.measures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 };
+  const measure = context.measures[index] ?? { left: 0, right: 0, width: 0 };
   const fontSize = Math.max(...lines.map((line) => line.fontSize));
   const widthShare =
     measure.width > 0 ? Math.max(...lines.map((line) => line.width)) / measure.width : 1;
@@ -188,7 +192,7 @@ export function detectQuotes(
   paragraphs: readonly JoinedParagraph[],
   context: QuoteContext,
 ): QuoteDecision[] {
-  const measured = paragraphs.map((paragraph) => featuresOf(paragraph, context));
+  const measured = paragraphs.map((paragraph, index) => featuresOf(paragraph, index, context));
 
   return measured.map((features) => {
     if (isEpigraph(features, context)) {

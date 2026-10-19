@@ -420,12 +420,13 @@ describe("buildBook: two-column reading order (E6-T02)", () => {
       ["We name the hours by light. And then forget the light."],
       ["The clock is a kind of weather. Made of metal and of glass."],
     ]);
-    // The title and the left column classify against the page measure; the
-    // right column still reads its indent as a block quote because the E5
-    // gates measure the whole page — that integration is E6-T04, out of
-    // scope here (the reading order and the block texts above are E6-T02).
-    expect(book.blocks.slice(0, 3).map((block) => block.kind)).toEqual([
+    // Every block classifies against the measure of its own band (E6-T04):
+    // the title and the left column against the page/strip, the right column
+    // flush left of its own column — no false block quote there anymore.
+    expect(book.blocks.map((block) => block.kind)).toEqual([
       "heading",
+      "paragraph",
+      "paragraph",
       "paragraph",
       "paragraph",
     ]);
@@ -437,6 +438,81 @@ describe("buildBook: two-column reading order (E6-T02)", () => {
     expect(book.blocks.map((block) => block.runs.map((run) => run.text))).toEqual([
       ["Alpha Beta gamma delta Epsilon."],
       ["Alone."],
+    ]);
+  });
+});
+
+describe("buildBook: column measures (E6-T04)", () => {
+  const COL1_X = 72;
+  const COL2_X = 318;
+  const COL_W = 222;
+  /** A full-column-width line of the fixture, on `baseline`, in the column at `x`. */
+  function columnLine(text: string, x: number, baseline: number): RawTextItem {
+    return item(text, x, baseline, BODY, { width: COL_W });
+  }
+  /** Two paragraphs per column, interleaved by baseline the way a real page prints them. */
+  const twoColumns = [
+    columnLine("Left alpha one.", COL1_X, 700),
+    columnLine("Left alpha two.", COL1_X, 715),
+    columnLine("Left beta one.", COL1_X, 740),
+    columnLine("Left beta two.", COL1_X, 755),
+    columnLine("Right gamma one.", COL2_X, 700),
+    columnLine("Right gamma two.", COL2_X, 715),
+  ];
+
+  it("finds a heading in the second column, measured against that column", () => {
+    // The title is flush left **of its column**: the page-wide measure would
+    // read its 240pt offset as a deep indent and reject it (E4-T02 only
+    // takes a flush-left line), the band measure reads 0em.
+    const items = [...twoColumns, item("Second Column Title", COL2_X, 755, 14, { width: 133 })];
+    const book = buildBook(doc([page(items)]));
+    const heading = book.blocks.find((block) => block.runs[0]?.text === "Second Column Title");
+    expect(heading?.kind).toBe("heading");
+    expect(heading?.level).toBe(1);
+  });
+
+  it("keeps a real block quote indented inside its own column", () => {
+    // 24pt = 2.18em of indent against the column's own left edge: a block
+    // quote by the E5-T04 rule. The flush-left paragraph beside it stays a
+    // paragraph — the page-wide measure used to read both as quotes.
+    const items = [
+      ...twoColumns,
+      item("Quoted words deep inside column two", COL2_X + 24, 740, BODY, { width: COL_W - 24 }),
+      item("still quoted on its second line", COL2_X + 24, 755, BODY, { width: COL_W - 24 }),
+    ];
+    const book = buildBook(doc([page(items)]));
+    expect(book.blocks.map((block) => block.kind)).toEqual([
+      "paragraph",
+      "paragraph",
+      "paragraph",
+      "blockquote",
+    ]);
+  });
+
+  it("reads the footnote at the foot of the page after both columns", () => {
+    // The note spans the gutter below both columns (y grows downward): the
+    // reading order puts it last, and the E5-T01 signals (bottom half,
+    // smaller face, marker) still claim it as a footnote. The note is this
+    // page's only full-width item: with a second one the gutter bins would
+    // take two votes against the busy column's peak (E6-T01 keeps at most
+    // 30% of the peak crossing) — a real page has many more column lines.
+    const items = [
+      ...twoColumns,
+      columnLine("Right beta one.", COL2_X, 740),
+      columnLine("Right beta two.", COL2_X, 755),
+      item("1. The note sits below both columns.", MARGIN, 770, 9, { width: 468 }),
+    ];
+    const book = buildBook(doc([page(items)]));
+    expect(book.blocks).toHaveLength(5);
+    expect(book.blocks.at(-1)?.runs.map((run) => run.text)).toEqual([
+      "1. The note sits below both columns.",
+    ]);
+    expect(book.blocks.at(-1)?.kind).toBe("footnote");
+    expect(book.blocks.slice(0, -1).map((block) => block.kind)).toEqual([
+      "paragraph",
+      "paragraph",
+      "paragraph",
+      "paragraph",
     ]);
   });
 });

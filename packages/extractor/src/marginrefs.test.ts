@@ -103,9 +103,10 @@ function layoutOf(pages: RawPage[]) {
   const headings = detectHeadings(paragraphs, {
     bodyFontSize: stats.bodyFontSize,
     lineHeight: stats.lineHeight,
-    measures: grouped.map((group) =>
-      pageMeasureOf(group.flat().filter((line) => !marginRefLines.has(line))),
-    ),
+    measures: paragraphs.map((paragraph) => {
+      const page = grouped[paragraph.pageFrom] ?? [];
+      return pageMeasureOf(page.flat().filter((line) => !marginRefLines.has(line)));
+    }),
   });
   return { document, stats, paragraphs, measures, headings };
 }

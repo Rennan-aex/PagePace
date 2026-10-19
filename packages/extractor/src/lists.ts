@@ -52,7 +52,7 @@ export interface ListDecision {
 
 /** Everything the decision needs from the document, measured once. */
 export interface ListContext {
-  /** Text area of each page, indexed by the 0-based page number. */
+  /** Text area each paragraph is judged against, in paragraph order (E6-T04): the band it starts in — a column of a two-column page or the full-width strip — or its page's text area. */
   measures: readonly PageMeasure[];
 }
 
@@ -76,12 +76,12 @@ export function detectLists(
   paragraphs: readonly JoinedParagraph[],
   context: ListContext,
 ): ListDecision[] {
-  return paragraphs.map((paragraph) => {
+  return paragraphs.map((paragraph, index) => {
     const first = paragraph.lines[0] as TextLine;
     if (LIST_MARKER.test(lineText(first.items))) {
       return { list: true, marked: true, uncertain: false };
     }
-    const measure = context.measures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 };
+    const measure = context.measures[index] ?? { left: 0, right: 0, width: 0 };
     const minIndentEm = minIndentEmOf(paragraph.lines, measure);
     if (minIndentEm >= LIST_MIN_INDENT_EM && minIndentEm < QUOTE_MIN_INDENT_EM) {
       return { list: true, marked: false, uncertain: true };

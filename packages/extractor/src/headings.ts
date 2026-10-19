@@ -92,7 +92,7 @@ export interface HeadingContext {
   bodyFontSize: number;
   /** Typical line spacing of the document (`documentStats().lineHeight`). */
   lineHeight: number;
-  /** Text area of each page, indexed by the 0-based page number. */
+  /** Text area each paragraph is judged against, in paragraph order (E6-T04): the band it starts in — a column of a two-column page or the full-width strip — or its page's text area. */
   measures: readonly PageMeasure[];
 }
 
@@ -158,10 +158,14 @@ function baselineOf(line: TextLine): number {
   return line.bottom;
 }
 
-function featuresOf(paragraph: JoinedParagraph, context: HeadingContext): HeadingFeatures {
+function featuresOf(
+  paragraph: JoinedParagraph,
+  index: number,
+  context: HeadingContext,
+): HeadingFeatures {
   const lines = paragraph.lines;
   const first = lines[0] as TextLine;
-  const measure = context.measures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 };
+  const measure = context.measures[index] ?? { left: 0, right: 0, width: 0 };
   const fontSize = Math.max(...lines.map((line) => line.fontSize));
   const widthShare =
     measure.width > 0 ? Math.max(...lines.map((line) => line.width)) / measure.width : 1;
@@ -287,7 +291,7 @@ export function detectHeadings(
   context: HeadingContext,
 ): HeadingDecision[] {
   const measured = paragraphs.map((paragraph, index) => {
-    const feature = featuresOf(paragraph, context);
+    const feature = featuresOf(paragraph, index, context);
     const previous = paragraphs[index - 1];
     const next = paragraphs[index + 1];
     const first = paragraph.lines[0] as TextLine;

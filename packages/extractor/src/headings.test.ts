@@ -77,10 +77,14 @@ function decisionsOf(pages: RawPage[]): HeadingDecision[] {
   const document = doc(pages);
   const stats = documentStats(document);
   const grouped = groupDocumentParagraphs(document);
-  return detectHeadings(joinCrossPageParagraphs(grouped, stats.bodyFontSize), {
+  const paragraphs = joinCrossPageParagraphs(grouped, stats.bodyFontSize);
+  const pageMeasures = grouped.map((page) => pageMeasureOf(page.flat()));
+  return detectHeadings(paragraphs, {
     bodyFontSize: stats.bodyFontSize,
     lineHeight: stats.lineHeight,
-    measures: grouped.map((page) => pageMeasureOf(page.flat())),
+    measures: paragraphs.map(
+      (paragraph) => pageMeasures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 },
+    ),
   });
 }
 

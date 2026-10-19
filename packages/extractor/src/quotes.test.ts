@@ -90,7 +90,10 @@ function layoutOf(pages: RawPage[]) {
   const stats = documentStats(document);
   const grouped = groupDocumentParagraphs(document);
   const paragraphs = joinCrossPageParagraphs(grouped, stats.bodyFontSize);
-  const measures = grouped.map((pageLines) => pageMeasureOf(pageLines.flat()));
+  const pageMeasures = grouped.map((pageLines) => pageMeasureOf(pageLines.flat()));
+  const measures = paragraphs.map(
+    (paragraph) => pageMeasures[paragraph.pageFrom] ?? { left: 0, right: 0, width: 0 },
+  );
   return {
     document,
     stats,

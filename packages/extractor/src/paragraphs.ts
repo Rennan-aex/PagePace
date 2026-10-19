@@ -37,12 +37,17 @@ import { documentStats } from "./stats";
  * numbers (indent of 1,2–3 em and paragraph gaps of 25pt against a 15pt
  * leading in the corpus) live in ADR-041.
  *
- * Columns (E6-T02): a page whose items project onto more than one column
- * (`detectColumns`, E6-T01) is read column by column — items split by the
- * detected columns, lines grouped inside each column (same-baseline items of
- * different columns never share a line) and the flow read spanning band first,
- * then each column left to right. A single-column page keeps the trivial
- * top-to-bottom order of E2.
+ * Columns (E6-T02 + E6-T04): a page whose items project onto more than one
+ * column (`detectColumns`, E6-T01) is read column by column — items split by
+ * the detected columns, lines grouped inside each column (same-baseline items
+ * of different columns never share a line) and the flow read spanning band
+ * first, then each column left to right, and a full-width block that starts
+ * below the columns (the footnote of a two-column page) last. Every line of
+ * a column page carries its `band` (`0` = spanning strip, `1..n` = columns)
+ * so `buildBook` measures each band on its own — a body paragraph of the
+ * second column is flush left **of its column**, not indented against the
+ * page (E6-T04). A single-column page keeps the trivial top-to-bottom order
+ * of E2 and the whole-page measure of E2/E4/E5.
  *
  * Side regions (E6-T03): a band of prose beside the body — a sidebar box in
  * the outer margin — is claimed by `splitSideRegions` before the lines are
@@ -52,11 +57,13 @@ import { documentStats } from "./stats";
  * `flags: ["sidebar"]`.
  *
  * Known limits: paragraphs never cross a page (the layout decides where the
- * text resumes), a full-width block at the **foot** of a two-column page
- * still reads before both columns (a true XY-cut would place it after them —
- * refinement for E6-T04), a band with a column's share of the items is left
- * to the column detector even when narrow, and a heading with no space above
- * it on a justified page is only caught by signal 2.
+ * text resumes) and never cross a **column break** either (a paragraph split
+ * by the gutter stays two blocks — joining them needs the E3-T04 signals
+ * inside one page), a full-width block that crosses the columns' height
+ * (a mid-page figure) still reads before them, a band with a column's share
+ * of the items is left to the column detector even when narrow, and a
+ * heading with no space above it on a justified page is only caught by
+ * signal 2.
  */
 
 /** First-line indent (as a fraction of the next line's font size) that starts a paragraph. */
@@ -138,9 +145,13 @@ export function groupParagraphs(lines: readonly TextLine[], typicalLeading: numb
 }
 
 /**
- * The paragraphs of one group of items, column-aware (E6-T02): spanning
- * items first, then each detected column left to right. One detected column
- * is the trivial single-column flow of E2.
+ * The paragraphs of one group of items, column-aware (E6-T02 + E6-T04):
+ * spanning items first, then each detected column left to right, and a
+ * full-width block that sits entirely **below** the columns (a footnote at
+ * the page foot) last — the cut a true XY-cut would make. One detected
+ * column is the trivial single-column flow of E2. Every line carries the
+ * `band` it came from (`0` = spanning strip, `1..n` = columns) so
+ * `buildBook` can measure each band on its own (E6-T04).
  */
 function columnFlowParagraphs(
   items: readonly RawTextItem[],
@@ -164,10 +175,37 @@ function columnFlowParagraphs(
     );
     perColumn[slot === -1 ? 0 : slot]?.push(entry);
   });
-  const ordered = groupParagraphs(groupItemLines(spanning), lineHeight);
-  for (const group of perColumn) {
-    ordered.push(...groupParagraphs(groupItemLines(group), lineHeight));
+  const columnBands = perColumn.map((group, slot) =>
+    groupItemLines(group).map((line) => ({ ...line, band: slot + 1 })),
+  );
+  const columnLines = columnBands.flat();
+  // A spanning line that starts below the lowest column baseline (the
+  // footnote of a two-column page, y growing downward) reads after the
+  // columns; every other spanning line — the title above, a figure crossing
+  // the columns' height — keeps reading first (E6-T02).
+  const columnBottom = Math.max(
+    -Number.POSITIVE_INFINITY,
+    ...columnLines.map((line) => line.bottom),
+  );
+  const head: TextLine[] = [];
+  const foot: TextLine[] = [];
+  for (const line of groupItemLines(spanning)) {
+    if (columnLines.length > 0 && line.top >= columnBottom) foot.push(line);
+    else head.push(line);
   }
+  const ordered = groupParagraphs(
+    head.map((line) => ({ ...line, band: 0 })),
+    lineHeight,
+  );
+  for (const band of columnBands) {
+    ordered.push(...groupParagraphs(band, lineHeight));
+  }
+  ordered.push(
+    ...groupParagraphs(
+      foot.map((line) => ({ ...line, band: 0 })),
+      lineHeight,
+    ),
+  );
   return ordered;
 }
 

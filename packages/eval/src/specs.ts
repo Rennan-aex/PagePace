@@ -202,7 +202,9 @@ export const SYNTHETIC_SPECS: readonly SyntheticSpec[] = [
     blocks: [
       {
         kind: "heading",
-        level: 2,
+        // The only heading of the document: by size cluster and order of
+        // appearance (`headingLevels`) it is level 1 — ADR-070.
+        level: 1,
         page: 1,
         column: 1,
         runs: [{ text: "Notes on Light" }],

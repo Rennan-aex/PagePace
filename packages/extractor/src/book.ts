@@ -9,7 +9,7 @@ import {
   UNCERTAIN_FOOTNOTE_FLAG,
 } from "./footnotes";
 import { tagGreekRuns } from "./greek";
-import { detectHeadings, pageMeasureOf } from "./headings";
+import { detectHeadings, type PageMeasure, pageMeasureOf } from "./headings";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import type { TextLine } from "./lines";
@@ -22,6 +22,7 @@ import {
   NOTE_LINK_UNCERTAIN_CONFIDENCE,
   NOTE_WITHOUT_CALL_FLAG,
 } from "./notelinks";
+import type { JoinedParagraph } from "./pagejoin";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
 import { detectQuotes, QUOTE_UNCERTAIN_CONFIDENCE, UNCERTAIN_QUOTE_FLAG } from "./quotes";
@@ -60,9 +61,8 @@ import { normalizeForReader } from "./unicode";
  * and reads the flow spanning band first, then each column left to right).
  * Pages follow the document order; the `reading_order` metric of
  * `@pagepace/eval` measures the claim against a golden. A full-width block
- * at the **foot** of a two-column page still reads before both columns (a
- * true XY-cut would place it after them — refinement for E6-T04),
- * and repeated regions belong to E3-T02.
+ * at the **foot** of a two-column page reads after both columns (the
+ * footnote of E6-T04), and repeated regions belong to E3-T02.
  *
  * Unicode (E3-T01): every run text goes through `normalizeForReader` before
  * it reaches the `Book`, so ligatures, soft hyphens, non-breaking spaces,
@@ -199,13 +199,20 @@ import { normalizeForReader } from "./unicode";
  * `groupPageParagraphs`) leaves the reading flow by order **and** carries
  * `flags: ["sidebar"]` — the same "kept, never removed" contract as
  * `margin_ref` (E5-T07). The confidence is not reduced: the claim is
- * structural, not doubt. Side lines never enter the page measures, so the
+ * structural, not doubt. Side lines never enter any measure, so the
  * gates of E4/E5 judge the body they belong to.
+ *
+ * Column measures (E6-T04): every paragraph is judged against the band it
+ * starts in (`paragraphMeasures`): the column of a two-column page, the
+ * full-width strip of a spanning block, the page for single-column and
+ * side-region paragraphs. A body paragraph of column 2 is flush left **of
+ * its column** (it stops reading as a block quote), a heading there is
+ * measured against its own column, and a spanning block still spans the
+ * page.
  *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
- * still read as text, the single column
- * rule of the paragraph layer stands, a heading without space above it needs
+ * still read as text, a heading without space above it needs
  * a display signal of its own, and the eval's `hyphen_join_acc` still scores
  * only intra-page sites (it walks the per-page paragraphs).
  */
@@ -255,6 +262,52 @@ export function blockId(page: number, ordinal: number, text: string): string {
 }
 
 /**
+ * The measure every paragraph of the joined flow is judged against
+ * (E6-T04): the band the paragraph starts in — the full-width strip or one
+ * column of a two-column page (the `band` its first line carries) — so a
+ * body paragraph of column 2 is flush left **of its column** while a
+ * spanning block (title, abstract, footnote at the foot) still spans the
+ * page. A side-region paragraph falls back to its page's measure, like
+ * before. The lines of a paragraph joined across pages come from
+ * `pageFrom`, so its measure is the one of the page it starts on;
+ * `pageMeasureOf` keeps excluding margin references and side lines.
+ */
+function paragraphMeasures(
+  paragraphs: readonly JoinedParagraph[],
+  pages: readonly (readonly (readonly TextLine[])[])[],
+  marginRefLines: ReadonlySet<TextLine>,
+): PageMeasure[] {
+  const perBand = new Map<string, PageMeasure>();
+  const perPage = new Map<number, PageMeasure>();
+  return paragraphs.map((paragraph) => {
+    const firstLine = paragraph.lines[0];
+    const band = firstLine?.band;
+    const pageLines = (pages[paragraph.pageFrom] ?? []).flat();
+    if (firstLine?.side !== true && band !== undefined && band > 0) {
+      const key = `${paragraph.pageFrom}/${band}`;
+      let measure = perBand.get(key);
+      if (measure === undefined) {
+        measure = pageMeasureOf(
+          pageLines.filter(
+            (line) => line.band === band && !marginRefLines.has(line) && line.side !== true,
+          ),
+        );
+        perBand.set(key, measure);
+      }
+      return measure;
+    }
+    let measure = perPage.get(paragraph.pageFrom);
+    if (measure === undefined) {
+      measure = pageMeasureOf(
+        pageLines.filter((line) => !marginRefLines.has(line) && line.side !== true),
+      );
+      perPage.set(paragraph.pageFrom, measure);
+    }
+    return measure;
+  });
+}
+
+/**
  * Builds the `Book` for a `RawDocument` and validates it against the schema
  * (throws `SchemaValidationError` if the assembled book is invalid, and
  * `BookError` when there is no text at all).
@@ -275,11 +328,10 @@ export function buildBook(document: RawDocument): Book {
   const marginRefLines = new Set(
     paragraphs
       .filter((_, index) => marginRefs[index]?.marginRef === true)
-      .map((paragraph) => paragraph.lines[0]),
+      .map((paragraph) => paragraph.lines[0])
+      .filter((line): line is TextLine => line !== undefined),
   );
-  const measures = pages.map((page) =>
-    pageMeasureOf(page.flat().filter((line) => !marginRefLines.has(line) && line.side !== true)),
-  );
+  const measures = paragraphMeasures(paragraphs, pages, marginRefLines);
   const headings = detectHeadings(paragraphs, {
     bodyFontSize,
     lineHeight: stats?.lineHeight ?? 0,
@@ -298,7 +350,8 @@ export function buildBook(document: RawDocument): Book {
   // fallback of `linkFootnoteCalls` (ADR-061: no schema change).
   const endnotes = detectEndnotes(paragraphs, { headings });
   // E5-T04: quotes are read off the same paragraph list — the indent of
-  // every line against the page's measure, the face and the leading.
+  // every line against the measure of its band (E6-T04), the face and the
+  // leading.
   const quotes = detectQuotes(paragraphs, {
     bodyFontSize,
     lineHeight: stats?.lineHeight ?? 0,
