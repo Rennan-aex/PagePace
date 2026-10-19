@@ -203,6 +203,17 @@ export {
   SUPSUB_MAX_SIZE_RATIO,
   SUPSUB_RISE_FACTOR,
 } from "./runs";
+export type { SideBand, SideRegion, SideSplit, SideSplitOptions } from "./sidebars";
+export {
+  SIDEBAR_FLAG,
+  SIDEBAR_MAX_LINE_GAP_FACTOR,
+  SIDEBAR_MAX_WIDTH_SHARE,
+  SIDEBAR_MIN_GAP_FACTOR,
+  SIDEBAR_MIN_LINES,
+  SIDEBAR_MIN_MAIN_SHARE,
+  SIDEBAR_MIN_WIDTH_FACTOR,
+  splitSideRegions,
+} from "./sidebars";
 export { itemsText, lineText, SPACE_GAP_FACTOR, spaceBetween } from "./spaces";
 export type { DocumentMargins, DocumentStats } from "./stats";
 export {

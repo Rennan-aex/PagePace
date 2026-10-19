@@ -28,6 +28,7 @@ import { detectQuotes, QUOTE_UNCERTAIN_CONFIDENCE, UNCERTAIN_QUOTE_FLAG } from "
 import { detectReferences } from "./references";
 import { stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
+import { SIDEBAR_FLAG } from "./sidebars";
 import { documentStats } from "./stats";
 import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
@@ -60,7 +61,7 @@ import { normalizeForReader } from "./unicode";
  * Pages follow the document order; the `reading_order` metric of
  * `@pagepace/eval` measures the claim against a golden. A full-width block
  * at the **foot** of a two-column page still reads before both columns (a
- * true XY-cut would place it after them — refinement for E6-T03/E6-T04),
+ * true XY-cut would place it after them — refinement for E6-T04),
  * and repeated regions belong to E3-T02.
  *
  * Unicode (E3-T01): every run text goes through `normalizeForReader` before
@@ -193,6 +194,14 @@ import { normalizeForReader } from "./unicode";
  * of every run is untouched, so the character-preservation acceptance of
  * the task (no Greek character lost) does not depend on this pass.
  *
+ * Side regions (E6-T03): a paragraph whose every line belongs to a side
+ * band (`splitSideRegions`; grouped last on its page by
+ * `groupPageParagraphs`) leaves the reading flow by order **and** carries
+ * `flags: ["sidebar"]` — the same "kept, never removed" contract as
+ * `margin_ref` (E5-T07). The confidence is not reduced: the claim is
+ * structural, not doubt. Side lines never enter the page measures, so the
+ * gates of E4/E5 judge the body they belong to.
+ *
  * Known limits: a table of contents comes from the PDF bookmarks or from the
  * detected headings (`buildToc`, E4-T03) — the printed index of the book is
  * still read as text, the single column
@@ -269,7 +278,7 @@ export function buildBook(document: RawDocument): Book {
       .map((paragraph) => paragraph.lines[0]),
   );
   const measures = pages.map((page) =>
-    pageMeasureOf(page.flat().filter((line) => !marginRefLines.has(line))),
+    pageMeasureOf(page.flat().filter((line) => !marginRefLines.has(line) && line.side !== true)),
   );
   const headings = detectHeadings(paragraphs, {
     bodyFontSize,
@@ -332,6 +341,11 @@ export function buildBook(document: RawDocument): Book {
     // shape would read as a heading (E4-T02) and the foot of a Stephanus
     // page as a footnote (E5-T01).
     const marginRef = marginRefs[index]?.marginRef === true;
+    // E6-T03: a side-region paragraph leaves the reading flow by order and
+    // by flag — kept in `blocks` like `margin_ref` (E5-T07), never removed.
+    // The confidence is not reduced: the claim is structural, not doubt.
+    const side = paragraph.lines.length > 0 && paragraph.lines.every((line) => line.side === true);
+    if (side && !marginRef) flags.push(SIDEBAR_FLAG);
     // E5-T06: the section title is the evidence, so a reference outranks
     // every other kind — including the note of the page foot (a numbered
     // entry set smaller reads as a footnote to E5-T01).

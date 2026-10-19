@@ -68,9 +68,9 @@ export function isMarginRefShaped(paragraph: JoinedParagraph): boolean {
 
 /**
  * Text area of each page, in points, measured **excluding the lines of the
- * margin-number candidates** — the two-pass measure a position gate needs.
- * A page whose every line is a candidate keeps a zero-width measure (the
- * gate then refuses to decide).
+ * margin-number candidates and the side-region lines of E6-T03** — the
+ * two-pass measure a position gate needs. A page whose every line is a
+ * candidate keeps a zero-width measure (the gate then refuses to decide).
  */
 export function bodyMeasures(
   pages: readonly (readonly TextLine[][])[],
@@ -82,7 +82,7 @@ export function bodyMeasures(
     for (const line of paragraph.lines) candidateLines.add(line);
   }
   return pages.map((page) =>
-    pageMeasureOf(page.flat().filter((line) => !candidateLines.has(line))),
+    pageMeasureOf(page.flat().filter((line) => !candidateLines.has(line) && line.side !== true)),
   );
 }
 

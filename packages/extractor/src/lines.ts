@@ -37,6 +37,8 @@ export interface TextLine {
   width: number;
   /** Largest font size of the items that carry text, in points. */
   fontSize: number;
+  /** The line belongs to a side region (E6-T03): out of the main flow, kept by `splitSideRegions`. */
+  side?: true;
 }
 
 interface MutableLine extends LineBox {

@@ -1,8 +1,9 @@
 import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
-import { detectColumns } from "./columns";
+import { detectColumns, type PageColumns } from "./columns";
 import { paragraphHyphenText } from "./hyphen";
 import { groupItemLines, type TextLine } from "./lines";
 import { stripRepeatedRegions } from "./repeated";
+import { splitSideRegions } from "./sidebars";
 import { documentStats } from "./stats";
 
 /**
@@ -43,11 +44,19 @@ import { documentStats } from "./stats";
  * then each column left to right. A single-column page keeps the trivial
  * top-to-bottom order of E2.
  *
+ * Side regions (E6-T03): a band of prose beside the body — a sidebar box in
+ * the outer margin — is claimed by `splitSideRegions` before the lines are
+ * built, so its items never glue to the body lines sharing the baseline.
+ * The main flow is read first and the side paragraphs last; their lines
+ * carry `side: true` and `buildBook` marks the blocks with
+ * `flags: ["sidebar"]`.
+ *
  * Known limits: paragraphs never cross a page (the layout decides where the
  * text resumes), a full-width block at the **foot** of a two-column page
  * still reads before both columns (a true XY-cut would place it after them —
- * refinement for E6-T03/E6-T04), and a heading with no space above it on a
- * justified page is only caught by signal 2.
+ * refinement for E6-T04), a band with a column's share of the items is left
+ * to the column detector even when narrow, and a heading with no space above
+ * it on a justified page is only caught by signal 2.
  */
 
 /** First-line indent (as a fraction of the next line's font size) that starts a paragraph. */
@@ -129,30 +138,22 @@ export function groupParagraphs(lines: readonly TextLine[], typicalLeading: numb
 }
 
 /**
- * The paragraphs of one page in reading order (E6-T02): the items split by
- * the detected columns (`detectColumns`), lines grouped inside each column so
- * same-baseline items of different columns never share a line, and the flow
- * read spanning band first, then each column left to right. A single-column
- * page (the fallback of the detector included) keeps the trivial order of E2.
+ * The paragraphs of one group of items, column-aware (E6-T02): spanning
+ * items first, then each detected column left to right. One detected column
+ * is the trivial single-column flow of E2.
  */
-export function groupPageParagraphs(
-  page: RawPage,
-  options: { bodyFontSize: number; lineHeight: number },
+function columnFlowParagraphs(
+  items: readonly RawTextItem[],
+  columns: PageColumns,
+  lineHeight: number,
 ): TextLine[][] {
-  const columns = detectColumns(page.items, {
-    bodyFontSize: options.bodyFontSize,
-    nonText: page.nonText ?? [],
-  });
-  if (columns.count <= 1) {
-    return groupParagraphs(groupItemLines(page.items), options.lineHeight);
-  }
   // Spanning items (the title/abstract that crosses the gutter) form their
   // own band; every other item goes to the column that holds its centre. A
   // non-spanning item always finds a column: the detector only keeps a
   // gutter the spanning flags already cover.
   const spanning: RawTextItem[] = [];
   const perColumn: RawTextItem[][] = columns.columns.map(() => []);
-  page.items.forEach((entry, index) => {
+  items.forEach((entry, index) => {
     if (columns.spanningItems[index] === true) {
       spanning.push(entry);
       return;
@@ -163,9 +164,39 @@ export function groupPageParagraphs(
     );
     perColumn[slot === -1 ? 0 : slot]?.push(entry);
   });
-  const ordered = groupParagraphs(groupItemLines(spanning), options.lineHeight);
+  const ordered = groupParagraphs(groupItemLines(spanning), lineHeight);
   for (const group of perColumn) {
-    ordered.push(...groupParagraphs(groupItemLines(group), options.lineHeight));
+    ordered.push(...groupParagraphs(groupItemLines(group), lineHeight));
+  }
+  return ordered;
+}
+
+/**
+ * The paragraphs of one page in reading order (E6-T02 + E6-T03): the side
+ * regions are claimed first (`splitSideRegions` — same-baseline items of
+ * different bands must never share a line), then the remaining items split
+ * by the detected columns (`detectColumns`), lines grouped inside each
+ * column, and the flow read spanning band first, then each column left to
+ * right. A page with neither side regions nor columns keeps the trivial
+ * order of E2. Side paragraphs come after the main flow, with `side: true`
+ * on every line.
+ */
+export function groupPageParagraphs(
+  page: RawPage,
+  options: { bodyFontSize: number; lineHeight: number },
+): TextLine[][] {
+  const split = splitSideRegions(page.items, options);
+  const columns = detectColumns(split.main, {
+    bodyFontSize: options.bodyFontSize,
+    nonText: page.nonText ?? [],
+  });
+  const ordered =
+    columns.count > 1
+      ? columnFlowParagraphs(split.main, columns, options.lineHeight)
+      : groupParagraphs(groupItemLines(split.main), options.lineHeight);
+  for (const region of split.regions) {
+    const lines: TextLine[] = groupItemLines(region.items).map((line) => ({ ...line, side: true }));
+    ordered.push(...groupParagraphs(lines, options.lineHeight));
   }
   return ordered;
 }

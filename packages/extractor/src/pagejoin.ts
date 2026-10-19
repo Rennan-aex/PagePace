@@ -33,7 +33,9 @@ import { lineText } from "./spaces";
  * continue from the last page it occupies), a hyphen site across pages is
  * not scored by the eval's `hyphen_join_acc` (that metric walks the
  * per-page paragraphs), and a line ending with a digit after a period
- * (footnote reference) is not treated as a sentence stop.
+ * (footnote reference) is not treated as a sentence stop. A side-region
+ * paragraph (E6-T03, `side: true`) never joins across pages in either
+ * direction: its last line and the next page's body are different flows.
  */
 
 /** Font-size factor above which a line counts as a heading (blocks the join). */
@@ -83,10 +85,11 @@ function isTitleLine(line: TextLine, bodyFontSize: number): boolean {
   return line.fontSize > bodyFontSize * PAGE_JOIN_TITLE_FONT_FACTOR;
 }
 
-/** Leftmost edge of the lines of one page (the margin the indent signal uses). */
+/** Leftmost edge of the main-flow lines of one book (side regions of E6-T03 never set the margin). */
 function leftMarginOf(lines: readonly TextLine[]): number {
   let left = Number.POSITIVE_INFINITY;
   for (const line of lines) {
+    if (line.side === true) continue;
     left = Math.min(left, line.x);
   }
   return left;
@@ -128,7 +131,12 @@ export function joinCrossPageParagraphs(
         const firstLine = paragraph[0];
         if (lastLine !== undefined && firstLine !== undefined) {
           const lastText = lineText(lastLine.items);
+          // E6-T03: a side-region paragraph (either side of the boundary)
+          // is a different flow — the signals above would otherwise glue a
+          // sidebar foot to the next page's body.
+          const sideBoundary = lastLine.side === true || firstLine.side === true;
           if (
+            !sideBoundary &&
             !endsSentence(lastText) &&
             !isTitleLine(lastLine, bodyFontSize) &&
             !isTitleLine(firstLine, bodyFontSize) &&
