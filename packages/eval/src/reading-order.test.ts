@@ -16,6 +16,9 @@ import { type Golden, hasGolden, parseGolden, resolveGoldenPath } from "./golden
 /** E2-T06: minimum `reading_order` of an N1 document (EVALUATION.md). */
 const READING_ORDER_TARGET_N1 = 0.99;
 
+/** E6-T02: minimum `reading_order` of an N2 document (EVALUATION.md). */
+const READING_ORDER_TARGET_N2 = 0.99;
+
 /** The ambient corpus; an unreadable private manifest falls back to the public one. */
 const corpus = (() => {
   try {
@@ -35,12 +38,18 @@ function readGolden(entry: CorpusEntry): Golden | null {
   return parseGolden(readFileSync(goldenPath, "utf8"), goldenPath);
 }
 
-const measured: { entry: CorpusEntry; golden: Golden }[] = [];
-for (const entry of corpus.entries) {
-  if (entry.level !== "N1" || !hasGolden(entry)) continue;
-  const golden = readGolden(entry);
-  if (golden !== null) measured.push({ entry, golden });
+function measuredAtLevel(level: "N1" | "N2"): { entry: CorpusEntry; golden: Golden }[] {
+  const measured: { entry: CorpusEntry; golden: Golden }[] = [];
+  for (const entry of corpus.entries) {
+    if (entry.level !== level || !hasGolden(entry)) continue;
+    const golden = readGolden(entry);
+    if (golden !== null) measured.push({ entry, golden });
+  }
+  return measured;
 }
+
+const measured = measuredAtLevel("N1");
+const measuredN2 = measuredAtLevel("N2");
 
 function readDocument(entry: CorpusEntry) {
   return ingestPdfjs(new Uint8Array(readFileSync(entry.path)), {
@@ -64,6 +73,30 @@ describe("E2-T06: N1 reading order against the golden", () => {
           `${entry.id}: ${order.edits} edit(s) between ${order.referenceBlocks} golden and ` +
             `${order.hypothesisBlocks} extracted block(s)`,
         ).toBeGreaterThanOrEqual(READING_ORDER_TARGET_N1);
+      },
+    );
+  }
+});
+
+// E6-T02: the same target on N2 — the measured N2 documents are the synthetic
+// two-column pages plus the single-column controls, so a column-aware reading
+// order has to land on the golden order without moving the controls.
+describe("E6-T02: N2 reading order against the golden", () => {
+  it("checks at least one N2 document (the acceptance must stay alive)", () => {
+    expect(measuredN2.map(({ entry }) => entry.id)).not.toHaveLength(0);
+  });
+
+  for (const { entry, golden } of measuredN2) {
+    it.skipIf(!existsSync(entry.path))(
+      `${entry.id}: reading_order >= ${READING_ORDER_TARGET_N2}`,
+      async () => {
+        const document = await readDocument(entry);
+        const order = blockReadingOrder(golden, document);
+        expect(
+          order.score,
+          `${entry.id}: ${order.edits} edit(s) between ${order.referenceBlocks} golden and ` +
+            `${order.hypothesisBlocks} extracted block(s)`,
+        ).toBeGreaterThanOrEqual(READING_ORDER_TARGET_N2);
       },
     );
   }

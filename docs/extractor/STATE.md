@@ -3,20 +3,20 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E5 CONCLUÍDA** — T01 (PR #45); T02 (PR #46); T03 (PR #48); T04 (PR #50); T05 (PR #51); T06 (PR #52); T07 (PR #53); T08 (PR #54). **E6 em andamento** — T01 (PR #56, 2026-10-19); T02 é a próxima. E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
-- **Tarefa atual:** **E6-T02 — ordem de leitura (XY-cut ou equivalente)** (detalhe em `phases/E6-columns.md`).
+- **Fase atual:** **E5 CONCLUÍDA** — T01 (PR #45); T02 (PR #46); T03 (PR #48); T04 (PR #50); T05 (PR #51); T06 (PR #52); T07 (PR #53); T08 (PR #54). **E6 em andamento** — T01 (PR #56); T02 concluída (PR #57, 2026-10-19); T03 é a próxima. E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37).
+- **Tarefa atual:** **E6-T03 — regiões laterais e *sidebars*** (detalhe em `phases/E6-columns.md`).
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (807 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (nenhuma métrica mudou com a E6-T01 — a detecção ainda não altera a extração).
-- **Última atualização:** 2026-10-19 (E6-T01 concluída).
+- **Status:** `pnpm verify` verde (820 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (`syn-n2-en-columns`: `reading_order`/`para_boundary_f1`/`heading_f1` = 1,0000, `block_kind_f1` 0,5556 — nada piorou).
+- **Última atualização:** 2026-10-19 (E6-T02 concluída).
 
-## Tarefa atual — E6-T02 · Ordem de leitura de colunas (cópia de `phases/E6-columns.md`)
-- Ordenar regiões com `detectColumns` (E6-T01): XY-cut ou equivalente; pontos de quebra entre colunas e páginas. **Aceite:** `reading_order` ≥ meta em N2 (`syn-n2-en-columns` hoje 0,1429); teste de regressão em N1 (não piora).
+## Tarefa atual — E6-T03 · Regiões laterais e *sidebars* (cópia de `phases/E6-columns.md`)
+- Marcar e tirar do fluxo principal (ou no fim da página) com `flags`. **Aceite:** fixture.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-19 — E6-T01 (detecção de colunas) — CONCLUÍDA (PR #56)** · `columns.ts` (camada 3, puro): projeção de **itens brutos** no eixo x — voto = centro no bin **ou** item cruzando o bin inteiro (bordas fechadas); gate relativo ao **pico** da projeção (não ao nº de itens: equações do arXiv têm ~600 itens/página que raspam bandas); guarda de largura mínima por coluna (0,2 da área) mata falso positivo de fio solto; teto `COLUMNS_MAX = 3`; `spanningItems`/`regionSpanning` marcam título/resumo/figura que atravessam. **ADR-067**. Sem mudança de esquema, sem métrica nova, **sem plug no `buildBook`**.
-- Provas: 17 unit + 2 sintéticos pdf.js (1/2 colunas + título atravessando) + 2 corpus `skipIf` (arXiv 7/10 páginas 2 col; rebus+SciLO 130/130 páginas 1 col — 4 falsos positivos do rebus sumiram). `pnpm eval --ci` exit 0, baseline intocada.
-- Próxima sessão: `pnpm verify` verde antes de mexer em algo → branch `e6-t02-reading-order` a partir de `main` → skill `add-heuristic`; consumir `detectColumns` no `buildBook` (reordenar blocos por coluna); alvo: `syn-n2-en-columns` `reading_order` ≥ 0,99 sem regressão em N1.
-- Armadilha: o `groupLines` continua intercalando colunas (usado pelas passes de semântica) — a ordenação da E6-T02 deve partir dos itens/colunas, não das linhas atuais.
+- **Sessão 2026-10-19 — E6-T02 (ordem de leitura) — CONCLUÍDA (PR #57)** · branch `e6-t02-reading-order` · `groupPageParagraphs` (`paragraphs.ts`): `detectColumns` separa os itens brutos da página por coluna (banda **spanning** própria) → `groupItemLines`/`groupParagraphs` por grupo → ordem = spanning primeiro, depois cada coluna da esquerda para a direita; página de coluna única idêntica ao antes; `groupLines` ganhou `groupItemLines` (núcleo por lista de itens). **ADR-068**. Gate N2 (`reading_order` ≥ 0,99) novo em `reading-order.test.ts`.
+- Resultado: `syn-n2-en-columns` `reading_order` **0,1429→1,0000**, `para_boundary_f1` **0→1,0000**, `heading_f1` **0→1,0000**, `block_kind_f1` **0,0667→0,5556** (coluna 2 ainda vira `blockquote`: o gate de recuo mede a página inteira — E6-T04); nenhum documento piorou; baseline regravada; **809→820 testes**; `pnpm eval --ci` exit 0.
+- Próxima sessão: `pnpm verify` verde antes de mexer → branch `e6-t03-sidebars` a partir de `main` → E6-T03 (marcar sidebars com `flags` e tirar do fluxo principal — aceite: fixture).
+- Pendências da E6: medida por coluna (E6-T04 — resolve `blockquote` indevido e `heading_level_acc` 0 no sintético); bloco full-width no rodapé de página de 2 colunas ainda lê antes das colunas (revisão em E6-T03/T04).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
@@ -30,17 +30,17 @@
 | E3 | done (2026-10-11, PRs #29–#34; checklist manual concluído 2026-10-11) |
 | E4 | done (T01 PR #38, T02 PR #40, T03 PR #42, T04 PR #43, T05 PR #44) |
 | E5 | done (T01 PR #45; T02 PR #46; T03 PR #48; T04 PR #50; T05 PR #51; T06 PR #52; T07 PR #53; T08 PR #54 — fase fechada 2026-10-18) |
-| E6 | in progress (T01 PR #56 done 2026-10-19; T02 next) |
+| E6 | in progress (T01 PR #56 done 2026-10-19; T02 done 2026-10-19; T03 next) |
 | E7…E10, SEG | todo (E8 descarta `font.data`; E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
 - `pnpm eval`: 30 documentos (15 públicos + 15 privados); 12 com gabarito (sintéticos `syn-*`); nenhum PDF real com gabarito ainda.
-- `text_cer` 0,0000 nos 12 · `para_boundary_f1` 1,0000 em 11 e 0,0000 em `syn-n2-en-columns` · `reading_order` 1,0000 nos 11 de coluna única e 0,1429 em `syn-n2-en-columns` · `header_footer_f1` 1,0000 nos 12 · `hyphen_join_acc` 1,0000 nos 12 (ADR-047) · `style_f1` 1,0000 nos 12 (E4-T01/T05) · `heading_f1`/`heading_level_acc` 1,0000 em 11 dos 12 e 0,0000 em `syn-n2-en-columns` (E4-T02) · `footnote_link_acc` 1,0000 nos 12 (E5-T02/E5-T03, ADR-060/061) · `block_kind_f1` 1,0000 em 11 dos 12 e 0,0667 em `syn-n2-en-columns` (E5-T04/T05/T06/T07, ADR-062/063/064/065).
+- `text_cer` 0,0000 nos 12 · `para_boundary_f1` **1,0000 nos 12** · `reading_order` **1,0000 nos 12** (E6-T02 leu as colunas na ordem; era 0,1429) · `header_footer_f1` 1,0000 nos 12 · `hyphen_join_acc` 1,0000 nos 12 (ADR-047) · `style_f1` 1,0000 nos 12 (E4-T01/T05) · `heading_f1` **1,0000 nos 12**; `heading_level_acc` 1,0000 em 11 e 0,0000 em `syn-n2-en-columns` (gabarito espera nível 2, extrator emite 1 — E6-T04) · `footnote_link_acc` 1,0000 nos 12 (E5-T02/E5-T03, ADR-060/061) · `block_kind_f1` 1,0000 em 11 e **0,5556** em `syn-n2-en-columns` (coluna 2 ainda vira `blockquote` — E6-T04; era 0,0667).
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-19 · **E6-T02 (ordem de leitura de colunas) — CONCLUÍDO** · **PR #57** · `groupPageParagraphs` consome `detectColumns` (banda spanning própria, colunas esquerda→direita) + `groupItemLines` extraído de `groupLines` + gate N2 (`reading_order` ≥ 0,99) + **ADR-068**; **820 testes**; `syn-n2-en-columns`: `reading_order`/`para_boundary_f1`/`heading_f1` 0,1429/0/0 → 1,0000/1/1, `block_kind_f1` 0,0667→0,5556; nenhum documento piorou, baseline regravada, `pnpm eval --ci` exit 0.
 - 2026-10-19 · **E6-T01 (detecção de colunas) — CONCLUÍDO** · **PR #56** · `columns.ts` (projeção de itens, voto centro-ou-cruzamento, gate pelo pico, guarda de largura, teto 3, `spanningItems`/`regionSpanning`) + aceitação sintética e de corpus + **ADR-067**; **807 testes**; `pnpm eval --ci` exit 0 (sem mudança de métrica — detecção fora do `buildBook` até a E6-T02).
-- 2026-10-18 · **E5-T08 (trechos em grego/latim) — CONCLUÍDO** · **PR #54** · `greek.ts` (lang "grc" por bloco óbvio de letras gregas; latim não marcado) + aceitação E2E (sintético `/ToUnicode` + `n2-en-arxiv-phobos` público) + **ADR-066**; **773 testes**; `pnpm eval --ci` exit 0 (sem mudança de métrica); **E5 fechada**.
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`.
 
 Histórico completo: docs/extractor/archive/

@@ -24,9 +24,10 @@ import { documentStats } from "./stats";
  * is capped at `COLUMNS_MAX`; extra gutters are dropped widest-last.
  *
  * Known limits: the decision is per page and per projection only (no XY-cut
- * recursion yet — E6-T02 consumes `columns`/`gutters` and `spanningItems` to
- * build the reading order), and a page whose columns are severely
- * unbalanced falls back to one column on purpose.
+ * recursion — the reading order of E6-T02 consumes `columns`/`gutters` and
+ * `spanningItems` as a flat "spanning band first, then columns left to
+ * right" rule), and a page whose columns are severely unbalanced falls back
+ * to one column on purpose.
  */
 
 /** Largest column count the detector reports (3 — books and papers rarely use more). */

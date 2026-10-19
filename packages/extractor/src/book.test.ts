@@ -386,6 +386,61 @@ describe("buildBook", () => {
   });
 });
 
+describe("buildBook: two-column reading order (E6-T02)", () => {
+  const COL1_X = 72;
+  const COL2_X = 318;
+  const COL_W = 222;
+  /** A full-column-width line of the fixture, on `baseline`, in the column at `x`. */
+  function columnLine(text: string, x: number, baseline: number): RawTextItem {
+    return item(text, x, baseline, BODY, { width: COL_W });
+  }
+
+  it("emits the blocks column by column, spanning title first", () => {
+    // Same geometry as the synthetic `syn-n2-en-columns`: a title on its own
+    // baseline, then two paragraphs per column interleaved by baseline.
+    // The title runs past the gutter (it is spanning) but stays short enough
+    // for the "short isolated line" heading signal of E4-T02.
+    const title = item("Notes on light", MARGIN, 660, BODY, { width: 250 });
+    const items = [
+      title,
+      columnLine("Light is not a thing.", COL1_X, 700),
+      columnLine("It is a way of seeing.", COL1_X, 715),
+      columnLine("The room holds two rooms.", COL1_X, 740),
+      columnLine("Noon and dusk at once.", COL1_X, 755),
+      columnLine("We name the hours by light.", COL2_X, 700),
+      columnLine("And then forget the light.", COL2_X, 715),
+      columnLine("The clock is a kind of weather.", COL2_X, 740),
+      columnLine("Made of metal and of glass.", COL2_X, 755),
+    ];
+    const book = buildBook(doc([page(items)]));
+    expect(book.blocks.map((block) => block.runs.map((run) => run.text))).toEqual([
+      ["Notes on light"],
+      ["Light is not a thing. It is a way of seeing."],
+      ["The room holds two rooms. Noon and dusk at once."],
+      ["We name the hours by light. And then forget the light."],
+      ["The clock is a kind of weather. Made of metal and of glass."],
+    ]);
+    // The title and the left column classify against the page measure; the
+    // right column still reads its indent as a block quote because the E5
+    // gates measure the whole page — that integration is E6-T04, out of
+    // scope here (the reading order and the block texts above are E6-T02).
+    expect(book.blocks.slice(0, 3).map((block) => block.kind)).toEqual([
+      "heading",
+      "paragraph",
+      "paragraph",
+    ]);
+    expect(book.blocks.every((block) => block.origin.pageFrom === 0)).toBe(true);
+  });
+
+  it("keeps the single-column order of E2 unchanged", () => {
+    const book = buildBook(doc([twoParagraphs]));
+    expect(book.blocks.map((block) => block.runs.map((run) => run.text))).toEqual([
+      ["Alpha Beta gamma delta Epsilon."],
+      ["Alone."],
+    ]);
+  });
+});
+
 describe("block ids", () => {
   it("are stable: two runs over the same document give the same ids", () => {
     const first = buildBook(doc([twoParagraphs]));

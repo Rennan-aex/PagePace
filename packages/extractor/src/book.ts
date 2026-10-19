@@ -51,15 +51,17 @@ import { normalizeForReader } from "./unicode";
  * runs of one style merged; an OCR text layer keeps plain runs (ADR-019).
  * The concatenated run text is the same text the join always produced.
  *
- * Reading order (E2-T06): blocks come out **page by page and, inside a page,
- * top to bottom** — the trivial single-column order of REQ-EXT-02. Pages
- * follow the document order and a page's paragraphs follow their first line,
- * both already sorted by the layers below; the `reading_order` metric of
- * `@pagepace/eval` measures the claim against a golden, and this module only
- * has to keep the order stable. Columns are detected per page by
- * `detectColumns` (E6-T01, layer 3 — item-level projection, spanning titles
- * and figures flagged) but the column-aware order itself is E6-T02; repeated
- * regions belong to E3-T02.
+ * Reading order (E2-T06 + E6-T02): blocks come out **page by page and,
+ * inside a page, in reading order** — for a single column that is the
+ * trivial top-to-bottom order of REQ-EXT-02, and for a column page the
+ * column-aware order of E6-T02 (`groupDocumentParagraphs` splits the items
+ * by the columns `detectColumns` found, groups the lines inside each column
+ * and reads the flow spanning band first, then each column left to right).
+ * Pages follow the document order; the `reading_order` metric of
+ * `@pagepace/eval` measures the claim against a golden. A full-width block
+ * at the **foot** of a two-column page still reads before both columns (a
+ * true XY-cut would place it after them — refinement for E6-T03/E6-T04),
+ * and repeated regions belong to E3-T02.
  *
  * Unicode (E3-T01): every run text goes through `normalizeForReader` before
  * it reaches the `Book`, so ligatures, soft hyphens, non-breaking spaces,

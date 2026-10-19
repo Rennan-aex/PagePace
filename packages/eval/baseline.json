@@ -51,14 +51,14 @@
       "text_cer": 0
     },
     "syn-n2-en-columns": {
-      "block_kind_f1": 0.06666666666666667,
+      "block_kind_f1": 0.5555555555555555,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
-      "heading_f1": 0,
+      "heading_f1": 1,
       "heading_level_acc": 0,
       "hyphen_join_acc": 1,
-      "para_boundary_f1": 0,
-      "reading_order": 0.1428571428571429,
+      "para_boundary_f1": 1,
+      "reading_order": 1,
       "style_f1": 1,
       "text_cer": 0
     },

@@ -1,6 +1,7 @@
-import type { RawDocument } from "@pagepace/schema";
+import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
+import { detectColumns } from "./columns";
 import { paragraphHyphenText } from "./hyphen";
-import { documentLines, type TextLine } from "./lines";
+import { groupItemLines, type TextLine } from "./lines";
 import { stripRepeatedRegions } from "./repeated";
 import { documentStats } from "./stats";
 
@@ -35,9 +36,18 @@ import { documentStats } from "./stats";
  * numbers (indent of 1,2–3 em and paragraph gaps of 25pt against a 15pt
  * leading in the corpus) live in ADR-041.
  *
+ * Columns (E6-T02): a page whose items project onto more than one column
+ * (`detectColumns`, E6-T01) is read column by column — items split by the
+ * detected columns, lines grouped inside each column (same-baseline items of
+ * different columns never share a line) and the flow read spanning band first,
+ * then each column left to right. A single-column page keeps the trivial
+ * top-to-bottom order of E2.
+ *
  * Known limits: paragraphs never cross a page (the layout decides where the
- * text resumes), a column is taken as the whole page (E6), and a heading with
- * no space above it on a justified page is only caught by signal 2.
+ * text resumes), a full-width block at the **foot** of a two-column page
+ * still reads before both columns (a true XY-cut would place it after them —
+ * refinement for E6-T03/E6-T04), and a heading with no space above it on a
+ * justified page is only caught by signal 2.
  */
 
 /** First-line indent (as a fraction of the next line's font size) that starts a paragraph. */
@@ -119,18 +129,62 @@ export function groupParagraphs(lines: readonly TextLine[], typicalLeading: numb
 }
 
 /**
+ * The paragraphs of one page in reading order (E6-T02): the items split by
+ * the detected columns (`detectColumns`), lines grouped inside each column so
+ * same-baseline items of different columns never share a line, and the flow
+ * read spanning band first, then each column left to right. A single-column
+ * page (the fallback of the detector included) keeps the trivial order of E2.
+ */
+export function groupPageParagraphs(
+  page: RawPage,
+  options: { bodyFontSize: number; lineHeight: number },
+): TextLine[][] {
+  const columns = detectColumns(page.items, {
+    bodyFontSize: options.bodyFontSize,
+    nonText: page.nonText ?? [],
+  });
+  if (columns.count <= 1) {
+    return groupParagraphs(groupItemLines(page.items), options.lineHeight);
+  }
+  // Spanning items (the title/abstract that crosses the gutter) form their
+  // own band; every other item goes to the column that holds its centre. A
+  // non-spanning item always finds a column: the detector only keeps a
+  // gutter the spanning flags already cover.
+  const spanning: RawTextItem[] = [];
+  const perColumn: RawTextItem[][] = columns.columns.map(() => []);
+  page.items.forEach((entry, index) => {
+    if (columns.spanningItems[index] === true) {
+      spanning.push(entry);
+      return;
+    }
+    const center = entry.x + entry.width / 2;
+    const slot = columns.columns.findIndex(
+      (column) => center >= column.x && center < column.x + column.width,
+    );
+    perColumn[slot === -1 ? 0 : slot]?.push(entry);
+  });
+  const ordered = groupParagraphs(groupItemLines(spanning), options.lineHeight);
+  for (const group of perColumn) {
+    ordered.push(...groupParagraphs(groupItemLines(group), options.lineHeight));
+  }
+  return ordered;
+}
+
+/**
  * Groups every page of a **clean** document (no repeated regions), in page
- * order. The typical line spacing comes from the document statistics (the
- * median of the whole book), so a page whose own gaps are unusual still breaks
- * at the book's rhythm. `documentParagraphs` and `buildBook` reach this
- * through `stripRepeatedRegions`; never call it with a raw document.
+ * order and, inside a page, in reading order (column-aware — E6-T02). The
+ * typical line spacing and the body size come from the document statistics
+ * (the median of the whole book), so a page whose own gaps are unusual still
+ * breaks at the book's rhythm. `documentParagraphs` and `buildBook` reach
+ * this through `stripRepeatedRegions`; never call it with a raw document.
  */
 export function groupDocumentParagraphs(document: RawDocument): TextLine[][][] {
-  const pages = documentLines(document);
   const hasText = document.pages.some((page) => page.items.length > 0);
-  if (!hasText) return pages.map(() => []);
-  const typicalLeading = documentStats(document).lineHeight;
-  return pages.map((lines) => groupParagraphs(lines, typicalLeading));
+  if (!hasText) return document.pages.map(() => []);
+  const stats = documentStats(document);
+  return document.pages.map((page) =>
+    groupPageParagraphs(page, { bodyFontSize: stats.bodyFontSize, lineHeight: stats.lineHeight }),
+  );
 }
 
 /**

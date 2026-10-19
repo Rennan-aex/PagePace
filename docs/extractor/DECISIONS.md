@@ -72,6 +72,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-065 | Numeração de margem: `margin_ref` fora do fluxo com `origin.bbox` | accepted |
 | ADR-066 | Grego: `Run.lang = "grc"` por bloco óbvio de letras gregas; latim não marcado | accepted |
 | ADR-067 | Colunas: detecção por projeção de itens (voto = centro ou cruzamento inteiro), teto em 3 | accepted |
+| ADR-068 | Ordem de leitura por coluna: agrupamento de itens por coluna no `groupDocumentParagraphs` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -568,3 +569,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — projeção sobre linhas do `groupLines` (rápido, mas funde colunas e nunca acha o gutter) · B — projeção sobre **itens brutos**, voto só quando o centro do item está no bin **ou** o item cruza o bin inteiro (bordas fechadas), gate relativo ao **pico** da projeção (nº do itens) e guarda de largura mínima por coluna (0,2 da área de conteúdo).
 **Decisão:** B. Constantes nomeadas (`COLUMNS_*`); teto `COLUMNS_MAX = 3` (sobra o gutter mais largo); título/resumo que atravessa sai em `spanningItems`/`regionSpanning` (figura nunca é cortada); página sem corpo mensurável ou coluna desequilibrada cai para 1 coluna de propósito.
 **Consequências:** medido no corpus: 7/10 páginas do arXiv em 2 colunas (páginas de título/figura leem 1), 99/99 + 11/11 + 20/20 páginas de coluna única permanecem 1 (4 falsos positivos do rebus sumiram com a guarda de largura). Sem mudança de esquema, sem métrica nova e sem plug no `buildBook` (E6-T02 consome `columns`/`gutters`/`spanningItems`); revisar quando a E6-T02 fizer o XY-cut.
+
+### ADR-068 · Ordem de leitura por coluna: agrupamento de itens por coluna no `groupDocumentParagraphs` · accepted · 2026-10-19
+**Contexto:** a E6-T01 detecta colunas mas não altera a extração; `groupLines` continua intercalando itens de colunas diferentes na mesma baseline, então os parágrafos de `syn-n2-en-columns` saem embaralhados (`reading_order` 0,1429). Reordenar os blocos **depois** de prontos não resolve: o texto dos parágrafos já estaria errado.
+**Alternativas:** A) reordenar blocos no fim do `buildBook` (texto continua intercalado) · B) partilhar os itens brutos por coluna antes de agrupar linhas e parágrafos (a ordem nasce do texto certo).
+**Decisão:** B — `groupPageParagraphs` (em `paragraphs.ts`) chama `detectColumns`, separa os itens **spanning** (banda própria) e os das colunas, roda `groupItemLines`/`groupParagraphs` por grupo e devolve: banda spanning primeiro, depois cada coluna da esquerda para a direita; página de coluna única segue idêntica ao antes. `buildBook` e o eval (`documentParagraphs`) passam a ver a mesma ordem, sem plug novo.
+**Consequências:** `reading_order`, `para_boundary_f1` e `heading_f1` de `syn-n2-en-columns` sobem para 1,0000 (baseline regravada, nada piorou); os 3 parágrafos da coluna 2 ainda viram `blockquote` (o gate de recuo mede a página inteira) e o nível do título fica 1 vs 2 do gabarito — integração das medidas por coluna é a E6-T04. Bloco full-width no **rodapé** de página de 2 colunas ainda lê antes das colunas (revisão em E6-T03/T04).

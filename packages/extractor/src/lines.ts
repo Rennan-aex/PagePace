@@ -13,9 +13,10 @@ import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
  * line whose box fits them vertically but never open one, so a marker can not
  * create a phantom line. Lines come out top to bottom, items left to right.
  *
- * Known limits: the page is treated as one column, so two-column pages
- * interleave until E6; the tolerance never sees the page statistics, only the
- * item itself, which keeps the function pure and per page.
+ * Known limits: grouping the whole page still joins same-baseline items
+ * across a column gutter — the column-aware paragraph layer (E6-T02) calls
+ * `groupItemLines` per column instead — and the tolerance never sees the page
+ * statistics, only the item itself, which keeps the function pure and per call.
  */
 
 /** Baseline distance (as a fraction of the item's font size) that still joins a line. */
@@ -114,9 +115,13 @@ function toTextLine(line: MutableLine): TextLine {
   };
 }
 
-/** Groups the text items of one page into visual lines, top to bottom. */
-export function groupLines(page: RawPage): TextLine[] {
-  const ordered = [...page.items]
+/**
+ * Groups text items into visual lines, top to bottom. The column-aware
+ * paragraph layer (E6-T02) calls it with the items of one column only, so the
+ * same grouping rule serves a whole page and a single column.
+ */
+export function groupItemLines(items: readonly RawTextItem[]): TextLine[] {
+  const ordered = [...items]
     .filter(hasContent)
     .sort((a, b) => baselineOf(a) - baselineOf(b) || a.x - b.x);
   const lines: MutableLine[] = [];
@@ -135,7 +140,7 @@ export function groupLines(page: RawPage): TextLine[] {
 
   // Spaces and pdf.js line-end markers (no content) ride along with the line
   // they sit in; without content they can not open a line of their own.
-  for (const item of page.items) {
+  for (const item of items) {
     if (hasContent(item)) continue;
     const baseline = baselineOf(item);
     const inside = lines.find((line) => baseline >= line.top && baseline <= line.bottom);
@@ -157,6 +162,11 @@ export function groupLines(page: RawPage): TextLine[] {
   }
 
   return lines.map(toTextLine).sort((a, b) => a.top - b.top || a.bottom - b.bottom || a.x - b.x);
+}
+
+/** Groups the text items of one page into visual lines, top to bottom. */
+export function groupLines(page: RawPage): TextLine[] {
+  return groupItemLines(page.items);
 }
 
 /** Groups every page of a document, in page order. */

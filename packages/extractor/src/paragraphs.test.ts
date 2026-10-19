@@ -217,6 +217,67 @@ describe("documentParagraphs", () => {
   });
 });
 
+describe("groupDocumentParagraphs: two-column pages (E6-T02)", () => {
+  const COL1_X = 72;
+  const COL2_X = 318;
+  const COL_W = 222;
+  /** A full-column-width line of the fixture, on `baseline`, in the column at `x`. */
+  function columnLine(text: string, x: number, baseline: number): RawTextItem {
+    return item(text, x, baseline, BODY, { width: COL_W });
+  }
+  /** Two paragraphs of two lines per column, interleaved by baseline the way a real page prints them. */
+  const twoColumns = page([
+    columnLine("Left alpha one.", COL1_X, 700),
+    columnLine("Left alpha two.", COL1_X, 715),
+    columnLine("Left beta one.", COL1_X, 740),
+    columnLine("Left beta two.", COL1_X, 755),
+    columnLine("Right gamma one.", COL2_X, 700),
+    columnLine("Right gamma two.", COL2_X, 715),
+    columnLine("Right delta one.", COL2_X, 740),
+    columnLine("Right delta two.", COL2_X, 755),
+  ]);
+
+  it("reads each column on its own, left column first", () => {
+    const [paragraphs] = documentParagraphs(doc([twoColumns]));
+    expect(paragraphs).toHaveLength(4);
+    expect(lengths(paragraphs ?? [])).toEqual([2, 2, 2, 2]);
+    expect(paragraphs?.map((paragraph) => paragraphText(paragraph))).toEqual([
+      "Left alpha one. Left alpha two.",
+      "Left beta one. Left beta two.",
+      "Right gamma one. Right gamma two.",
+      "Right delta one. Right delta two.",
+    ]);
+  });
+
+  it("puts the spanning title first, then the columns left to right", () => {
+    const title = item("A title that spans both columns of the page", MARGIN, 660, BODY, {
+      width: 468,
+    });
+    const [paragraphs] = documentParagraphs(doc([page([...twoColumns.items, title])]));
+    expect(paragraphs?.map((paragraph) => paragraphText(paragraph))).toEqual([
+      "A title that spans both columns of the page",
+      "Left alpha one. Left alpha two.",
+      "Left beta one. Left beta two.",
+      "Right gamma one. Right gamma two.",
+      "Right delta one. Right delta two.",
+    ]);
+  });
+
+  it("keeps the trivial order on a single-column page", () => {
+    const [paragraphs] = documentParagraphs(
+      doc([
+        page([
+          item("one", MARGIN, 100, BODY),
+          item("two", MARGIN + 30, 100, BODY),
+          item("three", MARGIN, 115, BODY),
+        ]),
+      ]),
+    );
+    expect(paragraphs).toHaveLength(1);
+    expect(paragraphText(paragraphs?.[0] ?? [])).toBe("one two three");
+  });
+});
+
 describe("paragraphText", () => {
   it("joins the lines of a paragraph with a single space", () => {
     const lines = [
