@@ -21,6 +21,19 @@ export {
   isSuspectCodePoint,
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";
+export type { ColumnDetectionOptions, ColumnRange, PageColumns } from "./columns";
+export {
+  COLUMNS_BIN_WIDTH,
+  COLUMNS_MAX,
+  COLUMNS_MIN_COLUMN_LINES,
+  COLUMNS_MIN_COLUMN_SHARE,
+  COLUMNS_MIN_CROSSING_LINES,
+  COLUMNS_MIN_GUTTER_FACTOR,
+  COLUMNS_SPANNING_MAX_SHARE,
+  detectColumns,
+  detectDocumentColumns,
+  detectPageColumns,
+} from "./columns";
 export type { EndnoteContext, EndnoteDecision } from "./endnotes";
 export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeSectionTitle } from "./endnotes";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";

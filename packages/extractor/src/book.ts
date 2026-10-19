@@ -56,7 +56,10 @@ import { normalizeForReader } from "./unicode";
  * follow the document order and a page's paragraphs follow their first line,
  * both already sorted by the layers below; the `reading_order` metric of
  * `@pagepace/eval` measures the claim against a golden, and this module only
- * has to keep the order stable. Columns and repeated regions belong to E6.
+ * has to keep the order stable. Columns are detected per page by
+ * `detectColumns` (E6-T01, layer 3 — item-level projection, spanning titles
+ * and figures flagged) but the column-aware order itself is E6-T02; repeated
+ * regions belong to E3-T02.
  *
  * Unicode (E3-T01): every run text goes through `normalizeForReader` before
  * it reaches the `Book`, so ligatures, soft hyphens, non-breaking spaces,

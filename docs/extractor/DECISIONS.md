@@ -71,6 +71,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-064 | Referências: título de seção exato + forma de entrada; `reference` acima de tudo | accepted |
 | ADR-065 | Numeração de margem: `margin_ref` fora do fluxo com `origin.bbox` | accepted |
 | ADR-066 | Grego: `Run.lang = "grc"` por bloco óbvio de letras gregas; latim não marcado | accepted |
+| ADR-067 | Colunas: detecção por projeção de itens (voto = centro ou cruzamento inteiro), teto em 3 | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -561,3 +562,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) marcar qualquer letra grego isolada (falsos positivos em todo livro de física) · B) todas as letras do run são grego **e** ≥ `GREEK_MIN_LETTERS` (3) — "bloco óbvio" por construção, sem flag; latim nunca marcado (indistinguível do alfabeto pt/en por caractere).
 **Decisão:** B — `greek.ts` (camada 5, puro, `\p{Script=Greek}`, pontuação/dígitos não votam); `tagGreekRuns` no fim de `book.ts`; aceitação automatizada com PDF sintético (`minipdf` ganhou `/ToUnicode`) + `n2-en-arxiv-phobos` público; sem mudança de esquema, golden nem métrica.
 **Consequências:** eval antes/depois idêntico (regra de ouro); latim e mistos ficam sem `lang` (limites conscientes); revisar se o leitor precisar de `la` (exigirá léxico, não caractere).
+
+### ADR-067 · Colunas: detecção por projeção de itens (voto = centro ou cruzamento inteiro), teto em 3 · accepted · 2026-10-19
+**Contexto:** E6-T01 pede perceber 1/2/3 colunas por página antes da ordem de leitura (E6-T02). `groupLines` ainda funde itens da mesma baseline em colunas diferentes (premissa de coluna única da E2), e em `n2-en-arxiv-phobos` o pdf.js emite itens caractere a caractere em equações (~600/página) que "raspam" bandas inteiras.
+**Alternativas:** A — projeção sobre linhas do `groupLines` (rápido, mas funde colunas e nunca acha o gutter) · B — projeção sobre **itens brutos**, voto só quando o centro do item está no bin **ou** o item cruza o bin inteiro (bordas fechadas), gate relativo ao **pico** da projeção (nº do itens) e guarda de largura mínima por coluna (0,2 da área de conteúdo).
+**Decisão:** B. Constantes nomeadas (`COLUMNS_*`); teto `COLUMNS_MAX = 3` (sobra o gutter mais largo); título/resumo que atravessa sai em `spanningItems`/`regionSpanning` (figura nunca é cortada); página sem corpo mensurável ou coluna desequilibrada cai para 1 coluna de propósito.
+**Consequências:** medido no corpus: 7/10 páginas do arXiv em 2 colunas (páginas de título/figura leem 1), 99/99 + 11/11 + 20/20 páginas de coluna única permanecem 1 (4 falsos positivos do rebus sumiram com a guarda de largura). Sem mudança de esquema, sem métrica nova e sem plug no `buildBook` (E6-T02 consome `columns`/`gutters`/`spanningItems`); revisar quando a E6-T02 fizer o XY-cut.
