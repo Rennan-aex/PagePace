@@ -39,6 +39,7 @@ export {
 } from "./corpus";
 
 export {
+  blockConfidenceCalibration,
   blockKindDetection,
   blockReadingOrder,
   type DocumentResult,
@@ -82,6 +83,9 @@ export {
   blockKindF1,
   type CerOptions,
   type CerResult,
+  type ConfidenceBlockLike,
+  type ConfidenceCalibrationResult,
+  confidenceCalibration,
   type HeaderFooterResult,
   headerFooterF1,
   MAX_CER_CELLS,

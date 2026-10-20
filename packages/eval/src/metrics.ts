@@ -773,3 +773,106 @@ export function blockKindF1(
   }
   return { f1, byKind };
 }
+
+/** One extracted block with the confidence the `Book` reports for it. */
+export interface ConfidenceBlockLike extends BlockKindLike {
+  confidence: number;
+}
+
+/** How the confidence calibration of one document scored (E7-T01). */
+export interface ConfidenceCalibrationResult {
+  /**
+   * Negated point-biserial correlation between `confidence` and the error
+   * flag: 1 = every wrong block is less confident than every right one (or
+   * nothing is wrong), 0 = confidence says nothing about the error,
+   * negative = the wrong blocks are the confident ones.
+   */
+  score: number;
+  /** Extracted blocks judged (the hypothesis side). */
+  blocks: number;
+  /** Blocks judged wrong — the false positives of the text+kind matching. */
+  wrong: number;
+  /** Mean confidence of the blocks judged right, `null` when there are none. */
+  meanRight: number | null;
+  /** Mean confidence of the blocks judged wrong, `null` when none is wrong. */
+  meanWrong: number | null;
+}
+
+/**
+ * Block confidence calibration (`confidence_calibration`, E7-T01): are the
+ * blocks the extraction is unsure about the ones it got wrong?
+ *
+ * A block is **wrong** exactly when it is a false positive of the
+ * `blockKindF1` matching — its `(kind, normalized text)` pair matches no
+ * golden block (a multiset, the same rule as `block_kind_f1`, so the two
+ * metrics always agree on what an error is). Golden blocks the extraction
+ * missed carry no confidence and are not judged: calibration can only be
+ * measured on the blocks the reader receives.
+ *
+ * The score is the **point-biserial correlation** between `confidence` and
+ * the error flag (1 = wrong, 0 = right), negated so higher is better.
+ * Conventions when the correlation is undefined: no wrong block scores 1
+ * (nothing to doubt), every block wrong scores 0 (confidence separated
+ * nothing), constant confidence with errors present scores 0 (no signal).
+ * Deterministic: same blocks, same number.
+ */
+export function confidenceCalibration(
+  reference: readonly BlockKindLike[],
+  hypothesis: readonly ConfidenceBlockLike[],
+): ConfidenceCalibrationResult {
+  const unmatched = new Map<string, number>();
+  for (const block of reference) {
+    const key = JSON.stringify([block.kind, normalizeText(block.text)]);
+    unmatched.set(key, (unmatched.get(key) ?? 0) + 1);
+  }
+
+  const wrongFlags: boolean[] = [];
+  let rightSum = 0;
+  let rightCount = 0;
+  let wrongSum = 0;
+  let wrong = 0;
+  for (const block of hypothesis) {
+    const key = JSON.stringify([block.kind, normalizeText(block.text)]);
+    const count = unmatched.get(key) ?? 0;
+    if (count > 0) {
+      unmatched.set(key, count - 1);
+      wrongFlags.push(false);
+      rightSum += block.confidence;
+      rightCount++;
+    } else {
+      wrongFlags.push(true);
+      wrongSum += block.confidence;
+      wrong++;
+    }
+  }
+
+  const blocks = hypothesis.length;
+  const meanRight = rightCount === 0 ? null : rightSum / rightCount;
+  const meanWrong = wrong === 0 ? null : wrongSum / wrong;
+
+  let score: number;
+  if (blocks === 0 || wrong === 0) {
+    score = 1;
+  } else if (wrong === blocks) {
+    score = 0;
+  } else {
+    const meanConfidence = (rightSum + wrongSum) / blocks;
+    const meanError = wrong / blocks;
+    let covariance = 0;
+    let varianceConfidence = 0;
+    let varianceError = 0;
+    hypothesis.forEach((block, index) => {
+      const error = wrongFlags[index] === true ? 1 : 0;
+      const dConfidence = block.confidence - meanConfidence;
+      const dError = error - meanError;
+      covariance += dConfidence * dError;
+      varianceConfidence += dConfidence * dConfidence;
+      varianceError += dError * dError;
+    });
+    const denominator = Math.sqrt(varianceConfidence * varianceError);
+    // Constant confidence with errors present: the model had no signal.
+    score = denominator === 0 ? 0 : -covariance / denominator;
+  }
+
+  return { score, blocks, wrong, meanRight, meanWrong };
+}

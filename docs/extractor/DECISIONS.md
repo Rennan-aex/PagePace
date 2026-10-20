@@ -73,8 +73,9 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-066 | Grego: `Run.lang = "grc"` por bloco óbvio de letras gregas; latim não marcado | accepted |
 | ADR-067 | Colunas: detecção por projeção de itens (voto = centro ou cruzamento inteiro), teto em 3 | accepted |
 | ADR-068 | Ordem de leitura por coluna: agrupamento de itens por coluna no `groupDocumentParagraphs` | accepted |
-| ADR-069 | Regiões laterais: split de itens antes das colunas, flag `sidebar`, blocos no fim da página | accepted |
-| ADR-070 | Medidas por banda de coluna (`TextLine.band`), rodapé lido depois das colunas, nível 1 no golden | accepted |
+| ADR-069 | Regiões laterais: split de itens antes das colunas, flag `sidebar` e blocos no fim da página | accepted |
+| ADR-070 | Medidas por banda de coluna: `TextLine.band`, rodapé depois das colunas e nível 1 no golden | accepted |
+| ADR-071 | Confiança por bloco: pesos aditivos por flag, piso 0,1 e métrica `confidence_calibration` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -589,3 +590,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) medida única por página com offset da coluna (o recuo ainda contaria a calha) · B) `TextLine.band` por linha e medida **por parágrafo** na banda que ele começa; rodapé = linha spanning começando abaixo da última baseline das colunas.
 **Decisão:** B — `columnFlowParagraphs` marca as bandas e separa o rodapé (ordem: título, colunas, rodapé); `paragraphMeasures` (`book.ts`) devolve a medida da banda (banda 0, lateral e margem = página; `pageMeasureOf` exclui `marginRefLines`/`side`) e `headings`/`quotes`/`lists` indexam `measures` por parágrafo (`marginrefs` segue por página com `bodyMeasures`); o spec do único título de `syn-n2-en-columns` passa a `level: 1` (`headingLevels`: maior cluster = 1), golden regenerado.
 **Consequências:** `block_kind_f1` 0,5556 → 1,0000 e `heading_level_acc` 0 → 1,0000 (baseline regravada, resto intacto, `pnpm eval --ci` exit 0), `pnpm verify` verde (839 testes, 5 novos que falham no código antigo). Limites: o parágrafo ainda não junta na quebra de coluna (BACKLOG, usa os sinais da E3-T04 dentro da página); bloco full-width que cruza a altura das colunas (figura no meio) segue lendo primeiro; um rodapé que não cabe abaixo das colunas não é detectado como coluna (share de spanning contra o pico, E6-T01).
+
+### ADR-071 · Confiança por bloco: pesos aditivos por flag, piso 0,1 e métrica `confidence_calibration` · accepted · 2026-10-20
+**Contexto:** E7-T01 — REQ-EXT-13 pede confiança (0–1) e motivos por bloco; a E2-T05 deixou constantes provisórias (0,9 digital / 0,5 OCR, ADR-042) aplicadas com `Math.min` espalhado pelo `buildBook`, o que não acumula dúvidas (OCR + hífen incerto ficava 0,5) e espalha a regra por 8 heurísticas.
+**Alternativas:** A) centralizar o `min(base, tetos)` (mesmo comportamento, só organiza) · B) soma dos pesos por flag com piso (dúvidas independentes se acumulam; uma flag sozinha mantém os valores históricos 0,7/0,3).
+**Decisão:** B — `confidence.ts` (núcleo puro) com `CONFIDENCE_FLAG_WEIGHTS` (dúvida 0,2 · broken-font 0,6 · estrutural 0,0), `MIN_BLOCK_CONFIDENCE` 0,1 e arredondamento em 2 casas; bases 0,9/0,5 mantidas; métrica `confidence_calibration` = correlação ponto-biserial **negada** entre confiança e erro (erro = falso positivo do casamento texto+kind, a mesma regra do `block_kind_f1`); sem erro = 1, todos errados = 0, confiança constante = 0.
+**Consequências:** baseline ganhou `confidence_calibration` 1,0000 nos 12 sintéticos (nenhum traz bloco errado — calibragem real espera o primeiro golden com erros); teste OCR+hífen atualizado (0,5 → 0,3, acumulação deliberada); pesos iguais para todo `uncertain-*` por falta de evidência contrária — revisar quando um golden real trouxer erros.

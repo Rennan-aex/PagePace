@@ -178,5 +178,6 @@ describe("METRIC_DIRECTIONS", () => {
     expect(METRIC_DIRECTIONS.text_cer).toBe("lower");
     expect(METRIC_DIRECTIONS.para_boundary_f1).toBe("higher");
     expect(METRIC_DIRECTIONS.footnote_link_acc).toBe("higher");
+    expect(METRIC_DIRECTIONS.confidence_calibration).toBe("higher");
   });
 });

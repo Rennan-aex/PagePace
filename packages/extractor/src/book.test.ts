@@ -13,6 +13,7 @@ import {
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING } from "./brokenfont";
+import { MIN_BLOCK_CONFIDENCE } from "./confidence";
 import { HYPHEN_UNCERTAIN_CONFIDENCE, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 
 const BODY = 11;
@@ -174,7 +175,7 @@ describe("buildBook", () => {
     ]);
   });
 
-  it("gives digital documents the provisional constant confidence", () => {
+  it("gives digital documents the base confidence (E7-T01)", () => {
     const book = buildBook(doc([twoParagraphs]));
     expect(book.blocks.every((block) => block.confidence === BOOK_BLOCK_CONFIDENCE)).toBe(true);
     expect(book.extraction.avgConfidence).toBe(BOOK_BLOCK_CONFIDENCE);
@@ -268,10 +269,11 @@ describe("buildBook", () => {
     expect(book.blocks[0]?.runs[0]?.text).toBe("O Ex-Ministro saiu cedo hoje.");
     expect(book.blocks[0]?.flags).toEqual([UNCERTAIN_HYPHEN_FLAG]);
     expect(book.blocks[0]?.confidence).toBe(HYPHEN_UNCERTAIN_CONFIDENCE);
-    // An OCR document keeps the lower of the two confidences.
+    // E7-T01: the doubt weight is subtracted from the OCR base too, so the
+    // two lowered signals combine instead of the lowest one winning.
     const fromOcr = buildBook(doc([uncertain], { ocrTextLayer: true }));
     expect(fromOcr.blocks[0]?.flags).toEqual([UNCERTAIN_HYPHEN_FLAG]);
-    expect(fromOcr.blocks[0]?.confidence).toBe(OCR_TEXT_LAYER_CONFIDENCE);
+    expect(fromOcr.blocks[0]?.confidence).toBe(0.3);
   });
 
   it("flags a block scrambled by a broken font mapping and warns the document (E3-T05)", () => {
@@ -308,13 +310,14 @@ describe("buildBook", () => {
     expect(book.extraction.avgConfidence).toBe(BOOK_BLOCK_CONFIDENCE);
   });
 
-  it("caps the confidence at the broken-font value for an OCR document (E3-T05)", () => {
+  it("floors the confidence of a broken-font OCR block at the minimum (E3-T05, E7-T01)", () => {
     const pua = String.fromCodePoint(0xe011);
     const broken = page([item(`${pua}${pua}${pua}${pua} ABCD`, MARGIN, 100, BODY)]);
     const book = buildBook(doc([broken], { ocrTextLayer: true }));
     expect(book.extraction.warnings).toEqual(["ocr-text-layer", BROKEN_FONT_MAPPING]);
     expect(book.blocks[0]?.flags).toEqual([BROKEN_FONT_MAPPING]);
-    expect(book.blocks[0]?.confidence).toBeLessThan(OCR_TEXT_LAYER_CONFIDENCE);
+    // 0.5 (OCR) − 0.6 (broken font) would be negative: the floor holds.
+    expect(book.blocks[0]?.confidence).toBe(MIN_BLOCK_CONFIDENCE);
   });
 
   it("carries bold/italic in the runs, from the font name (E4-T01)", () => {

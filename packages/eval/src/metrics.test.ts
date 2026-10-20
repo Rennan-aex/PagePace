@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   blockKindF1,
+  confidenceCalibration,
   footnoteLinkAcc,
   headingDetection,
   hyphenJoinAcc,
@@ -614,5 +615,119 @@ describe("blockKindF1", () => {
     ];
     const extracted = [{ text: "A", kind: "paragraph" }];
     expect(blockKindF1(golden, extracted)).toEqual(blockKindF1(golden, extracted));
+  });
+});
+
+describe("confidenceCalibration (E7-T01)", () => {
+  it("scores 1 when nothing is wrong: there is nothing to doubt", () => {
+    const golden = [
+      { text: "A.", kind: "paragraph" },
+      { text: "B.", kind: "paragraph" },
+    ];
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.9 },
+      { text: "B.", kind: "paragraph", confidence: 0.9 },
+    ];
+    const result = confidenceCalibration(golden, extracted);
+    expect(result.score).toBe(1);
+    expect(result.wrong).toBe(0);
+    expect(result.blocks).toBe(2);
+    expect(result.meanRight).toBe(0.9);
+    expect(result.meanWrong).toBeNull();
+  });
+
+  it("scores 1 on two empty sides (nothing to judge)", () => {
+    expect(confidenceCalibration([], []).score).toBe(1);
+  });
+
+  it("scores 0 when every block is wrong (confidence separated nothing)", () => {
+    const extracted = [
+      { text: "X.", kind: "paragraph", confidence: 0.9 },
+      { text: "Y.", kind: "paragraph", confidence: 0.2 },
+    ];
+    const result = confidenceCalibration([], extracted);
+    expect(result.wrong).toBe(2);
+    expect(result.score).toBe(0);
+  });
+
+  it("scores near 1 when every wrong block is less confident than every right one", () => {
+    const golden = [
+      { text: "A.", kind: "paragraph" },
+      { text: "B.", kind: "paragraph" },
+      { text: "C.", kind: "paragraph" },
+      { text: "D.", kind: "paragraph" },
+    ];
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.9 },
+      { text: "B.", kind: "paragraph", confidence: 0.9 },
+      { text: "C.", kind: "paragraph", confidence: 0.9 },
+      { text: "invented", kind: "paragraph", confidence: 0.2 },
+    ];
+    const result = confidenceCalibration(golden, extracted);
+    expect(result.wrong).toBe(1);
+    expect(result.meanWrong).toBe(0.2);
+    expect(result.meanRight).toBe(0.9);
+    expect(result.score).toBeGreaterThan(0.8);
+  });
+
+  it("goes negative when the wrong blocks are the confident ones (anti-calibrated)", () => {
+    const golden = [{ text: "A.", kind: "paragraph" }];
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.2 },
+      { text: "invented", kind: "paragraph", confidence: 0.9 },
+    ];
+    const result = confidenceCalibration(golden, extracted);
+    expect(result.wrong).toBe(1);
+    expect(result.score).toBeLessThan(0);
+  });
+
+  it("scores 0 when the confidence is constant and blocks are wrong (no signal)", () => {
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.7 },
+      { text: "invented", kind: "paragraph", confidence: 0.7 },
+    ];
+    expect(confidenceCalibration([], extracted).score).toBe(0);
+  });
+
+  it("counts a wrong kind as an error even when the text matches (same rule as blockKindF1)", () => {
+    const golden = [{ text: "A.", kind: "paragraph" }];
+    const extracted = [{ text: "A.", kind: "blockquote", confidence: 0.4 }];
+    const result = confidenceCalibration(golden, extracted);
+    expect(result.wrong).toBe(1);
+    expect(result.meanWrong).toBe(0.4);
+  });
+
+  it("agrees with blockKindF1 on what an error is (false positives only)", () => {
+    const golden = [
+      { text: "A.", kind: "paragraph" },
+      { text: "Quote.", kind: "blockquote" },
+    ];
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.9 },
+      { text: "Wrong quote.", kind: "blockquote", confidence: 0.5 },
+      { text: "Invented.", kind: "paragraph", confidence: 0.6 },
+    ];
+    let falsePositives = 0;
+    for (const score of blockKindF1(golden, extracted).byKind.values()) {
+      falsePositives += score.falsePositives.length;
+    }
+    expect(confidenceCalibration(golden, extracted).wrong).toBe(falsePositives);
+  });
+
+  it("normalizes text before matching, like the other metrics", () => {
+    const golden = [{ text: "  Hello   world  ", kind: "paragraph" }];
+    const extracted = [{ text: "Hello world", kind: "paragraph", confidence: 0.9 }];
+    expect(confidenceCalibration(golden, extracted).wrong).toBe(0);
+  });
+
+  it("is deterministic: the same blocks always give the same score", () => {
+    const golden = [{ text: "A.", kind: "paragraph" }];
+    const extracted = [
+      { text: "A.", kind: "paragraph", confidence: 0.9 },
+      { text: "invented", kind: "paragraph", confidence: 0.3 },
+    ];
+    expect(confidenceCalibration(golden, extracted)).toEqual(
+      confidenceCalibration(golden, extracted),
+    );
   });
 });

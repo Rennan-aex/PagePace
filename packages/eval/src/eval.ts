@@ -39,6 +39,8 @@ import {
   type BlockKindF1Result,
   type BlockKindLike,
   blockKindF1,
+  type ConfidenceCalibrationResult,
+  confidenceCalibration,
   type FootnoteLinkResult,
   footnoteLinkAcc,
   type HeaderFooterResult,
@@ -98,6 +100,10 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
   block_kind_f1     macro-average of the per-kind F1s over the kinds the
                     Book builder emits against the ones the golden declares
                     (E5-T04), 1 = every block at the right kind
+  confidence_calibration negated point-biserial correlation between the
+                    block confidence and the error flag (E7-T01), 1 = every
+                    wrong block is less confident than every right one (or
+                    nothing is wrong), negative = the confident ones are wrong
 
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
@@ -172,6 +178,8 @@ export interface DocumentResult {
   footnotes: FootnoteLinkResult | null;
   /** Block kind F1 (E5-T04), `null` when not measured. */
   blockKinds: BlockKindF1Result | null;
+  /** Block confidence calibration (E7-T01), `null` when not measured. */
+  calibration: ConfidenceCalibrationResult | null;
   error: string | null;
 }
 
@@ -211,6 +219,11 @@ function formatCer(value: number | null): string {
   return value === null ? "-" : value.toFixed(4);
 }
 
+/** Four decimals or `-`: the mean confidences of the calibration report. */
+function formatFixed(value: number | null): string {
+  return value === null ? "-" : value.toFixed(4);
+}
+
 function formatNumber(value: number | null): string {
   return value === null ? "-" : String(value);
 }
@@ -245,6 +258,10 @@ function formatFootnote(value: FootnoteLinkResult | null): string {
 
 function formatBlockKind(value: BlockKindF1Result | null): string {
   return value === null ? "-" : value.f1.toFixed(4);
+}
+
+function formatCalibration(value: ConfidenceCalibrationResult | null): string {
+  return value === null ? "-" : value.score.toFixed(4);
 }
 
 /** Left/right aligned text table, ASCII only (deterministic on any terminal). */
@@ -344,6 +361,7 @@ async function measure(
     headings: blockHeadingDetection(golden, document, coverage),
     footnotes: footnoteLinks(golden, document, coverage),
     blockKinds: blockKindDetection(golden, document, coverage),
+    calibration: blockConfidenceCalibration(golden, document, coverage),
     error: null,
   };
 }
@@ -564,6 +582,35 @@ export function blockKindDetection(
 }
 
 /**
+ * `confidence_calibration` of one document (E7-T01): are the blocks the
+ * extraction is unsure about the ones it got wrong? The acceptance test
+ * calls the very function the runner measures with.
+ *
+ * Reference: every golden block (kind and text). Hypothesis: every block of
+ * the `Book` for the covered pages with the `confidence` the reader
+ * receives, cropped by `coverage.pages` exactly like `blockReadingOrder`.
+ * A block is wrong when its (kind, normalized text) pair matches no golden
+ * block — the same multiset rule as `block_kind_f1`, so the two metrics
+ * always agree on what an error is.
+ */
+export function blockConfidenceCalibration(
+  golden: Golden,
+  document: RawDocument,
+  coverage: number[] | null = golden.coverage,
+): ConfidenceCalibrationResult {
+  const wanted = coverage === null ? null : new Set(coverage);
+  const text = (runs: readonly { text: string }[]): string => runs.map((run) => run.text).join("");
+  const reference: BlockKindLike[] = golden.blocks.map((block) => ({
+    text: text(block.runs),
+    kind: block.kind,
+  }));
+  const hypothesis = buildBook(document)
+    .blocks.filter((block) => wanted === null || wanted.has(block.origin.pageFrom + 1))
+    .map((block) => ({ text: text(block.runs), kind: block.kind, confidence: block.confidence }));
+  return confidenceCalibration(reference, hypothesis);
+}
+
+/**
  * Smallest fraction of a line's trigrams that must also appear in the golden
  * text for the line to count as golden content (E3-T02). A body line with a
  * character error keeps almost every trigram; a real head or foot shares
@@ -756,6 +803,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headings: null,
         footnotes: null,
         blockKinds: null,
+        calibration: null,
         error: messageOf(error),
       });
       errors++;
@@ -778,6 +826,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headings: null,
         footnotes: null,
         blockKinds: null,
+        calibration: null,
         error: null,
       });
       continue;
@@ -820,6 +869,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
         headings: null,
         footnotes: null,
         blockKinds: null,
+        calibration: null,
         error: messageOf(error),
       });
       errors++;
@@ -905,6 +955,7 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
     const headings = document.headings;
     const footnotes = document.footnotes;
     const blockKinds = document.blockKinds;
+    const calibration = document.calibration;
     if (
       document.status !== "measured" ||
       document.cer === null ||
@@ -915,12 +966,14 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       styles === null ||
       headings === null ||
       footnotes === null ||
-      blockKinds === null
+      blockKinds === null ||
+      calibration === null
     ) {
       continue;
     }
     metrics[document.id] = {
       block_kind_f1: blockKinds.f1,
+      confidence_calibration: calibration.score,
       footnote_link_acc: footnotes.acc,
       header_footer_f1: headerFooter.f1,
       heading_f1: headings.f1,
@@ -1119,6 +1172,7 @@ function renderReport(
     formatHeading(document.headings),
     formatFootnote(document.footnotes),
     formatBlockKind(document.blockKinds),
+    formatCalibration(document.calibration),
     formatNumber(document.edits),
     formatNumber(document.refChars),
   ]);
@@ -1137,6 +1191,7 @@ function renderReport(
       { name: "heading_f1", align: "right" },
       { name: "footnote_link_acc", align: "right" },
       { name: "block_kind_f1", align: "right" },
+      { name: "conf_calib", align: "right" },
       { name: "edits", align: "right" },
       { name: "ref chars", align: "right" },
     ],
@@ -1318,7 +1373,32 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}${kindSection}\n`;
+  // The acceptance of E7-T01 asks for the calibration report by document:
+  // how many wrong blocks the matching found and the mean confidence of the
+  // wrong and of the right blocks, so a miscalibration is visible.
+  const calibrationRows = documents.filter(
+    (document): document is DocumentResult & { calibration: ConfidenceCalibrationResult } =>
+      document.calibration !== null && document.calibration.wrong > 0,
+  );
+  const calibrationSection =
+    totals.measured === 0
+      ? ""
+      : `\n\nBlock confidence calibration (wrong blocks / mean confidence):\n${
+          calibrationRows.length === 0
+            ? `  none in ${totals.measured} measured document(s)`
+            : calibrationRows
+                .map(
+                  (document) =>
+                    `  ${document.id}: ${document.calibration.wrong} wrong of ` +
+                    `${document.calibration.blocks} block(s), mean confidence ` +
+                    `${formatFixed(document.calibration.meanRight)} right vs ` +
+                    `${formatFixed(document.calibration.meanWrong)} wrong ` +
+                    `(confidence_calibration ${document.calibration.score.toFixed(4)})`,
+                )
+                .join("\n")
+        }`;
+
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}${kindSection}${calibrationSection}\n`;
 }
 
 /** `"none"` or the per-kind invented/missed counts, kept short for one report line. */

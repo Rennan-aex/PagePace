@@ -1,31 +1,23 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
-import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
-import { CAPTION_UNCERTAIN_CONFIDENCE, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
+import { BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import { detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
+import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
 import { detectEndnotes } from "./endnotes";
-import {
-  detectFootnotes,
-  FOOTNOTE_UNCERTAIN_CONFIDENCE,
-  UNCERTAIN_FOOTNOTE_FLAG,
-} from "./footnotes";
+import { detectFootnotes, UNCERTAIN_FOOTNOTE_FLAG } from "./footnotes";
 import { tagGreekRuns } from "./greek";
 import { detectHeadings, type PageMeasure, pageMeasureOf } from "./headings";
-import { HYPHEN_UNCERTAIN_CONFIDENCE, paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
+import { paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import type { TextLine } from "./lines";
-import { detectLists, LIST_UNCERTAIN_CONFIDENCE, UNCERTAIN_LIST_FLAG } from "./lists";
+import { detectLists, UNCERTAIN_LIST_FLAG } from "./lists";
 import { bodyMeasures, detectMarginRefs } from "./marginrefs";
 import { buildMetadata } from "./metadata";
-import {
-  CALL_WITHOUT_NOTE_FLAG,
-  linkFootnoteCalls,
-  NOTE_LINK_UNCERTAIN_CONFIDENCE,
-  NOTE_WITHOUT_CALL_FLAG,
-} from "./notelinks";
+import { CALL_WITHOUT_NOTE_FLAG, linkFootnoteCalls, NOTE_WITHOUT_CALL_FLAG } from "./notelinks";
 import type { JoinedParagraph } from "./pagejoin";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
-import { detectQuotes, QUOTE_UNCERTAIN_CONFIDENCE, UNCERTAIN_QUOTE_FLAG } from "./quotes";
+import { detectQuotes, UNCERTAIN_QUOTE_FLAG } from "./quotes";
 import { detectReferences } from "./references";
 import { stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
@@ -33,6 +25,8 @@ import { SIDEBAR_FLAG } from "./sidebars";
 import { documentStats } from "./stats";
 import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
+
+export { BOOK_BLOCK_CONFIDENCE, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
 
 /**
  * Minimal `Book` builder (E2-T05 — layer 7, "saída").
@@ -44,9 +38,14 @@ import { normalizeForReader } from "./unicode";
  * same extraction always produces the same ids and anchors can re-anchor
  * after re-processing.
  *
- * Confidence is a provisional constant (the model of REQ-EXT-13 is E7): one
- * value for digital text, a reduced one plus the `ocr-text-layer` warning
- * for embedded OCR layers (ADR-019).
+ * Confidence (E7-T01 — REQ-EXT-13): every doubt flag a block carries
+ * lowers its confidence by the weight of `CONFIDENCE_FLAG_WEIGHTS`
+ * (`confidence.ts`) — the weights add up, the result is clamped at the
+ * minimum and rounded. The base is `BOOK_BLOCK_CONFIDENCE` for digital text
+ * and `OCR_TEXT_LAYER_CONFIDENCE` plus the `ocr-text-layer` warning for
+ * embedded OCR layers (ADR-019); `flags` are the reasons, `confidence` the
+ * combined number, and the eval measures the pair with
+ * `confidence_calibration`.
  *
  * Inline styles (E4-T01): runs carry bold/italic from the embedded font
  * name and sup/sub from size and baseline (`paragraphRuns`), with adjacent
@@ -76,8 +75,8 @@ import { normalizeForReader } from "./unicode";
  * Hyphenation (E3-T03): paragraph text glues words the typesetter broke with
  * a line-end hyphen (`pala-` + `vra` → `palavra`) while legitimate hyphens
  * keep theirs. A paragraph with at least one decision the rules could not
- * make confidently gets `flags: ["uncertain-hyphen"]` and the reduced
- * `HYPHEN_UNCERTAIN_CONFIDENCE` (ARCHITECTURE decision 6).
+ * make confidently gets `flags: ["uncertain-hyphen"]`, whose doubt weight
+ * lowers the block confidence (ARCHITECTURE decision 6, E7-T01).
  *
  * Cross-page join (E3-T04): a paragraph that runs out of room at the foot
  * of a page and resumes at the head of the next one becomes a single block
@@ -90,8 +89,8 @@ import { normalizeForReader } from "./unicode";
  *
  * Broken font mapping (E3-T05): a block whose text is full of U+FFFD or
  * private use characters (a font without a usable `ToUnicode`) keeps its
- * text but carries `flags: ["broken-font-mapping"]`, the reduced
- * `BROKEN_FONT_CONFIDENCE` and the document-level warning of the same name —
+ * text but carries `flags: ["broken-font-mapping"]` (the heaviest doubt
+ * weight) and the document-level warning of the same name —
  * the reader is told instead of being handed silent garbage. The detection
  * and its thresholds live in `brokenFontSignal`. `extraction.avgConfidence`
  * is the mean of the block confidences, so one broken chapter moves it.
@@ -120,8 +119,8 @@ import { normalizeForReader } from "./unicode";
  * `1 A note…` of the SciELO style) or a printed rule above it
  * (`detectFootnotes`). The text, the runs and the origin do not change: only
  * the kind does, and a note accepted by the rule alone carries
- * `flags: ["uncertain-footnote"]` with the reduced
- * `FOOTNOTE_UNCERTAIN_CONFIDENCE`. Notes restart their numbering by page and
+ * `flags: ["uncertain-footnote"]`, whose doubt weight lowers the block
+ * confidence (E7-T01). Notes restart their numbering by page and
  * by chapter, so the decisions are per page and never compare neighbours. A
  * note that ran out of room at the foot and continues on the next page is
  * one block (the E3-T04 join) and is judged by the page it starts on.
@@ -130,8 +129,8 @@ import { normalizeForReader } from "./unicode";
  * note is linked to the call pointing at it (`linkFootnoteCalls`): the call
  * run carries `noteRef` (the note's id), the note carries `anchor`, and the
  * orphans — a note without a call, a call without a note — become the flags
- * `note-without-call` / `call-without-note` with the reduced
- * `NOTE_LINK_UNCERTAIN_CONFIDENCE`. An OCR text layer never gets the pass:
+ * `note-without-call` / `call-without-note`, whose doubt weights lower the
+ * block confidence (E7-T01). An OCR text layer never gets the pass:
  * without `Run.sup` it could only invent flags (ADR-060).
  *
  * Endnotes (E5-T03 — REQ-EXT-08): a paragraph of a notes section becomes a
@@ -147,7 +146,8 @@ import { normalizeForReader } from "./unicode";
  * line sits inside the measure becomes `blockquote`, or `epigraph` when it
  * is short, indented and italic-dominant or smaller than the body
  * (`detectQuotes`). A quote accepted by the indent rule alone carries
- * `flags: ["uncertain-quote"]` and the reduced `QUOTE_UNCERTAIN_CONFIDENCE`.
+ * `flags: ["uncertain-quote"]`, whose doubt weight lowers the block
+ * confidence (E7-T01).
  * A footnote or a heading is never a quote: the size gates are
  * complementary (a note is smaller than `FOOTNOTE_MAX_SIZE_FACTOR`, a
  * heading is flush left).
@@ -221,10 +221,6 @@ import { normalizeForReader } from "./unicode";
 export const EXTRACTOR_TOOL = "@pagepace/extractor";
 /** Value written to `extraction.version` (keep in sync with the package). */
 export const EXTRACTOR_VERSION = "0.0.0";
-/** Provisional confidence of every block of a digital document. */
-export const BOOK_BLOCK_CONFIDENCE = 0.9;
-/** Reduced confidence for documents whose text comes from an embedded OCR layer. */
-export const OCR_TEXT_LAYER_CONFIDENCE = 0.5;
 /** Characters of block text hashed into the block id. */
 export const BLOCK_ID_HASH_CHARS = 32;
 /** Hex characters of the hash kept in the block id. */
@@ -365,7 +361,10 @@ export function buildBook(document: RawDocument): Book {
   // the entry-shaped paragraphs that follow it, until the next heading.
   const references = detectReferences(paragraphs, { headings });
   const fromOcr = document.source.ocrTextLayer === true;
-  const confidence = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
+  // E7-T01: every doubt flag is collected on the block and `blockConfidence`
+  // (confidence.ts) combines them — the weights add up, the result is
+  // clamped at the minimum and rounded.
+  const base = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
   const blocks: Block[] = [];
   // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote pass.
@@ -380,14 +379,11 @@ export function buildBook(document: RawDocument): Book {
     ordinals.set(paragraph.pageFrom, ordinal + 1);
     const pageLabel = stripped.pageLabels[paragraph.pageFrom];
     const flags: string[] = [];
-    let blockConfidence = confidence;
     if (hyphen.uncertain) {
       flags.push(UNCERTAIN_HYPHEN_FLAG);
-      blockConfidence = Math.min(blockConfidence, HYPHEN_UNCERTAIN_CONFIDENCE);
     }
     if (brokenFontSignal(text).broken) {
       flags.push(BROKEN_FONT_MAPPING);
-      blockConfidence = Math.min(blockConfidence, BROKEN_FONT_CONFIDENCE);
       brokenBlocks += 1;
     }
     // E5-T07: a margin number outranks every kind — the short isolated
@@ -405,7 +401,6 @@ export function buildBook(document: RawDocument): Book {
     const reference = !marginRef && references[index]?.reference === true;
     if (footnotes[index]?.uncertain === true && !reference && !marginRef) {
       flags.push(UNCERTAIN_FOOTNOTE_FLAG);
-      blockConfidence = Math.min(blockConfidence, FOOTNOTE_UNCERTAIN_CONFIDENCE);
     }
     const endnote = endnotes[index]?.endnote === true;
     // E5-T03: a paragraph of the endnote section is a note like any other —
@@ -421,7 +416,6 @@ export function buildBook(document: RawDocument): Book {
     const quoteKind = quote?.quote === true ? quote.kind : undefined;
     if (quote?.quote === true && quote.uncertain === true) {
       flags.push(UNCERTAIN_QUOTE_FLAG);
-      blockConfidence = Math.min(blockConfidence, QUOTE_UNCERTAIN_CONFIDENCE);
     }
     // E5-T05: the printed label of a figure or a table outranks quotes and
     // lists (a caption may sit indented under its figure); a marked item
@@ -434,11 +428,9 @@ export function buildBook(document: RawDocument): Book {
     const indentList = !isCaption && !markedList && list?.list === true;
     if (isCaption && caption?.uncertain === true) {
       flags.push(UNCERTAIN_CAPTION_FLAG);
-      blockConfidence = Math.min(blockConfidence, CAPTION_UNCERTAIN_CONFIDENCE);
     }
     if (indentList && list?.uncertain === true) {
       flags.push(UNCERTAIN_LIST_FLAG);
-      blockConfidence = Math.min(blockConfidence, LIST_UNCERTAIN_CONFIDENCE);
     }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
     // E5-T07: the box of the margin number itself (top-left page
@@ -483,7 +475,7 @@ export function buildBook(document: RawDocument): Book {
               ],
             }),
       },
-      confidence: blockConfidence,
+      confidence: blockConfidence(base, flags),
       flags,
     });
     // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote
@@ -518,13 +510,10 @@ export function buildBook(document: RawDocument): Book {
         if (run !== undefined) run.noteRef = noteId;
       }
       if (decision.anchor !== null) block.anchor = decision.anchor;
-      if (decision.withoutCall) {
-        block.flags.push(NOTE_WITHOUT_CALL_FLAG);
-        block.confidence = Math.min(block.confidence, NOTE_LINK_UNCERTAIN_CONFIDENCE);
-      }
-      if (decision.orphanCall) {
-        block.flags.push(CALL_WITHOUT_NOTE_FLAG);
-        block.confidence = Math.min(block.confidence, NOTE_LINK_UNCERTAIN_CONFIDENCE);
+      if (decision.withoutCall) block.flags.push(NOTE_WITHOUT_CALL_FLAG);
+      if (decision.orphanCall) block.flags.push(CALL_WITHOUT_NOTE_FLAG);
+      if (decision.withoutCall || decision.orphanCall) {
+        block.confidence = blockConfidence(base, block.flags);
       }
     }
   }

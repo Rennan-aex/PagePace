@@ -450,13 +450,16 @@ describe("baseline and CI gate", () => {
     // purpose: the golden is a single paragraph block for the whole 20-page
     // document while the extraction emits one paragraph per page, so the
     // per-kind matching on normalized text never finds a hit (E5-T04). This
-    // fixture exercises the gate, not the metric.
+    // fixture exercises the gate, not the metric. And
+    // `confidence_calibration` is 0 because every extracted block is wrong
+    // (the convention of E7-T01: confidence separated nothing).
     expect(JSON.parse(first)).toEqual({
       version: 1,
       tolerance: 0.002,
       documents: {
         "n1-en-sample": {
           block_kind_f1: 0,
+          confidence_calibration: 0,
           footnote_link_acc: 1,
           header_footer_f1: 1,
           heading_f1: 1,

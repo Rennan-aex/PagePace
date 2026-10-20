@@ -4,6 +4,7 @@
   "documents": {
     "syn-n1-en-paragraphs": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -16,6 +17,7 @@
     },
     "syn-n1-pt-acentos": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -28,6 +30,7 @@
     },
     "syn-n1-pt-cabecalhos": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -40,6 +43,7 @@
     },
     "syn-n1-pt-hifenizacao": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -52,6 +56,7 @@
     },
     "syn-n2-en-columns": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -64,6 +69,7 @@
     },
     "syn-n2-en-lists": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -76,6 +82,7 @@
     },
     "syn-n2-en-marginrefs": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -88,6 +95,7 @@
     },
     "syn-n2-en-references": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -100,6 +108,7 @@
     },
     "syn-n2-pt-estilos": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -112,6 +121,7 @@
     },
     "syn-n3-en-endnotes": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -124,6 +134,7 @@
     },
     "syn-n3-en-footnotes": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
@@ -136,6 +147,7 @@
     },
     "syn-n3-en-quotes": {
       "block_kind_f1": 1,
+      "confidence_calibration": 1,
       "footnote_link_acc": 1,
       "header_footer_f1": 1,
       "heading_f1": 1,
