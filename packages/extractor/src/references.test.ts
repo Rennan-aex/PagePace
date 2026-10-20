@@ -266,7 +266,7 @@ describe("buildBook with references (E5-T06)", () => {
     expect(book.blocks[2]?.flags).toEqual([]);
     expect(book.blocks[3]?.flags).toEqual([]);
     expect(book.blocks[2]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
-    expect(book.blocks[2]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(book.blocks[2]?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
   });
 
   it("wins over the foot note of E5-T01 for an entry set smaller in the page foot", () => {

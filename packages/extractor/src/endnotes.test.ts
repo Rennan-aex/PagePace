@@ -267,8 +267,8 @@ describe("buildBook with endnotes (E5-T03)", () => {
 
     const firstNote = book.blocks[3];
     const secondNote = book.blocks[4];
-    expect(firstNote?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
-    expect(secondNote?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+    expect(firstNote?.origin).toMatchObject({ pageFrom: 1, pageTo: 1 });
+    expect(secondNote?.origin).toMatchObject({ pageFrom: 1, pageTo: 1 });
 
     // E5-T02 contract on the endnotes: `noteRef` on the call, `anchor` back
     // on the note, and no orphan flag on either side.

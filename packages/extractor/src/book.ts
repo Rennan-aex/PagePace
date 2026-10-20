@@ -1,5 +1,6 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
+import { linePageMap, paragraphBBoxes } from "./bbox";
 import { BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
 import { detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
 import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
@@ -186,6 +187,14 @@ export { BOOK_BLOCK_CONFIDENCE, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
  * strips the lettered shape, so a Bekker sequence cannot leave the flow
  * as a folio before this pass sees it (ADR-065).
  *
+ * Block boxes (E7-T04 — REQ-EXT-12): since E7-T04 **every** block carries
+ * `origin.bbox` — one box per page the block touches, the union of its
+ * lines on that page (`paragraphBBoxes`, ADR-074). The margin_ref box is
+ * unchanged by the generalisation (a one-line block unions to its own
+ * line), and the boxes are what the reader app frames behind the "ver
+ * original" button of the correction screen (`renderPageRegion`,
+ * docs/app/VIEW-ORIGINAL.md).
+ *
  * Greek snippets (E5-T08 — REQ-EXT-18): a run whose every letter is Greek
  * script and has at least `GREEK_MIN_LETTERS` letters carries
  * `lang: "grc"` (`tagGreekRuns`) — the obvious block of a foreign
@@ -314,6 +323,9 @@ export function buildBook(document: RawDocument): Book {
   const stats = hasText ? documentStats(stripped.document) : null;
   const bodyFontSize = stats?.bodyFontSize ?? 0;
   const pages = groupDocumentParagraphs(stripped.document);
+  // E7-T04: every line knows its page, so each block can carry the union of
+  // its lines as `origin.bbox`, one box per page (ADR-074).
+  const linePages = linePageMap(pages);
   const paragraphs = joinCrossPageParagraphs(pages, bodyFontSize);
   // E5-T07: margin numbers first — the position gate needs the body measured
   // with the candidates excluded, and every other pass then measures the page
@@ -433,9 +445,6 @@ export function buildBook(document: RawDocument): Book {
       flags.push(UNCERTAIN_LIST_FLAG);
     }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
-    // E5-T07: the box of the margin number itself (top-left page
-    // coordinates), the "posição relativa ao texto" of REQ-EXT-19.
-    const marginLine = marginRef ? (paragraph.lines[0] as TextLine) : undefined;
     blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: marginRef
@@ -461,19 +470,11 @@ export function buildBook(document: RawDocument): Book {
       origin: {
         pageFrom: paragraph.pageFrom,
         pageTo: paragraph.pageTo,
+        // E7-T04: one box per page (top-left coordinates, ADR-074) — the
+        // union of the block's lines on that page, the data "ver original"
+        // frames. A margin_ref (E5-T07) unions to its own single line.
+        bbox: paragraphBBoxes(paragraph, linePages),
         ...(pageLabel === null || pageLabel === undefined ? {} : { originalPageLabel: pageLabel }),
-        ...(marginLine === undefined
-          ? {}
-          : {
-              bbox: [
-                {
-                  x: marginLine.x,
-                  y: marginLine.top,
-                  width: marginLine.width,
-                  height: marginLine.bottom - marginLine.top,
-                },
-              ],
-            }),
       },
       confidence: blockConfidence(base, flags),
       flags,

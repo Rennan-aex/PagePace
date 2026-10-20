@@ -250,7 +250,7 @@ describe("extract", () => {
     expect(book.source).toEqual({ fileName: "extract.pdf", pageCount: 1 });
     expect(book.blocks.length).toBeGreaterThan(0);
     expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);
-    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(book.blocks[0]?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
     expect(book.blocks[0]?.runs[0]?.text).toBe("line one line two line three");
   });
 

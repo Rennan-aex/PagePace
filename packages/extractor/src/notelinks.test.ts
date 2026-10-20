@@ -289,7 +289,7 @@ describe("buildBook with footnote calls (E5-T02)", () => {
       ]),
     );
     const note = book.blocks.find((block) => block.kind === "footnote");
-    expect(note?.origin).toEqual({ pageFrom: 0, pageTo: 1 });
+    expect(note?.origin).toMatchObject({ pageFrom: 0, pageTo: 1 });
     const call = book.blocks.find((block) => block.runs.some((run) => run.noteRef !== undefined));
     expect(call?.runs.find((run) => run.noteRef !== undefined)?.noteRef).toBe(note?.id);
     expect(note?.flags).toEqual([]);

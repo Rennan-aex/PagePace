@@ -347,7 +347,7 @@ describe("buildBook with footnotes (E5-T01 + E5-T02)", () => {
     );
     expect(book.blocks.map((block) => block.kind)).toEqual(["paragraph", "footnote"]);
     const note = book.blocks[1];
-    expect(note?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(note?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
     expect(note?.runs.map((run) => run.text)).toEqual(["1. A note that explains the line above."]);
     // E5-T02: nobody called the note, so the linking pass flags it and
     // floors its confidence (the block keeps no `anchor`).
@@ -372,7 +372,7 @@ describe("buildBook with footnotes (E5-T01 + E5-T02)", () => {
     // nor flags it — `uncertain-footnote` already carries the doubt.
     expect(note?.flags).toEqual([UNCERTAIN_FOOTNOTE_FLAG]);
     expect(note?.confidence).toBe(FOOTNOTE_UNCERTAIN_CONFIDENCE);
-    expect(note?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(note?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
     expect(book.extraction.avgConfidence).toBeLessThan(BOOK_BLOCK_CONFIDENCE);
   });
 });

@@ -80,7 +80,7 @@ describe("buildBook", () => {
     expect(book.extraction.version).toBe(EXTRACTOR_VERSION);
   });
 
-  it("turns each page paragraph into a paragraph block with the page as origin", () => {
+  it("turns each page paragraph into a block whose origin carries the page and the box (E7-T04)", () => {
     const book = buildBook(doc([twoParagraphs]));
     expect(book.blocks).toHaveLength(2);
     expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);
@@ -89,8 +89,16 @@ describe("buildBook", () => {
       ["Alone."],
     ]);
     expect(book.blocks.map((block) => block.origin)).toEqual([
-      { pageFrom: 0, pageTo: 0 },
-      { pageFrom: 0, pageTo: 0 },
+      {
+        pageFrom: 0,
+        pageTo: 0,
+        bbox: [{ x: 72, y: 89, width: 88, height: 41 }],
+      },
+      {
+        pageFrom: 0,
+        pageTo: 0,
+        bbox: [{ x: 72, y: 144, width: 33, height: 11 }],
+      },
     ]);
     expect(book.blocks.every((block) => block.flags.length === 0)).toBe(true);
   });
@@ -109,7 +117,14 @@ describe("buildBook", () => {
     expect(book.blocks).toHaveLength(2);
     expect(book.blocks[0]?.runs[0]?.text).toBe("Alpha beta gamma.");
     expect(book.blocks[1]?.runs[0]?.text).toBe("The paragraph that runs out of room resumes here.");
-    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 0, pageTo: 1 });
+    expect(book.blocks[1]?.origin).toEqual({
+      pageFrom: 0,
+      pageTo: 1,
+      bbox: [
+        { x: 72, y: 104, width: 126.5, height: 11 },
+        { x: 72, y: 89, width: 137.5, height: 11 },
+      ],
+    });
   });
 
   it("does not join across pages when the foot ends a sentence (E3-T04)", () => {
@@ -119,8 +134,16 @@ describe("buildBook", () => {
     ];
     const book = buildBook(doc(pages));
     expect(book.blocks).toHaveLength(2);
-    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
-    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+    expect(book.blocks[0]?.origin).toEqual({
+      pageFrom: 0,
+      pageTo: 0,
+      bbox: [{ x: 72, y: 89, width: 115.5, height: 11 }],
+    });
+    expect(book.blocks[1]?.origin).toEqual({
+      pageFrom: 1,
+      pageTo: 1,
+      bbox: [{ x: 72, y: 89, width: 126.5, height: 11 }],
+    });
   });
 
   it("does not join when the next page starts indented (E3-T04)", () => {
@@ -130,8 +153,16 @@ describe("buildBook", () => {
     ];
     const book = buildBook(doc(pages));
     expect(book.blocks).toHaveLength(2);
-    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
-    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+    expect(book.blocks[0]?.origin).toEqual({
+      pageFrom: 0,
+      pageTo: 0,
+      bbox: [{ x: 72, y: 89, width: 126.5, height: 11 }],
+    });
+    expect(book.blocks[1]?.origin).toEqual({
+      pageFrom: 1,
+      pageTo: 1,
+      bbox: [{ x: 92, y: 89, width: 137.5, height: 11 }],
+    });
   });
 
   it("does not join a paragraph with a heading on the next page (E3-T04)", () => {
@@ -146,7 +177,11 @@ describe("buildBook", () => {
     const book = buildBook(doc(pages));
     expect(book.blocks).toHaveLength(3);
     expect(book.blocks[1]?.runs[0]?.text).toBe("Chapter Two");
-    expect(book.blocks[1]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+    expect(book.blocks[1]?.origin).toEqual({
+      pageFrom: 1,
+      pageTo: 1,
+      bbox: [{ x: 72, y: 82, width: 99, height: 18 }],
+    });
   });
 
   it("glues a word broken by a hyphen at the page foot (E3-T04)", () => {
@@ -157,7 +192,14 @@ describe("buildBook", () => {
     const book = buildBook(doc(pages));
     expect(book.blocks).toHaveLength(1);
     expect(book.blocks[0]?.runs[0]?.text).toBe("The longest palavra in the book continues.");
-    expect(book.blocks[0]?.origin).toEqual({ pageFrom: 0, pageTo: 1 });
+    expect(book.blocks[0]?.origin).toEqual({
+      pageFrom: 0,
+      pageTo: 1,
+      bbox: [
+        { x: 72, y: 89, width: 93.5, height: 11 },
+        { x: 72, y: 89, width: 143, height: 11 },
+      ],
+    });
   });
 
   it("emits blocks in reading order: page by page, top to bottom, whatever the item order", () => {
@@ -212,9 +254,24 @@ describe("buildBook", () => {
       ["Body line 3 of the page."],
     ]);
     expect(book.blocks.map((block) => block.origin)).toEqual([
-      { pageFrom: 0, pageTo: 0, originalPageLabel: "1" },
-      { pageFrom: 1, pageTo: 1, originalPageLabel: "2" },
-      { pageFrom: 2, pageTo: 2, originalPageLabel: "3" },
+      {
+        pageFrom: 0,
+        pageTo: 0,
+        bbox: [{ x: 72, y: 659, width: 132, height: 11 }],
+        originalPageLabel: "1",
+      },
+      {
+        pageFrom: 1,
+        pageTo: 1,
+        bbox: [{ x: 72, y: 659, width: 132, height: 11 }],
+        originalPageLabel: "2",
+      },
+      {
+        pageFrom: 2,
+        pageTo: 2,
+        bbox: [{ x: 72, y: 659, width: 132, height: 11 }],
+        originalPageLabel: "3",
+      },
     ]);
   });
 

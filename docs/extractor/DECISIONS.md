@@ -78,6 +78,8 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-071 | Confiança por bloco: pesos aditivos por flag, piso 0,1 e métrica `confidence_calibration` | accepted |
 | ADR-072 | applyOverlay no @pagepace/schema: reancoragem estrita, ids de split `#n` e texto editado como verdade do usuário | accepted |
 | ADR-073 | Teste de reprocessamento: PDF sintético do minipdf + reextração leve simulada no teste | accepted |
+| ADR-074 | `origin.bbox` preenchido em todo bloco (união das linhas por página) | accepted |
+| ADR-075 | `renderPageRegion` com canvas injetado, no `@pagepace/extractor` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -610,3 +612,15 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** (a) PDF do corpus + reextração real com heurística mexida — acoplaria o teste ao corpus e a mudança de parâmetro não é determinística de documento para documento; (b) PDF sintético (`minipdf`) pela pipeline de produção (`ingestPdfjs` + `buildBook`) e reextração leve **simulada** no `Book` (ids todos renumerados, 1 parágrafo dividido, 2 fundidos, 1 lixo já removido, 1 parágrafo já cortado no mesmo ponto do leitor).
 **Decisão:** (b) — teste de integração em `packages/extractor/test/reprocess-overlay.test.ts`: overlay de 42 ops (os 6 tipos) aplica 100% no `Book` v1; na reextração simulada **40/42 (95,2%) reancoram** por citação (ids totalmente novos = pior caso) e as 2 que a nova extração já resolveu (`split_at` no parágrafo já cortado, `delete_block` na linha de colofão já removida) voltam em `unapplied`, na ordem do overlay.
 **Consequências:** nenhum código de produção mudou (só teste novo, `pnpm verify` 909 testes); a simulação é determinística e valida o livro contra o schema. Se aparecer um parâmetro real de reextração, trocar a simulação por ele sem mudar o critério de aceite.
+
+### ADR-074 · `origin.bbox` preenchido em todo bloco (união das linhas por página) · accepted · 2026-10-20
+**Contexto:** REQ-EXT-12 pede página(s) e bbox por bloco; desde a ADR-065 só o `margin_ref` preenchia `origin.bbox`. A tela de correção ("ver original", E7-T04) precisa enquadrar qualquer bloco sem reabrir o PDF nem re-medir o `RawDocument`.
+**Alternativas:** A) manter só o `margin_ref` (a tela re-mediria — dupla fonte de verdade e custo no app); B) preencher `origin.bbox` de todo bloco com a união das linhas de cada página.
+**Decisão:** B — `packages/extractor/src/bbox.ts` puro (`linesBBox`/`linePageMap`/`paragraphBBoxes`): uma caixa por página em ordem (`bbox[0]` = página de `pageFrom`), arredondada a 2 casas (determinismo, REQ-EXT-16); a linha → página sai do mapa de identidade das linhas do `groupDocumentParagraphs` (o join da E3-T04 preserva as referências). O box do `margin_ref` não muda (união de uma linha = a própria linha, ADR-065 confirmada).
+**Consequências:** sem mudança de esquema (o campo já existia); o `Book` cresce ~1 objeto por bloco; testes que comparavam `origin` agora conferem `bbox` (os de página passaram a `toMatchObject`); o `merge_with_next` do `applyOverlay` segue concatenando os arrays (ADR-072).
+
+### ADR-075 · `renderPageRegion` com canvas injetado, no `@pagepace/extractor` · accepted · 2026-10-20
+**Contexto:** a E7-T04 pede API para renderizar página/região (PDF.js) na tela de correção, com função de utilidade testada. O núcleo é portável (ADR-002), o `pdfjs-dist` já é dependência exata do extrator (ADR-015) e não pode entrar dependência de canvas de Node (licença/tamanho, regra 5).
+**Alternativas:** A) código de render só no app (hoje o app não existe — ficaria sem teste e fora do monorepo); B) função em `@pagepace/extractor` com o alvo injetado (`RenderTarget` = width/height + `getContext("2d")`).
+**Decisão:** B — `packages/extractor/src/render.ts`: `regionFrame` puro (fit/zoom explícito, centralização, `clip` em pixels do canvas com padding padrão 8) + `renderPageRegion(page: PDFPageProxy, target, options)` que clipa o contexto e delega ao `page.render` (fundo branco padrão; `restore` garantido; a tipagem pede `canvas: null` ao pdf.js — os tipos exigem, o runtime aceita). Teste: unitário com stubs + integração com página **real** do pdf.js sobre PDF do `minipdf`. Doc: `docs/app/VIEW-ORIGINAL.md`.
+**Consequências:** a tela de correção usa a mesma função que o teste; rotação ≠ 0 da página não é enquadrada (limit aceito, corpus é rotação 0); cancelamento continua sendo do `RenderTask` do pdf.js.

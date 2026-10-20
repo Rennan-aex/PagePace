@@ -37,6 +37,6 @@ describe("sidebars through pdf.js (synthetic, E6-T03 acceptance)", () => {
     expect(main?.runs[0]?.text).not.toContain("Side note");
     expect(side?.flags).toEqual([SIDEBAR_FLAG]);
     expect(side?.runs[0]?.text).toBe(`${SIDE} ${SIDE} ${SIDE}`);
-    expect(side?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(side?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
   });
 });

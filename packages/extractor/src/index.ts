@@ -1,4 +1,5 @@
 export { composeAccentItems } from "./accents";
+export { BBOX_DECIMALS, linePageMap, linesBBox, paragraphBBoxes } from "./bbox";
 export {
   AVG_CONFIDENCE_DECIMALS,
   BLOCK_ID_HASH_CHARS,
@@ -178,6 +179,23 @@ export {
   REFERENCE_SECTION_TITLES,
   REFERENCE_YEAR_OPENING,
 } from "./references";
+export type {
+  RegionFrame,
+  RegionFrameOptions,
+  RenderCanvasContext,
+  RenderPageOptions,
+  RenderTarget,
+  RenderTaskLike,
+  Size,
+} from "./render";
+export {
+  REGION_MIN_POINTS,
+  REGION_PADDING_DEFAULT,
+  RENDER_BACKGROUND_DEFAULT,
+  RenderTargetError,
+  regionFrame,
+  renderPageRegion,
+} from "./render";
 export type {
   RepeatedBand,
   RepeatedOccurrence,

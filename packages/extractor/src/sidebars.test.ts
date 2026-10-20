@@ -237,7 +237,7 @@ describe("buildBook: sidebar blocks carry the flag at the page end (E6-T03)", ()
     expect(side?.runs[0]?.text).toBe("Side note line 1. Side note line 2. Side note line 3.");
     // The flag is structural, not doubt: confidence stays at the book level.
     expect(side?.confidence).toBe(main?.confidence);
-    expect(side?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(side?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
   });
 
   it("never joins a sidebar foot to the first paragraph of the next page (E3-T04 guard)", () => {
@@ -255,11 +255,11 @@ describe("buildBook: sidebar blocks carry the flag at the page end (E6-T03)", ()
     expect(book.blocks).toHaveLength(3);
     const side = book.blocks[1];
     expect(side?.flags).toEqual([SIDEBAR_FLAG]);
-    expect(side?.origin).toEqual({ pageFrom: 0, pageTo: 0 });
+    expect(side?.origin).toMatchObject({ pageFrom: 0, pageTo: 0 });
     expect(side?.runs[0]?.text).toBe(
       "Side note line 1. Side note line 2. Side note line 3. The note ends without stop",
     );
     expect(book.blocks[2]?.runs[0]?.text).toBe("The body resumes on the next page.");
-    expect(book.blocks[2]?.origin).toEqual({ pageFrom: 1, pageTo: 1 });
+    expect(book.blocks[2]?.origin).toMatchObject({ pageFrom: 1, pageTo: 1 });
   });
 });

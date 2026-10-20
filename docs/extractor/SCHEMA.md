@@ -98,6 +98,7 @@ interface Run {
 | Texto digital normal | `Book` sem esse warning | leitura normal |
 
 **Texto de um bloco** = concatenação de `runs[].text`. Offsets de âncora sempre referem a esse texto.
+**`origin.bbox` (E7-T04, ADR-074):** uma caixa **por página** que o bloco ocupa — a união das linhas do bloco naquela página, coordenadas top-left em pontos; `bbox[0]` corresponde a `origin.pageFrom`, a última a `origin.pageTo`. O extrator preenche em todo bloco (o `margin_ref` da ADR-065 mantém a caixa da própria linha). É o dado que a tela de correção enquadra no "ver original" (`docs/app/VIEW-ORIGINAL.md`).
 **Hifenização:** o texto do bloco já vem com palavras unidas; hifens genuínos de palavras compostas são preservados.
 **`metadata` (E4-T04):** `language` sai da detecção léxica (stopwords pt/en sobre o texto dos blocos) somada à dica `source.lang` do PDF; `title`/`authors` vêm dos campos `Title`/`Author` do PDF depois da saneação (vazio e nome de arquivo descartados). PDF sem sinal → `language: "unknown"`, campos de título/autores ausentes.
 **Palavras:** não estão no modelo; ver `@pagepace/segmenter`.
