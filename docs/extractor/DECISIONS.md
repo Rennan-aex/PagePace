@@ -76,6 +76,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-069 | Regiões laterais: split de itens antes das colunas, flag `sidebar` e blocos no fim da página | accepted |
 | ADR-070 | Medidas por banda de coluna: `TextLine.band`, rodapé depois das colunas e nível 1 no golden | accepted |
 | ADR-071 | Confiança por bloco: pesos aditivos por flag, piso 0,1 e métrica `confidence_calibration` | accepted |
+| ADR-072 | applyOverlay no @pagepace/schema: reancoragem estrita, ids de split `#n` e texto editado como verdade do usuário | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -596,3 +597,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) centralizar o `min(base, tetos)` (mesmo comportamento, só organiza) · B) soma dos pesos por flag com piso (dúvidas independentes se acumulam; uma flag sozinha mantém os valores históricos 0,7/0,3).
 **Decisão:** B — `confidence.ts` (núcleo puro) com `CONFIDENCE_FLAG_WEIGHTS` (dúvida 0,2 · broken-font 0,6 · estrutural 0,0), `MIN_BLOCK_CONFIDENCE` 0,1 e arredondamento em 2 casas; bases 0,9/0,5 mantidas; métrica `confidence_calibration` = correlação ponto-biserial **negada** entre confiança e erro (erro = falso positivo do casamento texto+kind, a mesma regra do `block_kind_f1`); sem erro = 1, todos errados = 0, confiança constante = 0.
 **Consequências:** baseline ganhou `confidence_calibration` 1,0000 nos 12 sintéticos (nenhum traz bloco errado — calibragem real espera o primeiro golden com erros); teste OCR+hífen atualizado (0,5 → 0,3, acumulação deliberada); pesos iguais para todo `uncertain-*` por falta de evidência contrária — revisar quando um golden real trouxer erros.
+
+### ADR-072 · applyOverlay no @pagepace/schema: reancoragem estrita, ids de split `#n` e texto editado como verdade do usuário · accepted · 2026-10-20
+**Contexto:** E7-T02 (REQ-EXT-14) pedia as 6 operações de correção do leitor (merge, split, set_kind, delete, edit_text, set_style) com reancoragem por `quote/prefix/suffix` e `unapplied` explícito, sem perder a ligação com o PDF.
+**Alternativas:** (a) função pura no `@pagepace/schema` (casa do contrato Overlay; o app continua dependendo só do contrato) · (b) pacote novo `@pagepace/overlay` (mais um workspace para um módulo) · (c) no `@pagepace/extractor` (o app passaria a puxar pdfjs junto).
+**Decisão:** (a) — `packages/schema/src/apply.ts`, determinístico, resultado validado por `parseBook`. Reancoragem: id + citação nos offsets gravados; se falhar, busca **única** da citação com prefixo/suffix em todo o livro; zero ou 2+ achados = `unapplied`. Offsets internos das ops deslocam pelo delta da reancoragem. `split_at` gera id `<id>#<n>` (n ≥ 2, menor livre); `merge_with_next` mantém id/tipo do primeiro, confiança mínima, união de flags e retargeta toc/noteRef/âncora; `edit_text` substiti a faixa com texto simples e marca o bloco como confiança 1 sem flags (verdade do usuário); `delete_block` nunca remove o último bloco e limpa ponteiros órfãos; `set_style` fatia runs nas bordas (true liga, false remove); overlay de outro `bookId` = todas as ops em `unapplied`.
+**Consequências:** E7-T03 mede a reancoragem pós-reprocessamento; SCHEMA.md §4 documenta a semântica; tipos não mudaram (sem bump de versão); `packages/schema/package.json` sincronizado em 1.2.0 (estava defasado desde a E4-T04). Revisar se precisarmos de deslocamento por faixa (hoje delta uniforme) ou motivo de falha por op em `unapplied`.

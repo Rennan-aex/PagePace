@@ -7,6 +7,9 @@ import { overlaySchema } from "./overlay";
 import type { RawDocument } from "./raw";
 import { rawDocumentSchema } from "./raw";
 
+export type { ApplyOverlayResult } from "./apply";
+export { applyOverlay, blockText } from "./apply";
+
 export type {
   Anchor,
   Block,

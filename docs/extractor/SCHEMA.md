@@ -128,7 +128,7 @@ type CorrectionOp = { id: string; createdAt: string; target: Anchor } & (
   | { op: "set_style"; start: number; end: number; style: Partial<Pick<Run, "bold" | "italic" | "sup" | "sub">> }
 );
 ```
-`applyOverlay(book, overlay) → { book, unapplied: CorrectionOp[] }`: operações que não reancoram vão para `unapplied` (mostradas ao usuário, nunca descartadas em silêncio).
+`applyOverlay(book, overlay) → { book, unapplied: CorrectionOp[] }`: operações que não reancoram vão para `unapplied` (mostradas ao usuário, nunca descartadas em silêncio). **Implementado na E7-T02** (`packages/schema/src/apply.ts`, ADR-072): reancoragem por id + citação nos offsets gravados e, se o id sumir ou o texto mudar, busca **única** da citação com prefixo/suffix em todo o livro (zero ou vários achados = `unapplied`); offsets internos das operações deslocam pelo delta da reancoragem; `split_at` cria id `<id>#<n>` determinístico; `merge_with_next` mantém o id/tipo do primeiro bloco e retargeta toc/noteRef/âncora; `edit_text` substiti a faixa com texto simples e marca o bloco como confiança 1 sem flags (verdade do usuário); `delete_block` nunca remove o último bloco e limpa ponteiros órfãos; `set_style` liga/desliga flags por faixa; overlay de outro `bookId` inteiro vai para `unapplied`.
 
 ## Changelog
 - `0.0.0`: placeholder do pacote.

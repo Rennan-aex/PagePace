@@ -26,7 +26,7 @@ Cada camada é uma função pura `entrada → saída` com tipos explícitos, tes
 Se existir **struct tree** (PDF tagged), ele entra como sinal forte nas camadas 3–4, nunca como verdade absoluta (muitos são ruins).
 
 ## Pacotes (monorepo)
-- `schema`: tipos + validação do `RawDocument`, `Book`, `Overlay`. Sem dependências.
+- `schema`: tipos + validação do `RawDocument`, `Book`, `Overlay`, e `applyOverlay` (E7-T02, correções do leitor). Sem dependências.
 - `extractor`: camadas 1–7. Núcleo portável; leitura de arquivo só em adaptadores/CLI.
 - `segmenter`: frases e palavras pt/en. Puro.
 - `eval`: runner do corpus, métricas, comparação com baseline.
