@@ -6,7 +6,10 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.10",
+    "@pagepace/eval": "workspace:*",
     "@pagepace/extractor": "workspace:*",
-    "@pagepace/schema": "workspace:*"
+    "@pagepace/schema": "workspace:*",
+    "pdfjs-dist": "6.4.299"
   }
 }

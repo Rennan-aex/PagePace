@@ -29,12 +29,21 @@ importers:
 
   packages/cli:
     dependencies:
+      '@napi-rs/canvas':
+        specifier: ^1.0.10
+        version: 1.0.10
+      '@pagepace/eval':
+        specifier: workspace:*
+        version: link:../eval
       '@pagepace/extractor':
         specifier: workspace:*
         version: link:../extractor
       '@pagepace/schema':
         specifier: workspace:*
         version: link:../schema
+      pdfjs-dist:
+        specifier: 6.4.299
+        version: 6.4.299
 
   packages/eval:
     dependencies:

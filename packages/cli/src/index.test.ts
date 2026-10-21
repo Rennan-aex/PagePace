@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { SCANNED_PDF_MESSAGE } from "@pagepace/extractor";
@@ -299,5 +299,184 @@ describe("extract", () => {
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");
     expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+  });
+});
+
+describe("inspect report formats (E7-T05)", () => {
+  async function samplePdf(name: string): Promise<string> {
+    return writePdf(
+      name,
+      buildPdf([
+        [
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+          textStream("line three", { x: 72, y: 360, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+  }
+
+  it("lists the extracted blocks with kind, confidence and flags", async () => {
+    const file = await writePdf(
+      "flags.pdf",
+      buildPdf([
+        [
+          textStream("Chapter", { x: 72, y: 500, size: 24 }),
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+          textStream("line three", { x: 72, y: 360, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const streams = capture();
+    const code = await run(["inspect", file], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.out()).toContain("== Página 1");
+    expect(streams.out()).toContain("heading nível 1");
+    expect(streams.out()).toContain("paragraph · páginas 1 · confiança 0.90");
+    expect(streams.out()).toContain("flags: nenhuma");
+  });
+
+  it("requires --out for md and html and rejects an unknown format", async () => {
+    const file = await samplePdf("formats.pdf");
+
+    const md = capture();
+    expect(await run(["inspect", file, "--format", "md"], md.io)).toBe(EXIT_USAGE);
+    expect(md.err()).toContain("exige --out");
+
+    const html = capture();
+    expect(await run(["inspect", file, "--format", "html"], html.io)).toBe(EXIT_USAGE);
+    expect(html.err()).toContain("exige --out");
+
+    const bogus = capture();
+    expect(await run(["inspect", file, "--format", "pdf"], bogus.io)).toBe(EXIT_USAGE);
+    expect(bogus.err()).toContain("Formato inválido");
+  });
+
+  it("writes the text report to --out", async () => {
+    const file = await samplePdf("out-text.pdf");
+    const out = path.join(dir, "report.txt");
+
+    const streams = capture();
+    const code = await run(["inspect", file, "--out", out], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toContain("Relatório gravado em");
+    const written = await readFile(out, "utf8");
+    expect(written).toContain("Páginas medidas: 1 de 1");
+    expect(written).toContain("== Página 1");
+  });
+
+  it("writes an html report with the page image embedded", async () => {
+    const file = await samplePdf("out-html.pdf");
+    const out = path.join(dir, "report.html");
+
+    const streams = capture();
+    const code = await run(["inspect", file, "--format", "html", "--out", out], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).toContain("Relatório gravado em");
+    const written = await readFile(out, "utf8");
+    expect(written).toContain("<!doctype html>");
+    expect(written).toContain("data:image/png;base64,");
+    expect(written).toContain('class="blocks"');
+  });
+
+  it("writes a markdown report with the page image next to it", async () => {
+    const file = await samplePdf("out-md.pdf");
+    const out = path.join(dir, "report.md");
+
+    const streams = capture();
+    const code = await run(["inspect", file, "--format", "md", "--out", out], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    const written = await readFile(out, "utf8");
+    expect(written).toContain("| Original | Extraído |");
+    expect(written).toContain("](report-inspect/pagina-1.png)");
+    const png = await readFile(path.join(dir, "report-inspect", "pagina-1.png"));
+    expect(png.subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
+
+  it("limits the report to --pages", async () => {
+    const file = await writePdf(
+      "three-inspect.pdf",
+      buildPdf([textStream("one"), textStream("two"), textStream("three")]),
+    );
+
+    const streams = capture();
+    const code = await run(["inspect", file, "--pages", "2-2"], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.out()).toContain("Páginas no relatório: 2");
+    expect(streams.out()).toContain("== Página 2");
+    expect(streams.out()).not.toContain("== Página 1");
+    expect(streams.out()).not.toContain("== Página 3");
+  });
+});
+
+describe("explain-page (E7-T05)", () => {
+  it("prints every layer's decision for the page", async () => {
+    const file = await writePdf(
+      "explain.pdf",
+      buildPdf([
+        [
+          textStream("Chapter One", { x: 72, y: 500, size: 24 }),
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+          textStream("line three", { x: 72, y: 360, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const streams = capture();
+    const code = await run(["explain-page", file, "1"], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).toBe("");
+    expect(streams.out()).toContain("Página 1 de 1");
+    expect(streams.out()).toContain("--- Bloco 1");
+    expect(streams.out()).toContain("kind: ");
+    expect(streams.out()).toContain("camadas:");
+    expect(streams.out()).toContain("margin-ref: ");
+    expect(streams.out()).toContain("heading: ");
+    expect(streams.out()).toContain("hyphen: ");
+  });
+
+  it("rejects a page outside the document and a missing argument", async () => {
+    const file = await writePdf("explain-range.pdf", buildPdf([textStream("only page")]));
+
+    const outside = capture();
+    expect(await run(["explain-page", file, "2"], outside.io)).toBe(EXIT_USAGE);
+    expect(outside.err()).toContain("página 2 inexistente");
+
+    const missing = capture();
+    expect(await run(["explain-page", file], missing.io)).toBe(EXIT_USAGE);
+    expect(missing.err()).toContain("exige o arquivo PDF e o número da página");
+
+    const noFile = capture();
+    expect(await run(["explain-page"], noFile.io)).toBe(EXIT_USAGE);
+    expect(noFile.err()).toContain("exige o arquivo PDF e o número da página");
+  });
+});
+
+describe("eval dispatch (E7-T05)", () => {
+  it("shows the eval help through the pagepace CLI", async () => {
+    const streams = capture();
+    const code = await run(["eval", "--help"], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.out()).toContain("text_cer");
+    expect(streams.out()).toContain("confidence_calibration");
+  });
+
+  it("rejects an unknown eval option with the eval usage", async () => {
+    const streams = capture();
+    const code = await run(["eval", "--bogus"], streams.io);
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(streams.err()).toContain("eval: unknown option: --bogus");
   });
 });

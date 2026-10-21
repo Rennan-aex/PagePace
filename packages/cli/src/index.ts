@@ -1,15 +1,26 @@
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, join, relative } from "node:path";
+import { runEvalCli } from "@pagepace/eval";
 import {
   BookError,
   buildBook,
   documentStats,
+  ExplainPageError,
+  explainPage,
   ingestPdfjs,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
   StatsError,
 } from "@pagepace/extractor";
 import { SchemaValidationError } from "@pagepace/schema";
+import { renderPagesPng } from "./render-pdf";
+import {
+  formatExplainText,
+  formatInspectHtml,
+  formatInspectMarkdown,
+  formatInspectText,
+  inspectModel,
+} from "./report";
 
 export const PACKAGE_NAME = "@pagepace/cli";
 
@@ -27,28 +38,45 @@ type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
 
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace inspect <arquivo.pdf>
   pnpm pagepace extract <arquivo.pdf>
+  pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
+  pnpm pagepace explain-page <arquivo.pdf> <n>
+  pnpm pagepace eval [--diff|--ci|--update-baseline]
   pnpm pagepace --help`;
 
 export const HELP = `pagepace — extrator de PDF do PagePace
 
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace inspect <arquivo.pdf>
   pnpm pagepace extract <arquivo.pdf>
+  pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
+  pnpm pagepace explain-page <arquivo.pdf> <n>
+  pnpm pagepace eval [--diff|--ci|--update-baseline]
   pnpm pagepace --help
 
 Comandos:
-  dump-raw <arquivo.pdf>   Lê o PDF e escreve o RawDocument (JSON) no console
-  inspect <arquivo.pdf>    Mostra as estatísticas do documento (corpo, entrelinha,
-                           margens e largura de coluna)
-  extract <arquivo.pdf>    Gera o Book (JSON) e escreve no console
+  dump-raw <arquivo.pdf>    Lê o PDF e escreve o RawDocument (JSON) no console
+  extract <arquivo.pdf>     Gera o Book (JSON) e escreve no console
+  inspect <arquivo.pdf>     Relatório da extração: resumo do documento e os blocos
+                            de cada página, com tipo, confiança e flags de dúvida
+  explain-page <pdf> <n>    Explica a página n (1-based): a decisão de cada camada
+                            (colunas, margin-ref, heading, footnote, quote, lista,
+                            hífen etc.) parágrafo a parágrafo
+  eval                      Roda a avaliação do corpus contra os gabaritos
+                            (mesmas opções de pnpm eval: --diff, --ci,
+                            --update-baseline)
 
 Opções:
-  --pages 1-5              Só as páginas de 1 a 5 (1-based, inclusivo)
-  --pages 3                Só a página 3
-  -h, --help               Mostra esta ajuda
+  --pages 1-5               Só as páginas de 1 a 5 (1-based, inclusivo)
+  --pages 3                 Só a página 3
+  --format text             Relatório em texto no console (padrão do inspect)
+  --format md               Relatório Markdown, com a página original ao lado dos
+                            blocos; exige --out e grava as imagens numa pasta
+                            <arquivo>-inspect/ ao lado do .md
+  --format html             Relatório HTML lado a lado com as imagens embutidas;
+                            exige --out
+  --out <arquivo>           Grava o relatório em arquivo em vez do console
+  -h, --help                Mostra esta ajuda
 
 Códigos de saída:
   0  sucesso
@@ -77,6 +105,13 @@ function parsePages(value: string): PageRange | null {
   return { from, to };
 }
 
+function pagesOfRange(range: PageRange, pageCount: number): number[] {
+  const to = Math.min(range.to, pageCount);
+  const pages: number[] = [];
+  for (let page = range.from; page <= to; page++) pages.push(page);
+  return pages;
+}
+
 function messageOf(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return String(error);
@@ -97,20 +132,23 @@ function describeIngestError(file: string, error: unknown): string {
   return `Falha ao ler ${file}: ${messageOf(error)}\n`;
 }
 
-type LoadResult = { document: RawDocument } | { error: string; code: number };
+type LoadResult = { document: RawDocument; bytes: Uint8Array } | { error: string; code: number };
 
-async function loadDocument(file: string, pageRange?: PageRange): Promise<LoadResult> {
-  let bytes: Uint8Array;
+async function loadBytes(file: string): Promise<Uint8Array | { error: string; code: number }> {
   try {
     // pdf.js rejects a Node `Buffer` even though it extends `Uint8Array`.
-    bytes = new Uint8Array(await readFile(file));
+    return new Uint8Array(await readFile(file));
   } catch (error) {
     return { error: describeReadError(file, error), code: EXIT_ERROR };
   }
+}
 
+async function loadDocument(file: string, pageRange?: PageRange): Promise<LoadResult> {
+  const bytes = await loadBytes(file);
+  if ("error" in bytes) return bytes;
   try {
     const document = await ingestPdfjs(bytes, { fileName: basename(file), pageRange });
-    return { document };
+    return { document, bytes };
   } catch (error) {
     if (error instanceof ScannedPdfError) {
       return { error: `${SCANNED_PDF_MESSAGE}\n`, code: EXIT_SCANNED };
@@ -119,6 +157,22 @@ async function loadDocument(file: string, pageRange?: PageRange): Promise<LoadRe
       return { error: `Faixa de páginas inválida: ${messageOf(error)}\n`, code: EXIT_USAGE };
     }
     return { error: describeIngestError(file, error), code: EXIT_ERROR };
+  }
+}
+
+async function writeOrOut(io: CliIo, out: string | undefined, text: string): Promise<number> {
+  if (out === undefined) {
+    io.out(text);
+    return EXIT_OK;
+  }
+  try {
+    await mkdir(dirname(out), { recursive: true });
+    await writeFile(out, text, "utf8");
+    io.err(`Relatório gravado em ${out}\n`);
+    return EXIT_OK;
+  } catch (error) {
+    io.err(`Não foi possível gravar ${out}: ${messageOf(error)}\n`);
+    return EXIT_ERROR;
   }
 }
 
@@ -171,61 +225,127 @@ async function dumpRaw(args: readonly string[], io: CliIo): Promise<number> {
   return EXIT_OK;
 }
 
-function formatStats(
-  file: string,
-  document: RawDocument,
-  stats: ReturnType<typeof documentStats>,
-): string {
-  const pt = (value: number): string => `${value.toFixed(2)} pt`;
-  const { margins } = stats;
-  return [
-    `Arquivo: ${file}`,
-    `Páginas medidas: ${stats.pagesMeasured} de ${document.source.pageCount}`,
-    `Itens de texto: ${stats.itemsMeasured}`,
-    `Corpo (moda ponderada): ${pt(stats.bodyFontSize)}`,
-    `Entrelinha típica: ${pt(stats.lineHeight)}`,
-    `Margens: topo ${pt(margins.top)} · direita ${pt(margins.right)} · base ${pt(margins.bottom)} · esquerda ${pt(margins.left)}`,
-    `Largura de coluna: ${pt(stats.columnWidth)}`,
-    "",
-  ].join("\n");
+interface InspectOptions {
+  file: string;
+  pageRange?: PageRange;
+  format: "text" | "md" | "html";
+  out?: string;
 }
 
-async function inspect(args: readonly string[], io: CliIo): Promise<number> {
+function parseInspectArgs(args: readonly string[]): InspectOptions | { error: string } {
   let file: string | undefined;
+  let pageRange: PageRange | undefined;
+  let format: InspectOptions["format"] = "text";
+  let out: string | undefined;
 
-  for (const arg of args) {
-    if (arg === "-h" || arg === "--help") {
-      io.out(HELP);
-      return EXIT_OK;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index] as string;
+    if (arg === "-h" || arg === "--help") return { error: "" };
+    if (arg === "--pages" || arg.startsWith("--pages=")) {
+      const inline = arg.startsWith("--pages=") ? arg.slice("--pages=".length) : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      const parsed = value === undefined ? null : parsePages(value);
+      if (!parsed) {
+        return {
+          error: `Valor inválido para --pages: ${value ?? "(valor ausente)"}. Use --pages 1-5 ou --pages 3.\n`,
+        };
+      }
+      pageRange = parsed;
+      continue;
     }
-    if (arg.startsWith("-")) {
-      io.err(`Opção desconhecida: ${arg}\n\n${USAGE}\n`);
-      return EXIT_USAGE;
+    if (arg === "--format" || arg.startsWith("--format=")) {
+      const inline = arg.startsWith("--format=") ? arg.slice("--format=".length) : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      if (value !== "text" && value !== "md" && value !== "html") {
+        return {
+          error: `Formato inválido: ${value ?? "(valor ausente)"}. Use --format text, md ou html.\n`,
+        };
+      }
+      format = value;
+      continue;
     }
+    if (arg === "--out" || arg.startsWith("--out=")) {
+      const inline = arg.startsWith("--out=") ? arg.slice("--out=".length) : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      if (value === undefined || value.startsWith("-")) {
+        return { error: `Opção --out exige um caminho de arquivo.\n` };
+      }
+      out = value;
+      continue;
+    }
+    if (arg.startsWith("-")) return { error: `Opção desconhecida: ${arg}\n\n${USAGE}\n` };
     if (file !== undefined) {
-      io.err(`Só é possível ler um arquivo por vez: ${file} e ${arg}\n`);
-      return EXIT_USAGE;
+      return { error: `Só é possível ler um arquivo por vez: ${file} e ${arg}\n` };
     }
     file = arg;
   }
 
-  if (file === undefined) {
-    io.err(`Falta o arquivo PDF.\n\n${USAGE}\n`);
+  if (file === undefined) return { error: `Falta o arquivo PDF.\n\n${USAGE}\n` };
+  if (format !== "text" && out === undefined) {
+    return {
+      error: `O formato ${format} exige --out (um caminho de arquivo).\n`,
+    };
+  }
+  return { file, ...(pageRange === undefined ? {} : { pageRange }), format, out };
+}
+
+async function inspect(args: readonly string[], io: CliIo): Promise<number> {
+  const parsed = parseInspectArgs(args);
+  if ("error" in parsed) {
+    if (parsed.error === "") {
+      io.out(HELP);
+      return EXIT_OK;
+    }
+    io.err(parsed.error);
     return EXIT_USAGE;
   }
 
-  const loaded = await loadDocument(file);
+  const loaded = await loadDocument(parsed.file);
   if ("error" in loaded) {
     io.err(loaded.error);
     return loaded.code;
   }
 
   try {
-    io.out(formatStats(file, loaded.document, documentStats(loaded.document)));
-    return EXIT_OK;
+    const book = buildBook(loaded.document);
+    const stats = documentStats(loaded.document);
+    const pages =
+      parsed.pageRange === undefined
+        ? Array.from({ length: loaded.document.source.pageCount }, (_, index) => index + 1)
+        : pagesOfRange(parsed.pageRange, loaded.document.source.pageCount);
+    const model = inspectModel(parsed.file, loaded.document, book, stats, pages);
+
+    if (parsed.format === "text") {
+      return await writeOrOut(io, parsed.out, formatInspectText(model));
+    }
+
+    const images = await renderPagesPng(loaded.bytes, pages);
+    if (parsed.format === "html") {
+      const base64 = new Map([...images].map(([page, png]) => [page, png.toString("base64")]));
+      return await writeOrOut(io, parsed.out, formatInspectHtml(model, base64));
+    }
+
+    // Markdown: the PNGs live next to the .md, referenced relatively.
+    const out = parsed.out as string;
+    const assetDir = `${out.replace(/\.(md|markdown)$/i, "")}-inspect`;
+    await mkdir(assetDir, { recursive: true });
+    const imageRefs = new Map<number, string>();
+    for (const [page, png] of images) {
+      const imagePath = join(assetDir, `pagina-${page}.png`);
+      await writeFile(imagePath, png);
+      imageRefs.set(page, relative(dirname(out), imagePath).replace(/\\/g, "/"));
+    }
+    return await writeOrOut(io, out, formatInspectMarkdown(model, imageRefs));
   } catch (error) {
+    if (error instanceof BookError || error instanceof SchemaValidationError) {
+      io.err(`Não foi possível gerar o Book de ${parsed.file}: ${messageOf(error)}\n`);
+      return EXIT_ERROR;
+    }
     if (error instanceof StatsError) {
-      io.err(`Não foi possível medir o documento ${file}: ${error.message}\n`);
+      io.err(`Não foi possível medir o documento ${parsed.file}: ${error.message}\n`);
       return EXIT_ERROR;
     }
     throw error;
@@ -274,6 +394,58 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
   }
 }
 
+async function explainPageCommand(args: readonly string[], io: CliIo): Promise<number> {
+  let file: string | undefined;
+  let pageNumber: number | undefined;
+
+  for (const arg of args) {
+    if (arg === "-h" || arg === "--help") {
+      io.out(HELP);
+      return EXIT_OK;
+    }
+    if (arg.startsWith("-")) {
+      io.err(`Opção desconhecida: ${arg}\n\n${USAGE}\n`);
+      return EXIT_USAGE;
+    }
+    if (file === undefined) {
+      file = arg;
+      continue;
+    }
+    if (pageNumber === undefined && /^\d+$/.test(arg)) {
+      pageNumber = Number(arg);
+      continue;
+    }
+    io.err(`Argumento inesperado: ${arg}\n\n${USAGE}\n`);
+    return EXIT_USAGE;
+  }
+
+  if (file === undefined || pageNumber === undefined) {
+    io.err(`explain-page exige o arquivo PDF e o número da página.\n\n${USAGE}\n`);
+    return EXIT_USAGE;
+  }
+
+  const loaded = await loadDocument(file);
+  if ("error" in loaded) {
+    io.err(loaded.error);
+    return loaded.code;
+  }
+
+  try {
+    io.out(formatExplainText(explainPage(loaded.document, pageNumber)));
+    return EXIT_OK;
+  } catch (error) {
+    if (error instanceof ExplainPageError) {
+      io.err(`${error.message}\n`);
+      return EXIT_USAGE;
+    }
+    if (error instanceof BookError || error instanceof SchemaValidationError) {
+      io.err(`Não foi possível gerar o Book de ${file}: ${messageOf(error)}\n`);
+      return EXIT_ERROR;
+    }
+    throw error;
+  }
+}
+
 /**
  * Runs the CLI and returns the process exit code.
  *
@@ -293,6 +465,10 @@ export async function run(argv: readonly string[], io: CliIo): Promise<number> {
   if (command === "dump-raw") return dumpRaw(args, io);
   if (command === "inspect") return inspect(args, io);
   if (command === "extract") return extract(args, io);
+  if (command === "explain-page") return explainPageCommand(args, io);
+  // The eval runner owns its own flags, messages and exit codes (E1-T06):
+  // the CLI only dispatches, so `pagepace eval` and `pnpm eval` stay one code.
+  if (command === "eval") return runEvalCli(args, io);
   io.err(`Comando desconhecido: ${command}\n\n${USAGE}\n`);
   return EXIT_USAGE;
 }

@@ -37,6 +37,14 @@ export {
 } from "./columns";
 export type { EndnoteContext, EndnoteDecision } from "./endnotes";
 export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeSectionTitle } from "./endnotes";
+export type {
+  ExplainedHyphenSite,
+  ExplainedLayer,
+  ExplainedLine,
+  ExplainedParagraph,
+  PageExplanation,
+} from "./explain";
+export { ExplainPageError, explainPage } from "./explain";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
 export type { FootnoteContext, FootnoteDecision } from "./footnotes";

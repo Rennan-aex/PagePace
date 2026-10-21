@@ -1,6 +1,6 @@
 # Checklist manual: conferência visual da extração
 
-Executar ao fim de cada fase do extrator (E2–E8) com `pagepace inspect <pdf>` (relatório lado a lado: página original × blocos extraídos, com flags de confiança). Use 1 livro N1, 1 artigo N2 e 1 livro de filosofia N3 (pelo menos um em pt e um em en).
+Executar ao fim de cada fase do extrator (E2–E8) com `pagepace inspect <pdf>` (relatório lado a lado: página original × blocos extraídos, com flags de confiança — formatos `text`, `md` e `html`, ver `packages/cli/README.md`). Use 1 livro N1, 1 artigo N2 e 1 livro de filosofia N3 (pelo menos um em pt e um em en).
 
 Data: ____ · Fase: ____ · Commit: ____ · Quem: ____
 
@@ -90,4 +90,27 @@ $b.blocks | Where-Object { $_.origin.pageFrom -eq $pag } | ForEach-Object {
 Para a E3, repita (2) e (5) em **3 páginas** de `n1-pt-sofia` (comece por
 `$pag = 11`, `$pag = 100`, `$pag = 250`) e faça (3) e (4) em `n1-pt-curinga`
 e `n1-en-sofia`.
+
+**(6) Relatório lado a lado (E7)** — gera um HTML com a página original ao
+lado dos blocos extraídos; blocos com flags de dúvida aparecem em vermelho
+(abra o arquivo no navegador):
+
+```powershell
+pnpm pagepace inspect <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf --pages 10-12 --format html --out $env:TEMP\sofia.html
+Start-Process "$env:TEMP\sofia.html"
+```
+
+Deve abrir o navegador com as 3 páginas. Errado: página em branco (render
+falhou) ou bloco vermelho que na verdade está certo (falso alarme de flag).
+
+**(7) Por que a página saiu assim (E7)** — a decisão de cada camada de uma
+página, parágrafo a parágrafo (troque o número da página):
+
+```powershell
+pnpm -s pagepace explain-page <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf 12
+```
+
+Deve listar os blocos com `kind`, `confiança`, `flags` e o bloco `camadas:`
+com a decisão de cada camada. Confira que o `kind` impresso é o mesmo do
+passo (2) para os mesmos blocos.
 

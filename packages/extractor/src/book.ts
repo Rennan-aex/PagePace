@@ -277,7 +277,7 @@ export function blockId(page: number, ordinal: number, text: string): string {
  * `pageFrom`, so its measure is the one of the page it starts on;
  * `pageMeasureOf` keeps excluding margin references and side lines.
  */
-function paragraphMeasures(
+export function paragraphMeasures(
   paragraphs: readonly JoinedParagraph[],
   pages: readonly (readonly (readonly TextLine[])[])[],
   marginRefLines: ReadonlySet<TextLine>,

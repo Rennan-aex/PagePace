@@ -80,6 +80,8 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-073 | Teste de reprocessamento: PDF sintético do minipdf + reextração leve simulada no teste | accepted |
 | ADR-074 | `origin.bbox` preenchido em todo bloco (união das linhas por página) | accepted |
 | ADR-075 | `renderPageRegion` com canvas injetado, no `@pagepace/extractor` | accepted |
+| ADR-076 | `@napi-rs/canvas` (Apache-2.0) só na CLI, como adaptador de render | accepted |
+| ADR-077 | `inspect` text/md/html com `--out` e `explain-page` fiel ao `Book` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -624,3 +626,15 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) código de render só no app (hoje o app não existe — ficaria sem teste e fora do monorepo); B) função em `@pagepace/extractor` com o alvo injetado (`RenderTarget` = width/height + `getContext("2d")`).
 **Decisão:** B — `packages/extractor/src/render.ts`: `regionFrame` puro (fit/zoom explícito, centralização, `clip` em pixels do canvas com padding padrão 8) + `renderPageRegion(page: PDFPageProxy, target, options)` que clipa o contexto e delega ao `page.render` (fundo branco padrão; `restore` garantido; a tipagem pede `canvas: null` ao pdf.js — os tipos exigem, o runtime aceita). Teste: unitário com stubs + integração com página **real** do pdf.js sobre PDF do `minipdf`. Doc: `docs/app/VIEW-ORIGINAL.md`.
 **Consequências:** a tela de correção usa a mesma função que o teste; rotação ≠ 0 da página não é enquadrada (limit aceito, corpus é rotação 0); cancelamento continua sendo do `RenderTask` do pdf.js.
+
+### ADR-076 · `@napi-rs/canvas` (Apache-2.0) só na CLI, como adaptador de render · accepted · 2026-10-21
+**Contexto:** o `inspect` em md/html precisa das imagens das páginas; o extractor tem `renderPageRegion` com canvas injetado (ADR-075) mas não pode depender de uma implementação de canvas (regra 6, núcleo portável).
+**Alternativas:** A) canvas no extractor (quebra a portabilidade do núcleo) · B) `@napi-rs/canvas` só em `packages/cli` (adaptador Node, binários pré-compilados, sem bibliotecas de sistema) · C) relatório sem imagem (perde o "lado a lado" pedido no aceite da tarefa).
+**Decisão:** B — a CLI é adaptador Node (a regra 6 permite fs/canvas lá); licença Apache-2.0; o pacote nunca vai para o navegador (o app desenha no `<canvas>` do DOM, ADR-075).
+**Consequências:** `pnpm pagepace inspect --format md|html` grava PNGs/embute base64; se o app precisar desses bytes no futuro, o caminho é o pdf.js do navegador, não este adaptador.
+
+### ADR-077 · `inspect` text/md/html com `--out` e `explain-page` fiel ao `Book` · accepted · 2026-10-21
+**Contexto:** a checklist manual pedia "relatório lado a lado: página original × blocos, com flags" (E7-T05); o `explain-page` precisa mostrar a decisão de cada camada sem poder divergir do `Book` emitido.
+**Alternativas:** A) reimplementar o pipeline num relatório paralelo (risco de divergir do builder) · B) rodar o pipeline real e ler kind/level/flags/confidence do `Book` real, casando parágrafo↔bloco pela ordem de emissão (mesmo skip de parágrafos vazios).
+**Decisão:** B; no `inspect`, text é o default no console (compatível com E1-T04) e md/html exigem `--out` (md grava os PNGs numa pasta `<arquivo>-inspect/` ao lado, html embute base64).
+**Consequências:** `explain.test.ts` compara explain×Book a cada mudança; mexer no builder exige manter o casamento; relatórios grandes de livro use `--pages`.
