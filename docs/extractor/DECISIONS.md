@@ -82,6 +82,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-075 | `renderPageRegion` com canvas injetado, no `@pagepace/extractor` | accepted |
 | ADR-076 | `@napi-rs/canvas` (Apache-2.0) só na CLI, como adaptador de render | accepted |
 | ADR-077 | `inspect` text/md/html com `--out` e `explain-page` fiel ao `Book` | accepted |
+| ADR-078 | CLI: caminho normalizado textualmente e `--out` raiz recusado | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -638,3 +639,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) reimplementar o pipeline num relatório paralelo (risco de divergir do builder) · B) rodar o pipeline real e ler kind/level/flags/confidence do `Book` real, casando parágrafo↔bloco pela ordem de emissão (mesmo skip de parágrafos vazios).
 **Decisão:** B; no `inspect`, text é o default no console (compatível com E1-T04) e md/html exigem `--out` (md grava os PNGs numa pasta `<arquivo>-inspect/` ao lado, html embute base64).
 **Consequências:** `explain.test.ts` compara explain×Book a cada mudança; mexer no builder exige manter o casamento; relatórios grandes de livro use `--pages`.
+
+### ADR-078 · CLI: caminho normalizado textualmente e `--out` raiz recusado · accepted · 2026-10-22
+**Contexto:** no Windows o `pnpm run` escapa as barras invertidas dos argumentos (`C:\\x\\y.pdf`), poluindo título, resumo e mensagens; com variável de ambiente vazia o `--out` virava `\Desktop\\x.html`, cujo `path.win32.dirname` devolve o próprio caminho (parse de UNC incompleto) e o `mkdir` falha com `UNKNOWN ... mkdir '<arquivo>.html\'`.
+**Alternativas:** A) `path.normalize` (depende da plataforma: no CI Linux não colapsa `\` e reescreveria UNC legítimo) · B) colapsar textualmente as corridas de separador preservando o par `\\`/`//` inicial (UNC), aplicado no parse; fs e exibição recebem o mesmo caminho limpo · C) exigir que o usuário contorne com aspas (PO iniciante; já citava o caminho normal).
+**Decisão:** B + validação no parse: `--out` cujo `dirname` é o próprio caminho (raiz/UNC incompleto) falha cedo com erro de uso explicando o formato esperado. No mesmo passe, a faixa de páginas (`páginas 1-2`) passou a aparecer no HTML/MD (antes só no text) e o resumo indica camada de OCR embutida (ADR-019).
+**Consequências:** UNC legítimo passa intacto; o caso que quebrou o relatório do PO é recusado com mensagem clara em vez de stack trace; testes portáveis no CI Linux (texto puro, sem `path` da plataforma).

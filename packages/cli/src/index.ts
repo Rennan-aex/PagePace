@@ -20,6 +20,7 @@ import {
   formatInspectMarkdown,
   formatInspectText,
   inspectModel,
+  normalizeCliPath,
 } from "./report";
 
 export const PACKAGE_NAME = "@pagepace/cli";
@@ -208,7 +209,7 @@ async function dumpRaw(args: readonly string[], io: CliIo): Promise<number> {
       io.err(`Só é possível ler um arquivo por vez: ${file} e ${arg}\n`);
       return EXIT_USAGE;
     }
-    file = arg;
+    file = normalizeCliPath(arg);
   }
 
   if (file === undefined) {
@@ -273,17 +274,22 @@ function parseInspectArgs(args: readonly string[]): InspectOptions | { error: st
       if (value === undefined || value.startsWith("-")) {
         return { error: `Opção --out exige um caminho de arquivo.\n` };
       }
-      out = value;
+      out = normalizeCliPath(value);
       continue;
     }
     if (arg.startsWith("-")) return { error: `Opção desconhecida: ${arg}\n\n${USAGE}\n` };
     if (file !== undefined) {
       return { error: `Só é possível ler um arquivo por vez: ${file} e ${arg}\n` };
     }
-    file = arg;
+    file = normalizeCliPath(arg);
   }
 
   if (file === undefined) return { error: `Falta o arquivo PDF.\n\n${USAGE}\n` };
+  if (out !== undefined && (out === "" || dirname(out) === out)) {
+    return {
+      error: `Caminho de --out inválido: ${out === "" ? "(vazio)" : out}. Use um caminho de arquivo com pasta e nome, ex.: C:\\Users\\seu-nome\\relatorio.html\n`,
+    };
+  }
   if (format !== "text" && out === undefined) {
     return {
       error: `O formato ${format} exige --out (um caminho de arquivo).\n`,
@@ -368,7 +374,7 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
       io.err(`Só é possível ler um arquivo por vez: ${file} e ${arg}\n`);
       return EXIT_USAGE;
     }
-    file = arg;
+    file = normalizeCliPath(arg);
   }
 
   if (file === undefined) {
@@ -408,7 +414,7 @@ async function explainPageCommand(args: readonly string[], io: CliIo): Promise<n
       return EXIT_USAGE;
     }
     if (file === undefined) {
-      file = arg;
+      file = normalizeCliPath(arg);
       continue;
     }
     if (pageNumber === undefined && /^\d+$/.test(arg)) {

@@ -6,14 +6,14 @@
 - **Fase atual:** **E7 CONCLUÍDA** (2026-10-21) — T01–T05 done (ADR-071/072/073/074/075/076/077). E6 CONCLUÍDA — T01 (PR #56); T02 (PR #57); T03, T04 (2026-10-19, ADR-070). E5 fechada (PRs #45–#54); E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37). Próxima fase: **E8** (`phases/` de E8 — descarta `font.data`).
 - **Tarefa atual:** nenhuma em andamento — E7-T05 concluída. Próxima sessão: primeira tarefa de **E8**.
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (944 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacta — E7-T05 mudou só CLI/docs, nenhuma heurística).
-- **Última atualização:** 2026-10-21 (E7-T05 concluída; ADR-076/077).
+- **Status:** `pnpm verify` verde (950 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacta — a sessão de 2026-10-22 mudou só a apresentação da CLI, nenhuma heurística).
+- **Última atualização:** 2026-10-22 (consertos da CLI: ADR-078; varredura de 5 relatórios inspect no BACKLOG).
 
 ## Tarefa atual — nenhuma (E7 fechada; próxima: E8)
 - Ver **Fase atual** acima e o arquivo da fase de E8 em `phases/`.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-21 — E7-T05 (CLI completa) — CONCLUÍDO** · branch `e7-t05-cli-full` (de `main` `67e42f6`). Entregue: `packages/extractor/src/explain.ts` (`explainPage` fiel ao `Book`) + CLI com `inspect --format text|md|html --out` (render com `@napi-rs/canvas`, ADR-076), `explain-page <pdf> <n>` e `eval` delegado ao `@pagepace/eval` + **`packages/cli/README.md`** + checklist manual passos (6)/(7) + **ADR-076/077**. **944 testes** (+15), `pnpm eval --ci` exit 0, `check:docs` verde. E7 **fechada**. Próxima: primeira tarefa de **E8** (ver `phases/` de E8).
+- **Sessão 2026-10-22 — consertos da CLI + backlog da varredura — CONCLUÍDO** · branch `fix/cli-inspect-presentation` (de `main` `8be8fd8` + docs). Entregue: `normalizeCliPath` (barras duplicadas do pnpm, UNC preservado), `--out` raiz recusado com erro claro, faixa `páginas X-Y` no HTML/MD, resumo com nota de OCR (**ADR-078**); BACKLOG com a varredura dos 5 relatórios inspect (fila 3A: pequenos → embaralhamento/rodapé → spike fi/à); relatórios do PO em `<CORPUS_PRIVATE_DIR>\Relatórios`. **950 testes** (+6), `pnpm eval --ci` exit 0. Próxima: primeira tarefa de **E8** (ou BACKLOG P1 da fila 3A, se o PO escolher).
 - *(handoffs anteriores: ver Log de sessões e archive/)*
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
@@ -38,8 +38,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-22 · **Consertos da CLI + backlog da varredura — CONCLUÍDO** · `normalizeCliPath`, `--out` raiz recusado, `páginas X-Y` no HTML/MD, nota de OCR no resumo (**ADR-078**); BACKLOG com os achados dos 5 relatórios inspect (fila 3A); **950 testes** (+6); `pnpm eval --ci` exit 0.
 - 2026-10-21 · **E7-T05 (CLI completa) — CONCLUÍDO** · `explain.ts` no extractor (pipeline real + `Book` final, ADR-077) + CLI `inspect` text/md/html (render `@napi-rs/canvas`, ADR-076), `explain-page`, `eval` delegado; README do pacote + checklist (6)/(7); **944 testes** (+15); `pnpm eval --ci` exit 0; **ADR-076/077**; **E7 fechada**.
-- 2026-10-20 · **E7-T04 (dados para "ver original") — CONCLUÍDO** · `bbox.ts` + `render.ts` no extractor (todo bloco com `origin.bbox` por página; `renderPageRegion` com canvas injetado, sem dependência nova); doc `docs/app/VIEW-ORIGINAL.md`; **929 testes** (+20); `pnpm eval --ci` exit 0; **ADR-074/075**.
-- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md` (E7-T02/T03).
+- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md` (E7-T02/T03; E7-T04 ver ADR-074/075).
 
 Histórico completo: docs/extractor/archive/

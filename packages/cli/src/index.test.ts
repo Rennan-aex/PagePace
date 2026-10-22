@@ -6,6 +6,7 @@ import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
 import { EXIT_ERROR, EXIT_OK, EXIT_SCANNED, EXIT_USAGE, HELP, run } from "./index";
+import { normalizeCliPath, pagesRange } from "./report";
 
 /**
  * E1-T04: the minimal CLI.
@@ -459,6 +460,76 @@ describe("explain-page (E7-T05)", () => {
     const noFile = capture();
     expect(await run(["explain-page"], noFile.io)).toBe(EXIT_USAGE);
     expect(noFile.err()).toContain("exige o arquivo PDF e o número da página");
+  });
+});
+
+describe("path handling and --out validation (CLI fixes)", () => {
+  it("collapses the doubled backslashes pnpm adds on Windows", async () => {
+    const streams = capture();
+    const code = await run(["dump-raw", "missing\\\\dir\\\\nope.pdf"], streams.io);
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(streams.err()).toContain("missing\\dir\\nope.pdf");
+    expect(streams.err()).not.toContain("missing\\\\dir");
+  });
+
+  it("rejects a --out that names a root instead of a file, before reading the PDF", async () => {
+    const streams = capture();
+    const code = await run(["inspect", "no-such.pdf", "--out", path.sep], streams.io);
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(streams.err()).toContain("Caminho de --out inválido");
+    expect(streams.err()).toContain("pasta e nome");
+  });
+
+  it("normalizeCliPath collapses separator runs and keeps a leading UNC marker", () => {
+    expect(normalizeCliPath("C:\\\\Users\\\\me\\\\x.pdf")).toBe("C:\\Users\\me\\x.pdf");
+    expect(normalizeCliPath("\\\\nas\\\\share\\\\x.pdf")).toBe("\\\\nas\\share\\x.pdf");
+    expect(normalizeCliPath("corpus/public//x.pdf")).toBe("corpus/public/x.pdf");
+    expect(normalizeCliPath("plain.pdf")).toBe("plain.pdf");
+  });
+
+  it("pagesRange collapses consecutive pages and keeps gaps", () => {
+    expect(pagesRange([1])).toBe("1");
+    expect(pagesRange([1, 2, 3])).toBe("1-3");
+    expect(pagesRange([1, 3])).toBe("1, 3");
+    expect(pagesRange([3, 1, 2, 5])).toBe("1-3, 5");
+  });
+
+  it("shows the page span of every block in the html and markdown reports", async () => {
+    const file = await writePdf(
+      "span.pdf",
+      buildPdf([
+        [
+          textStream("line one", { x: 72, y: 400, size: 12 }),
+          textStream("line two", { x: 72, y: 380, size: 12 }),
+        ].join("\n"),
+      ]),
+    );
+
+    const htmlOut = path.join(dir, "span.html");
+    const html = capture();
+    expect(await run(["inspect", file, "--format", "html", "--out", htmlOut], html.io)).toBe(
+      EXIT_OK,
+    );
+    expect(await readFile(htmlOut, "utf8")).toContain('<span class="pages">páginas 1</span>');
+
+    const mdOut = path.join(dir, "span.md");
+    const md = capture();
+    expect(await run(["inspect", file, "--format", "md", "--out", mdOut], md.io)).toBe(EXIT_OK);
+    expect(await readFile(mdOut, "utf8")).toContain("páginas 1 · confiança");
+  });
+
+  it("notes an embedded OCR layer in the summary (base confidence 0.50)", async () => {
+    const file = await writePdf(
+      "ocr-report.pdf",
+      buildPdf([textStream("invisible OCR text layer", { renderMode: 3 })]),
+    );
+    const streams = capture();
+    const code = await run(["inspect", file], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.out()).toContain("camada de OCR embutida");
   });
 });
 

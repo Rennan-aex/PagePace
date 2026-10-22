@@ -10,6 +10,39 @@ import type { Book } from "@pagepace/schema";
  * nothing here touches the filesystem.
  */
 
+/**
+ * Cleans a path the user typed on the command line: `pnpm run` escapes
+ * backslashes on Windows, doubling every separator (`C:\\x\\y.pdf`). Each
+ * run of separators collapses to one; a leading `\\`/`//` (UNC) is kept, so
+ * a real network path keeps its meaning (ADR-077).
+ */
+export function normalizeCliPath(input: string): string {
+  const unc = input.startsWith("\\\\") || input.startsWith("//") ? input.slice(0, 2) : "";
+  const rest = unc === "" ? input : input.slice(2);
+  return unc + rest.replace(/[\\/]{2,}/g, (run) => run.charAt(0));
+}
+
+/** `1`, `1-3`, `1, 3`: pages as collapsed ranges, never `1-3` for 1 and 3 only. */
+export function pagesRange(pages: readonly number[]): string {
+  const sorted = [...new Set(pages)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start: number | undefined;
+  let previous: number | undefined;
+  for (const page of sorted) {
+    if (previous === undefined || page !== previous + 1) {
+      if (start !== undefined && previous !== undefined) {
+        parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+      }
+      start = page;
+    }
+    previous = page;
+  }
+  if (start !== undefined && previous !== undefined) {
+    parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+  }
+  return parts.join(", ");
+}
+
 /** One block of the inspect model, in reading order. */
 export interface ReportBlock {
   id: string;
@@ -31,6 +64,8 @@ export interface ReportPage {
 /** Everything the inspect report renders. */
 export interface InspectModel {
   file: string;
+  /** The text comes from an invisible OCR layer (ADR-019): base confidence 0.50. */
+  ocrTextLayer: boolean;
   pageCount: number;
   pages: ReportPage[];
   stats: {
@@ -50,13 +85,14 @@ function blockText(block: Book["blocks"][number]): string {
 /** Blocks of `book` that touch each 1-based page of `pages`, in reading order. */
 export function inspectModel(
   file: string,
-  document: { source: { pageCount: number } },
+  document: { source: { pageCount: number; ocrTextLayer?: boolean } },
   book: Book,
   stats: DocumentStats,
   pages: readonly number[],
 ): InspectModel {
   return {
     file,
+    ocrTextLayer: document.source.ocrTextLayer === true,
     pageCount: document.source.pageCount,
     pages: pages.map((page) => ({
       page,
@@ -101,23 +137,28 @@ function flagsLabel(flags: readonly string[]): string {
 /** The document summary both reports open with. */
 export function formatSummary(model: InspectModel): string {
   const { margins } = model.stats;
-  return [
+  const lines = [
     `Arquivo: ${model.file}`,
     `Páginas medidas: ${model.stats.pagesMeasured} de ${model.pageCount}`,
     `Itens de texto: ${model.stats.itemsMeasured}`,
     `Páginas no relatório: ${model.pages.map((page) => page.page).join(", ")}`,
+  ];
+  if (model.ocrTextLayer) {
+    lines.push("Texto: camada de OCR embutida (confiança base 0,50, ADR-019)");
+  }
+  lines.push(
     `Corpo (moda ponderada): ${pt(model.stats.bodyFontSize)}`,
     `Entrelinha típica: ${pt(model.stats.lineHeight)}`,
     `Margens: topo ${pt(margins.top)} · direita ${pt(margins.right)} · base ${pt(margins.bottom)} · esquerda ${pt(margins.left)}`,
     `Largura de coluna: ${pt(model.stats.columnWidth)}`,
     "",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 function blockHeading(block: ReportBlock): string {
   const level = block.level === undefined ? "" : ` nível ${block.level}`;
-  const pages = block.pages.join("-");
-  return `${block.kind}${level} · páginas ${pages} · confiança ${block.confidence.toFixed(2)} · flags: ${flagsLabel(block.flags)}`;
+  return `${block.kind}${level} · páginas ${pagesRange(block.pages)} · confiança ${block.confidence.toFixed(2)} · flags: ${flagsLabel(block.flags)}`;
 }
 
 /** Plain-text report: summary plus every block of every reported page. */
@@ -158,7 +199,7 @@ export function formatInspectMarkdown(
         : page.blocks
             .map(
               (block) =>
-                `**${escapeHtml(block.kind)}**${block.level === undefined ? "" : ` (nível ${block.level})`} — confiança ${block.confidence.toFixed(2)} · flags: ${flagsLabel(block.flags)}\n\n> ${escapeHtml(block.text).replace(/\n/g, "\n> ")}`,
+                `**${escapeHtml(block.kind)}**${block.level === undefined ? "" : ` (nível ${block.level})`} — páginas ${pagesRange(block.pages)} · confiança ${block.confidence.toFixed(2)} · flags: ${flagsLabel(block.flags)}\n\n> ${escapeHtml(block.text).replace(/\n/g, "\n> ")}`,
             )
             .join("\n\n");
     out.push(`| Original | Extraído |`, `| --- | --- |`, `| ${imageCell} | ${blocksCell} |`, "");
@@ -187,6 +228,7 @@ export function formatInspectHtml(
         <article class="block${block.flags.length > 0 ? " flagged" : ""}">
           <header>
             <span class="kind">${escapeHtml(block.kind)}${block.level === undefined ? "" : ` (nível ${block.level})`}</span>
+            <span class="pages">páginas ${pagesRange(block.pages)}</span>
             <span class="confidence">confiança ${block.confidence.toFixed(2)}</span>
             <span class="flags">flags: ${escapeHtml(flagsLabel(block.flags))}</span>
           </header>
@@ -250,7 +292,7 @@ export function formatExplainText(explanation: PageExplanation): string {
     out.push("", "(nenhum parágrafo nesta página)");
   }
   for (const [index, paragraph] of explanation.paragraphs.entries()) {
-    const pages = paragraph.pages.join("-");
+    const pages = pagesRange(paragraph.pages);
     const level = paragraph.level === undefined ? "" : ` nível ${paragraph.level}`;
     out.push(
       "",
