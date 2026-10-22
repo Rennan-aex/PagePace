@@ -47,6 +47,34 @@ describe("hyphenJoinDecision", () => {
     expect(hyphenJoinDecision("demos", "la")).toBe("keep");
   });
 
+  it("keeps the compounds the corpus found broken at a line end (backlog 3A)", () => {
+    // Read off the 40 printed line-end hyphens of `n1-pt-sofia`, whose
+    // default join was mangling them (`lírios-` + `amarelos` → the reported
+    // "líriosamarelos"). Each pair is a compound the book prints whole.
+    const compounds = [
+      ["lírios", "amarelos"],
+      ["quebra", "cabeça"],
+      ["bem", "vindo"],
+      ["meia", "idade"],
+      ["pré", "socráticos"],
+      ["greco", "romano"],
+      ["marxismo", "leninismo"],
+      ["cartões", "postais"],
+      ["cartão", "postal"],
+      ["palavras", "chave"],
+      ["sexta", "feira"],
+      ["recém", "nascido"],
+      ["sul", "americano"],
+      ["livre", "arbítrio"],
+      ["inter", "relação"],
+      ["matérias", "primas"],
+      ["todo", "poderosa"],
+    ] as const;
+    for (const [left, right] of compounds) {
+      expect(hyphenJoinDecision(left, right), `${left}-${right}`).toBe("keep");
+    }
+  });
+
   it("keeps but doubts a proper noun after the hyphen", () => {
     expect(hyphenJoinDecision("Ex", "Ministro")).toBe("uncertain");
     expect(hyphenJoinDecision("Mc", "Donald")).toBe("uncertain");
@@ -84,6 +112,15 @@ describe("hyphenSiteBetween", () => {
       right: "teórico",
       decision: "keep",
       word: "não-teórico",
+    });
+  });
+
+  it("gives the reader lírios-amarelos, not líriosamarelos (backlog 3A)", () => {
+    expect(hyphenSiteBetween("os jardins os lírios-", "amarelos já floresciam.")).toEqual({
+      left: "lírios",
+      right: "amarelos",
+      decision: "keep",
+      word: "lírios-amarelos",
     });
   });
 

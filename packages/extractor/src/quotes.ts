@@ -32,6 +32,14 @@ import type { JoinedParagraph } from "./pagejoin";
  * affiliation or an e-mail); and a one-line indented face (a subtitle, a
  * byline) is an epigraph only with attribution or sentence punctuation.
  *
+ * Dialogue and the label's body (backlog 3A, second round): a block that
+ * opens with a speech dash (`— Rom, rom, rom! — ronronou ele.`, the printed
+ * quotation mark of spoken prose) is body text, not a quote — the same dash
+ * that closes an attribution line is what opens a speaker's turn; and a
+ * block sitting directly after a metadata label (`ABSTRACT`, then the
+ * abstract itself) is the body of that entry, however indented the journal
+ * sets it.
+ *
  * Priority in `buildBook`: a footnote or a heading never becomes a quote —
  * the size gates of those passes are complementary (a note is smaller than
  * `FOOTNOTE_MAX_SIZE_FACTOR`, a heading is flush left and not
@@ -40,8 +48,10 @@ import type { JoinedParagraph } from "./pagejoin";
  * Known limits: a quote that starts with a list marker (`1.`, `•`) is not
  * recognised yet (E5-T05 will reclassify those paragraphs), a quotation
  * mark alone (`"`, `“`) is not a signal (too many false positives in body
- * dialogue), and a centred epigraph is only caught by the italic/size
- * rules — the indent rule assumes a left-aligned block.
+ * dialogue), a centred epigraph is only caught by the italic/size
+ * rules — the indent rule assumes a left-aligned block, and the label's
+ * body is taken from the paragraph immediately before it (a label split
+ * from its body by another block is not followed).
  */
 
 /** Minimum left inset (fraction of the font size) that marks a block quote. */
@@ -75,6 +85,14 @@ export const QUOTE_SENTENCE_END = /[.!?…:;]["»”')\]]*\s*$/;
  */
 export const QUOTE_LABEL =
   /^(?:keywords?|palavras-chave|palavraschave|e-?mail|affiliation|afilia[çc][ãa]o|abstract|resumo|received|accepted|doi)\b/i;
+
+/**
+ * Speech dash that opens a speaker's turn (`— Rom, rom, rom!`, `- Yes.`).
+ * The em/en dash is the printed quotation mark of dialogue, so a block that
+ * opens with it is body prose: the same glyph that closes an epigraph's
+ * attribution is what opens the speech (backlog 3A, second round).
+ */
+export const QUOTE_DIALOGUE_DASH = /^[—–]\s*\S/;
 
 /** One decision per input paragraph, in the same order. */
 export interface QuoteDecision {
@@ -188,6 +206,20 @@ function opensWithLabel(features: QuoteFeatures): boolean {
   return QUOTE_LABEL.test(firstLine.trimStart());
 }
 
+/** A block opens like spoken dialogue: the dash is a speech mark (backlog 3A). */
+function opensWithDialogue(features: QuoteFeatures): boolean {
+  const firstLine = features.text.split("\n", 1)[0] ?? "";
+  return QUOTE_DIALOGUE_DASH.test(firstLine.trimStart());
+}
+
+/** Whether a block sits directly after a metadata label, so it is that entry's body. */
+function followsLabel(measured: readonly QuoteFeatures[], index: number): boolean {
+  const previous = measured[index - 1];
+  if (previous === undefined) return false;
+  const firstLine = previous.text.split("\n", 1)[0] ?? "";
+  return QUOTE_LABEL.test(firstLine.trimStart());
+}
+
 /** A one-line display line reads as a quote only with attribution or punctuation. */
 function hasQuoteShape(features: QuoteFeatures): boolean {
   return QUOTE_ATTRIBUTION.test(features.text) || QUOTE_SENTENCE_END.test(features.text.trimEnd());
@@ -237,7 +269,11 @@ export function detectQuotes(
 ): QuoteDecision[] {
   const measured = paragraphs.map((paragraph, index) => featuresOf(paragraph, index, context));
 
-  return measured.map((features) => {
+  return measured.map((features, index) => {
+    // Dialogue and the body of a metadata label are prose however the page
+    // sets them (backlog 3A, second round): the speech dash opens a turn,
+    // and a block after `Abstract:` is that entry's own text.
+    if (opensWithDialogue(features) || followsLabel(measured, index)) return NOT_A_QUOTE;
     if (isEpigraph(features, context)) {
       return { quote: true, kind: "epigraph" as const, uncertain: false };
     }

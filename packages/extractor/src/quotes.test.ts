@@ -181,6 +181,45 @@ describe("detectQuotes", () => {
     }
   });
 
+  it("keeps a dialogue line as a paragraph, never a quote (backlog 3A)", () => {
+    // "— Rom, rom, rom! — ronronou ele." sits indented and closed like a
+    // sentence: the em dash that opens it is the speech mark of spoken prose,
+    // not the attribution of a quotation.
+    const decisions = decisionsOf([
+      pageWithQuote(["— Rom, rom, rom! — ronronou ele."], { x: MARGIN + 24 }),
+    ]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+
+    const italic = decisionsOf([
+      pageWithQuote(["— Não, respondeu ela, e saiu andando."], {
+        x: MARGIN + 36,
+        fontName: "Helvetica-Oblique",
+      }),
+    ]);
+    expect(italic.filter((decision) => decision.quote)).toHaveLength(0);
+  });
+
+  it("keeps the body that follows a metadata label as a paragraph (backlog 3A)", () => {
+    // The abstract of an A&A paper: the label line, then the abstract itself
+    // set smaller and indented inside the measure — the indent rule alone
+    // would claim that body as a blockquote.
+    const page0 = page([
+      ...bodyAt(100),
+      ...lines(["ABSTRACT"], 170, { size: 9 }),
+      ...lines(
+        ["Context. The abstract runs indented on", "every line the journal sets inside it."],
+        210,
+        { x: MARGIN + 24, size: 9 },
+      ),
+      ...bodyAt(290),
+      ...bodyAt(350),
+    ]);
+    const decisions = decisionsOf([page0]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+    const abstractBody = decisions.at(-1);
+    expect(abstractBody?.quote).toBe(false);
+  });
+
   it("keeps a one-line indented display line without quote shape as a paragraph", () => {
     // A title/subtitle or a byline set italic and indented is not an epigraph
     // unless it reads like a quote (attribution or sentence punctuation).

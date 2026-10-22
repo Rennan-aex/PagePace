@@ -59,8 +59,17 @@ export const HEADING_SHORT_MAX_LINES = 2;
 export const HEADING_SHORT_WIDTH_SHARE = 0.7;
 /** Extra space (fraction of the typical leading) that counts as isolation. */
 export const HEADING_ISOLATION_FACTOR = 1.5;
-/** Sizes closer than this fraction of the larger one share one level. */
-export const HEADING_SIZE_CLUSTER_FACTOR = 0.05;
+/**
+ * Sizes closer than this fraction of the larger one share one level. 0,06
+ * and not 0,05 (backlog 3A): the half-title of `n4-pt-astrofisica` sets its
+ * title at 29,75 pt and the author at 28,08 pt — 1,7 pt apart, the same
+ * display band by eye, but a whole level apart at 0,05, so the cover read
+ * 1/2/4 with a skipped level. Measured on the corpus before changing: n1
+ * (curinga) and n3 (filosofia) keep every cluster, n2 only merges the
+ * 17,22/16,35 pt title pair, and the synthetic headings (14/16/18 pt over a
+ * 9 pt body) stay one level apart.
+ */
+export const HEADING_SIZE_CLUSTER_FACTOR = 0.06;
 /** Deepest heading level the schema accepts (`@pagepace/schema`). */
 export const HEADING_MAX_LEVEL = 6;
 
@@ -74,6 +83,16 @@ export const HEADING_NUMBERING_WORD =
 
 /** Section numbers of a heading (`1.2 Title`, `1.2.3`); a bare `1.` is not one. */
 export const HEADING_SECTION_NUMBERING = /^\d+(?:\.\d+)+\s*\S/;
+
+/**
+ * Section numbering followed by a capitalised word (`2.1. Challenges in
+ * choosing priors`). The numbered face of a subsection the typesetter sets
+ * italic (A&A sets `2.1.` subheads in slanted type) is a title, so the
+ * italic gate must not reject it — an epigraph never opens with a section
+ * number, and prose that starts with a decimal keeps its lowercase word
+ * after the number (backlog 3A).
+ */
+export const HEADING_SECTION_TITLE = /^\d+(?:\.\d+)+\.?\s+\p{Lu}/u;
 
 /** Bullets and list numbers (`•`, `-`, `1.`, `1)`, `(a)`) a heading never starts with. */
 export const HEADING_LIST_MARKER = /^(?:[-–—•▪◦*]|\(?\w{1,2}\)|\d{1,3}[.)])\s+/;
@@ -252,7 +271,12 @@ function isHeading(features: HeadingFeatures, context: HeadingContext): boolean 
       features.fontSize >= body * HEADING_SIZE_FACTOR || features.boldShare >= HEADING_BOLD_SHARE;
     if (!display || listed) return false;
   }
-  if (features.italicShare > HEADING_ITALIC_MAX_SHARE) return false;
+  if (
+    features.italicShare > HEADING_ITALIC_MAX_SHARE &&
+    !HEADING_SECTION_TITLE.test(features.text)
+  ) {
+    return false;
+  }
   if (HEADING_CAPTION_MARKER.test(features.text)) return false;
   return (
     features.fontSize >= body * HEADING_SIZE_FACTOR ||

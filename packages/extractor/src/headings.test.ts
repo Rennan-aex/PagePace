@@ -242,6 +242,35 @@ describe("detectHeadings", () => {
     expect(decisions[1]?.heading).toBe(false);
   });
 
+  it("finds an italic numbered subsection, the slanted subhead of a journal (backlog 3A)", () => {
+    // A&A sets `2.1.` subheads in slanted type at the body size: the number
+    // is the title signal and an epigraph never opens with a section number,
+    // so the italic share alone must not reject the block.
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["2.1. Challenges in choosing priors"], 155, BODY, {
+          fontName: "Helvetica-Oblique",
+        }),
+        ...BODY_LONG(180),
+      ]),
+    ]);
+    expect(decisions[1]?.heading).toBe(true);
+  });
+
+  it("keeps an italic decimal sentence out of the heading kind (backlog 3A)", () => {
+    // The number carries prose here — the word after it is lowercase — so
+    // the subsection exemption of the italic gate must not apply.
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["2.1 of the sample was noise"], 155, BODY, { fontName: "Helvetica-Oblique" }),
+        ...BODY_LONG(180),
+      ]),
+    ]);
+    expect(decisions[1]?.heading).toBe(false);
+  });
+
   it("keeps a caption as a caption, not a heading", () => {
     const decisions = decisionsOf([
       page([...BODY_LONG(100), ...lines(["Fig. 3 The village street"], 155), ...BODY_LONG(180)]),
@@ -300,6 +329,15 @@ describe("headingLevels", () => {
   it("shares one level between sizes closer than the cluster factor", () => {
     const close = BODY * (1 + HEADING_SIZE_CLUSTER_FACTOR / 2);
     expect(headingLevels([close, BODY])).toEqual([1, 1]);
+  });
+
+  it("keeps the cover of n4-pt-astrofisica free of a skipped level (backlog 3A)", () => {
+    // Its cover and half-title set the title at 36/29,75 pt and the author at
+    // 28,08 pt: 1,7 pt apart, the same display band, so the author sits one
+    // level below the title instead of two (the cover read 1/2/4).
+    expect(headingLevels([36, 29.75, 28.08, 24.79, 12])).toEqual([1, 2, 2, 3, 4]);
+    // A journal subsection stays below its section: 9,46 against 10,36 pt.
+    expect(headingLevels([10.36, 9.46])).toEqual([1, 2]);
   });
 
   it("falls back to the reading order when every heading has one size", () => {

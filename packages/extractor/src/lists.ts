@@ -14,6 +14,11 @@ import { lineText } from "./spaces";
  * is enough on its own: a bullet inside an indented quote is still a list
  * item, so a marked item outranks the quote pass (E5-T04) in `buildBook`.
  *
+ * A dash of dialogue never opens an item (backlog 3A): `— Rom, rom, rom! —
+ * ronronou ele.` (n1-pt-sofia) is spoken prose, and the em/en dash is the
+ * speech mark the typesetter prints, not a bullet — the marker list keeps
+ * the hyphen `-`, which is the printed bullet, and drops `–—`.
+ *
  * A second, weaker rule reads **indent alone**: every line of the block sits
  * between `LIST_MIN_INDENT_EM` and the block-quote gate
  * (`QUOTE_MIN_INDENT_EM`) away from the page's left edge — the shallow recuo
@@ -39,7 +44,7 @@ export const UNCERTAIN_LIST_FLAG = "uncertain-list";
 export const LIST_UNCERTAIN_CONFIDENCE = 0.7;
 
 /** Bullets and list numbers (`•`, `-`, `*`, `1.`, `2)`, `(3)`) that open a list item. */
-export const LIST_MARKER = /^(?:[-•‣◦▪–—*·]|\(?\w{1,2}\)|\d{1,3}[.)])\s+/;
+export const LIST_MARKER = /^(?:[-•‣◦▪*·]|\(?\w{1,2}\)|\d{1,3}[.)])\s+/;
 
 /** One decision per input paragraph, in the same order. */
 export interface ListDecision {

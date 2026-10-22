@@ -27,6 +27,14 @@ import { lineText } from "./spaces";
  * they do not prove. That is why the lexicons stay tiny and the leftover
  * doubt is flagged instead of silenced (ARCHITECTURE decision 6).
  *
+ * Measured on `n1-pt-sofia` (backlog 3A): all 40 of its printed line-end
+ * hyphens are content — 15 enclisis pronouns the clitic rule already keeps,
+ * 1 uncertain proper noun, and 24 the default join was mangling
+ * (`lírios-` + `amarelos` → "líriosamarelos"). The lexical compounds among
+ * them entered the lexicon as they were found. The default join stays: a
+ * typeset journal breaks words by the syllable and nothing the layout shows
+ * separates the two classes.
+ *
  * Known limits: never crosses a page (that join is E3-T04), one decision per
  * site (no re-reading of the joined word), and soft hyphens (U+00AD) are not
  * sites — they leave no printed `-` and `normalizeUnicode` removes them.
@@ -63,9 +71,26 @@ export const HYPHEN_CLITICS_EN: ReadonlySet<string> = new Set([]);
 /** Small per-language lexicon of compounds whose hyphen is content. */
 export const HYPHEN_LEXICON_PT: ReadonlySet<string> = new Set([
   "bem-estar",
+  "bem-vindo",
+  "cartão-postal",
+  "cartões-postais",
+  "greco-romano",
   "guarda-chuva",
   "guarda-roupa",
+  "inter-relação",
+  "lírios-amarelos",
+  "livre-arbítrio",
+  "marxismo-leninismo",
+  "matérias-primas",
+  "meia-idade",
+  "palavras-chave",
+  "pré-socráticos",
+  "quebra-cabeça",
+  "recém-nascido",
   "segunda-feira",
+  "sexta-feira",
+  "sul-americano",
+  "todo-poderosa",
 ]);
 export const HYPHEN_LEXICON_EN: ReadonlySet<string> = new Set([
   "long-term",

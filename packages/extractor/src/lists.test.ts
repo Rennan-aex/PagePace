@@ -122,6 +122,14 @@ describe("LIST_MARKER", () => {
       expect(LIST_MARKER.test(prose), prose).toBe(false);
     }
   });
+
+  it("keeps the dash of dialogue out of the marker list (backlog 3A)", () => {
+    // The em/en dash is the printed quotation mark of speech ("— Rom, rom,
+    // rom! — ronronou ele."), not a bullet; the hyphen `-` stays a marker.
+    expect(LIST_MARKER.test("— Rom, rom, rom! — ronronou ele.")).toBe(false);
+    expect(LIST_MARKER.test("– Não, respondeu ela.")).toBe(false);
+    expect(LIST_MARKER.test("- item here")).toBe(true);
+  });
 });
 
 describe("detectLists", () => {
@@ -192,6 +200,11 @@ describe("detectLists", () => {
     ]);
     expect(decisions.every((decision) => !decision.list)).toBe(true);
   });
+
+  it("keeps a dialogue line as prose, not a list item (backlog 3A)", () => {
+    const decisions = decisionsOf([pageWithItem(["— Rom, rom, rom! — ronronou ele."])]);
+    expect(decisions.every((decision) => !decision.list)).toBe(true);
+  });
 });
 
 describe("buildBook with lists (E5-T05)", () => {
@@ -239,5 +252,23 @@ describe("buildBook with lists (E5-T05)", () => {
   it("keeps body paragraphs as paragraphs", () => {
     const book = buildBook(doc([page([...bodyAt(100), ...bodyAt(160), ...bodyAt(220)])]));
     expect(book.blocks.every((block) => block.kind === "paragraph")).toBe(true);
+  });
+
+  it("emits a paragraph for a dialogue line, neither list_item nor quote (backlog 3A)", () => {
+    const book = buildBook(
+      doc([
+        page([
+          ...bodyAt(100),
+          ...lines(["— Rom, rom, rom! — ronronou ele."], 170, { x: MARGIN + 24 }),
+          ...bodyAt(230),
+        ]),
+      ]),
+    );
+    const dialogue = book.blocks.find((block) =>
+      block.runs.some((run) => run.text.includes("Rom, rom")),
+    );
+    expect(dialogue?.kind).toBe("paragraph");
+    expect(book.blocks.some((block) => block.kind === "list_item")).toBe(false);
+    expect(book.blocks.some((block) => block.kind === "blockquote")).toBe(false);
   });
 });
