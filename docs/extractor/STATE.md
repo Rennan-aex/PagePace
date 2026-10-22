@@ -4,16 +4,18 @@
 
 ## Situação
 - **Fase atual:** **E7 CONCLUÍDA** (2026-10-21) — T01–T05 done (ADR-071/072/073/074/075/076/077). E6 CONCLUÍDA — T01 (PR #56); T02 (PR #57); T03, T04 (2026-10-19, ADR-070). E5 fechada (PRs #45–#54); E4 fechada (PRs #38–#44); E3 fechada (PRs #29–#34); consertos P1 na `main` (PR #37). Próxima fase: **E8** (`phases/` de E8 — descarta `font.data`).
-- **Tarefa atual:** nenhuma em andamento — E7-T05 concluída. Próxima sessão: primeira tarefa de **E8**.
+- **Tarefa atual:** fila 3A (erros pequenos witt) concluída nesta sessão. Próxima sessão: restantes da fila 3A (casos n2/n4/sofia), ou primeira tarefa de **E8**.
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (950 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacta — a sessão de 2026-10-22 mudou só a apresentação da CLI, nenhuma heurística).
-- **Última atualização:** 2026-10-22 (consertos da CLI: ADR-078; varredura de 5 relatórios inspect no BACKLOG).
+- **Status:** `pnpm verify` verde (966 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (sem regressão — `text_cer` 0.0000 nos 12 medidos; **ADR-079**).
+- **Última atualização:** 2026-10-22 (fila 3A witt: ornamento/hífen/tipos — ADR-079).
 
-## Tarefa atual — nenhuma (E7 fechada; próxima: E8)
-- Ver **Fase atual** acima e o arquivo da fase de E8 em `phases/`.
+## Tarefa atual — BACKLOG fila 3A (P1): erros pequenos do wittgenstein
+- **CONCLUÍDA** nesta sessão (branch `fix/backlog-3a-wittgenstein-small`, ADR-079): (a) glifo "`" (`stripOrnamentItems`), (b) hífen duplo (colapso p/ 1 hífen), (c) tipos witt (frente-mater → paragraph, "` 1" → heading). (d) dispensado — o espaço " Artigo" vinha do ornamento já removido em (a).
+- **Restante da fila 3A (próxima sessão):** casos n2/n4/sofia (byline n2, subheads 2.1, capa n4, "Rom", "Goethe", "ABSTRACT", "líriosamarelos") — ver BACKLOG linha 22. Side-detection do witt (P2) continua pendente.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-22 — consertos da CLI + backlog da varredura — CONCLUÍDO** · branch `fix/cli-inspect-presentation` (de `main` `8be8fd8` + docs). Entregue: `normalizeCliPath` (barras duplicadas do pnpm, UNC preservado), `--out` raiz recusado com erro claro, faixa `páginas X-Y` no HTML/MD, resumo com nota de OCR (**ADR-078**); BACKLOG com a varredura dos 5 relatórios inspect (fila 3A: pequenos → embaralhamento/rodapé → spike fi/à); relatórios do PO em `<CORPUS_PRIVATE_DIR>\Relatórios`. **950 testes** (+6), `pnpm eval --ci` exit 0. Próxima: primeira tarefa de **E8** (ou BACKLOG P1 da fila 3A, se o PO escolher).
+- **Sessão 2026-10-22/2 — fila 3A (erros pequenos witt) — CONCLUÍDO** · branch `fix/backlog-3a-wittgenstein-small` (4 commits `fix:`). (a) `stripOrnamentItems` (accents.ts, chamado na ingestão pós-`composeAccentItems`): apaga texto de item de fonte-símbolo (Wingdings/Webdings/Symbol/Zapf/Marlett) que é espaço ou acento avulso — geometria intacta. (b) `hyphenSiteBetween`: sítio cuja próxima linha reabre com "-" → `keep`, colapsa p/ 1 hífen (hyphen.ts + espelho dropLeadingHyphen em runs.ts). (c) `detectQuotes`: rótulo (Keywords/E-mail/Abstract/…) nunca é citação; epígrafe de 1 linha exige atribuição ou pontuação; recuo sozinho só reclama bloco ≥2 linhas (e 1 linha sem forma de citação → paragraph). `detectHeadings`: face de display (bold/tamanho) dispensa o gate de recuo, salvo linha com marcador. (d) dispensado (0 blocos witt com espaço nas bordas após (a)). **Witt pág.1 agora:** heading "Artigo…", paragraph "Wittgenstein and skepticism"/"Daniel Temp ¯ºÖ"/afiliação/E-mail/Keywords, heading nível 2 "1 Considerações iniciais". "¯ºÖ"=ícone ORCID (Academicons, P2 side-detection). `pnpm verify` 966 verdes; `pnpm eval --ci` exit 0. Docs: ADR-079, BACKLOG, STATE. Próx.: restantes fila 3A ou E8.
+- **Sessão 2026-10-22 — consertos da CLI + backlog da varredura — CONCLUÍDO** · branch `fix/cli-inspect-presentation`: `normalizeCliPath`, `--out` raiz recusado, faixa `páginas X-Y`, nota de OCR (**ADR-078**); BACKLOG com varredura (fila 3A); 950 testes; `pnpm eval --ci` exit 0.
 - *(handoffs anteriores: ver Log de sessões e archive/)*
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
@@ -38,8 +40,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-22 · **Fila 3A (erros pequenos witt) — CONCLUÍDO** · ornamento "`" (`stripOrnamentItems`), hífen duplo (colapso 1 hífen), tipos witt (frente-mater→paragraph, "` 1"→heading); (d) dispensado; **ADR-079**; **966 testes** (+16); `pnpm eval --ci` exit 0.
 - 2026-10-22 · **Consertos da CLI + backlog da varredura — CONCLUÍDO** · `normalizeCliPath`, `--out` raiz recusado, `páginas X-Y` no HTML/MD, nota de OCR no resumo (**ADR-078**); BACKLOG com os achados dos 5 relatórios inspect (fila 3A); **950 testes** (+6); `pnpm eval --ci` exit 0.
-- 2026-10-21 · **E7-T05 (CLI completa) — CONCLUÍDO** · `explain.ts` no extractor (pipeline real + `Book` final, ADR-077) + CLI `inspect` text/md/html (render `@napi-rs/canvas`, ADR-076), `explain-page`, `eval` delegado; README do pacote + checklist (6)/(7); **944 testes** (+15); `pnpm eval --ci` exit 0; **ADR-076/077**; **E7 fechada**.
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md` (E7-T02/T03; E7-T04 ver ADR-074/075).
 
 Histórico completo: docs/extractor/archive/

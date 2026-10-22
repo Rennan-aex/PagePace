@@ -83,6 +83,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-076 | `@napi-rs/canvas` (Apache-2.0) só na CLI, como adaptador de render | accepted |
 | ADR-077 | `inspect` text/md/html com `--out` e `explain-page` fiel ao `Book` | accepted |
 | ADR-078 | CLI: caminho normalizado textualmente e `--out` raiz recusado | accepted |
+| ADR-079 | Frente-mater do wittgenstein: ornamento, hífen duplo e tipos | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -645,3 +646,8 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) `path.normalize` (depende da plataforma: no CI Linux não colapsa `\` e reescreveria UNC legítimo) · B) colapsar textualmente as corridas de separador preservando o par `\\`/`//` inicial (UNC), aplicado no parse; fs e exibição recebem o mesmo caminho limpo · C) exigir que o usuário contorne com aspas (PO iniciante; já citava o caminho normal).
 **Decisão:** B + validação no parse: `--out` cujo `dirname` é o próprio caminho (raiz/UNC incompleto) falha cedo com erro de uso explicando o formato esperado. No mesmo passe, a faixa de páginas (`páginas 1-2`) passou a aparecer no HTML/MD (antes só no text) e o resumo indica camada de OCR embutida (ADR-019).
 **Consequências:** UNC legítimo passa intacto; o caso que quebrou o relatório do PO é recusado com mensagem clara em vez de stack trace; testes portáveis no CI Linux (texto puro, sem `path` da plataforma).
+
+### ADR-079 · Frente-mater do wittgenstein: ornamento, hífen duplo e tipos · accepted · 2026-10-22
+**Contexto:** o SciELO `n3-pt-scielo-wittgenstein` (sem gabarito) imprimiu ornamentos de seção como acento avulso (o ``` de uma Wingdings3), quebrou o composto `não-teórico` em `não- -teórico`, e leu a frente-mater (subtítulo, autor, afiliação, `E-mail:`, `Keywords:`) como epígrafes/blockquotes; a rail esquerda infla a medida e faz o título de seção recuado parecer citação.
+**Decisão:** (1) na ingestão, `stripOrnamentItems` apaga o texto de item de fonte-símbolo que é espaço ou acento de espaçamento avulso (geometria intacta); (2) `hyphenSiteBetween` reconhece o sítio cuja linha seguinte reabre com `-` e colapsa para um só hífen (`keep`); (3) `detectQuotes`: rótulo de front-matter nunca é citação, epígrafe de 1 linha exige atribuição ou pontuação, e recuo sozinho só reclama bloco de ≥2 linhas; (4) `detectHeadings`: face de display (bold/tamanho) dispensa o gate de recuo, salvo linha com marcador de lista.
+**Consequências:** frente-mater vira `paragraph` e o título de seção vira `heading` nível 2 (sem mudar esquema); casos de n2/n4/sofia e a correção de side-detection (P2) seguem pendentes na fila 3A. Sem regressão: `pnpm eval --ci` exit 0, `text_cer` 0.0000 nos 12 medidos.

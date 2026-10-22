@@ -1,4 +1,5 @@
 import type { RawPage, RawTextItem } from "@pagepace/schema";
+import { isSymbolFontName } from "./fontstyle";
 
 /**
  * Spacing-accent recomposition (E3-T01b — REQ-EXT-18, layer 7 "saida").
@@ -79,6 +80,47 @@ const RECLASSIFY_ROUNDS = 3;
 const isSpacingAccent = (char: string): boolean => SPACING_ACCENTS.has(char);
 const endsWithWhitespace = (text: string): boolean => /\s$/.test(text);
 const startsWithWhitespace = (text: string): boolean => /^\s/.test(text);
+
+/**
+ * Whether an item is a symbol-font ornament pdf.js mapped to a spacing
+ * accent or a blank by codepoint collision (backlog 3A): a Wingdings3
+ * section arrow reads as `` ` ``, a Wingdings square as a plain space.
+ * The glyph is decoration, not text — the reader must not see it.
+ */
+function isOrnamentItem(item: RawTextItem): boolean {
+  if (!isSymbolFontName(item.fontName)) return false;
+  const trimmed = item.text.trim();
+  if (trimmed === "") return true;
+  return [...trimmed].length === 1 && isSpacingAccent(trimmed);
+}
+
+/**
+ * Drops the text of symbol-font ornaments (backlog 3A): an item drawn in a
+ * dingbat family whose text is blank or a lone spacing accent carries no
+ * reader text. Geometry is never edited — the item stays in place with
+ * `text: ""`, exactly like a consumed accent, so line grouping and space
+ * inference see the same boxes. A real glyph of a symbol family (a math
+ * `∑`) is kept: only blanks and codepoint-collision accents are ornaments.
+ * Deterministic: same page in, same page out.
+ */
+export function stripOrnamentItems(page: RawPage): RawPage {
+  const items = page.items;
+  let touched = false;
+  const texts: string[] = [];
+  for (const item of items) {
+    if (isOrnamentItem(item)) {
+      texts.push("");
+      touched = true;
+    } else {
+      texts.push(item.text);
+    }
+  }
+  if (!touched) return page;
+  return {
+    ...page,
+    items: items.map((original, index) => ({ ...original, text: texts[index] ?? original.text })),
+  };
+}
 const sameFontSize = (a: RawTextItem, b: RawTextItem): boolean =>
   Math.abs(a.fontSize - b.fontSize) <= 0.01 * Math.max(a.fontSize, b.fontSize);
 

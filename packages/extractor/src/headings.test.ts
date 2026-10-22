@@ -186,6 +186,35 @@ describe("detectHeadings", () => {
     expect(decisions[1]?.heading).toBe(false);
   });
 
+  it("lets a display face outrank the indent rule (backlog 3A)", () => {
+    // SciELO sets a section number in the left rail and the title one space
+    // right of it: the bold 14 pt line reads as indented but is a heading.
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["1 Considerações iniciais"], 155, 14, {
+          x: INDENT,
+          fontName: "Helvetica-Bold",
+        }),
+        ...BODY_LONG(190),
+      ]),
+    ]);
+    expect(decisions[1]?.heading).toBe(true);
+  });
+
+  it("keeps an indented bold list item out of the heading kind", () => {
+    // The printed marker still wins: size or weight alone never turns a list
+    // item into a heading.
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["1. First point"], 155, 14, { x: INDENT, fontName: "Helvetica-Bold" }),
+        ...BODY_LONG(190),
+      ]),
+    ]);
+    expect(decisions[1]?.heading).toBe(false);
+  });
+
   it("keeps a centered list marker as a list item, not a heading", () => {
     // E5-T05: a bullet block can sit on the measure's centre by accident
     // (the Helvetica widths of a synthetic item did) and the layout never

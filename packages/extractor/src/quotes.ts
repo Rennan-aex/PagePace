@@ -26,6 +26,12 @@ import type { JoinedParagraph } from "./pagejoin";
  * case becomes a flag plus the reduced `QUOTE_UNCERTAIN_CONFIDENCE`
  * (ARCHITECTURE decision 6).
  *
+ * Front-matter guards (backlog 3A): a block that opens with a metadata label
+ * (`Keywords:`, `E-mail:`, `Abstract`...) is never a quote; the indent rule
+ * alone claims only a block of two or more lines (a lone indented line is an
+ * affiliation or an e-mail); and a one-line indented face (a subtitle, a
+ * byline) is an epigraph only with attribution or sentence punctuation.
+ *
  * Priority in `buildBook`: a footnote or a heading never becomes a quote —
  * the size gates of those passes are complementary (a note is smaller than
  * `FOOTNOTE_MAX_SIZE_FACTOR`, a heading is flush left and not
@@ -53,8 +59,22 @@ export const UNCERTAIN_QUOTE_FLAG = "uncertain-quote";
 /** Reduced confidence of a block carrying `UNCERTAIN_QUOTE_FLAG`. */
 export const QUOTE_UNCERTAIN_CONFIDENCE = 0.7;
 
+/** Lines the indent rule needs before it may claim a block on its own. */
+export const QUOTE_MIN_INDENT_ONLY_LINES = 2;
+
 /** Attribution line of an epigraph: `— Author`, `- Author`, `– Author`. */
 export const QUOTE_ATTRIBUTION = /(?:^|\n)\s*[—–-]\s*\S/;
+
+/** Sentence punctuation a one-line quote is closed with. */
+export const QUOTE_SENTENCE_END = /[.!?…:;]["»”')\]]*\s*$/;
+
+/**
+ * Front-matter labels a one-line block may open with and never read as a
+ * quote (backlog 3A): `Keywords:`, `Palavras-chave:`, `E-mail:`, the
+ * section labels of an abstract, the receipt lines of a journal article.
+ */
+export const QUOTE_LABEL =
+  /^(?:keywords?|palavras-chave|palavraschave|e-?mail|affiliation|afilia[çc][ãa]o|abstract|resumo|received|accepted|doi)\b/i;
 
 /** One decision per input paragraph, in the same order. */
 export interface QuoteDecision {
@@ -162,26 +182,49 @@ function leadingDiffers(features: QuoteFeatures, context: QuoteContext): boolean
   return Math.abs(features.leadingShare - 1) >= QUOTE_LEADING_TOLERANCE;
 }
 
+/** A block opens like front-matter metadata, not like a quote (backlog 3A). */
+function opensWithLabel(features: QuoteFeatures): boolean {
+  const firstLine = features.text.split("\n", 1)[0] ?? "";
+  return QUOTE_LABEL.test(firstLine.trimStart());
+}
+
+/** A one-line display line reads as a quote only with attribution or punctuation. */
+function hasQuoteShape(features: QuoteFeatures): boolean {
+  return QUOTE_ATTRIBUTION.test(features.text) || QUOTE_SENTENCE_END.test(features.text.trimEnd());
+}
+
 function isEpigraph(features: QuoteFeatures, context: QuoteContext): boolean {
+  if (opensWithLabel(features)) return false;
   if (features.lines.length > QUOTE_EPIGRAPH_MAX_LINES) return false;
   if (!isIndented(features)) return false;
   const smaller =
     context.bodyFontSize > 0 && features.fontSize < context.bodyFontSize * QUOTE_MAX_SIZE_FACTOR;
   const italic = features.italicShare >= QUOTE_ITALIC_SHARE;
   if (!italic && !smaller) return false;
+  // A one-line indented face (a subtitle, a byline) is a display line, not a
+  // quote, unless it carries attribution or sentence punctuation; a real
+  // epigraph is two or more lines, or closed like a sentence (backlog 3A).
+  if (features.lines.length === 1 && !hasQuoteShape(features)) return false;
   // Short, indented, italic or smaller: an epigraph. The attribution line
   // (`— Author`) and isolation corroborate but are not required.
   return true;
 }
 
 function isBlockquote(features: QuoteFeatures, context: QuoteContext): boolean {
+  if (opensWithLabel(features)) return false;
   if (!isIndented(features)) return false;
   const smaller =
     context.bodyFontSize > 0 && features.fontSize < context.bodyFontSize * QUOTE_MAX_SIZE_FACTOR;
   const spaced = leadingDiffers(features, context);
-  // Indent alone is enough for a block quote (the "recuo" of E5-T04); the
-  // smaller face or a different leading only raise confidence.
-  return smaller || spaced || features.minIndentEm >= QUOTE_MIN_INDENT_EM;
+  const corroborated = smaller || spaced || QUOTE_ATTRIBUTION.test(features.text);
+  // A lone indented line (an affiliation, an e-mail, a byline) is front
+  // matter, not a quote: the indent rule only claims a real block of two or
+  // more lines, and a single line needs attribution or sentence punctuation
+  // to read as a quotation (backlog 3A).
+  if (features.lines.length < QUOTE_MIN_INDENT_ONLY_LINES && !hasQuoteShape(features)) return false;
+  // Indent alone is enough for a block quote of two or more lines (the "recuo"
+  // of E5-T04); the smaller face or a different leading only raise confidence.
+  return corroborated || features.lines.length >= QUOTE_MIN_INDENT_ONLY_LINES;
 }
 
 /**

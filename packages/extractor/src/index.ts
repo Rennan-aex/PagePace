@@ -1,4 +1,4 @@
-export { composeAccentItems } from "./accents";
+export { composeAccentItems, stripOrnamentItems } from "./accents";
 export { BBOX_DECIMALS, linePageMap, linesBBox, paragraphBBoxes } from "./bbox";
 export {
   AVG_CONFIDENCE_DECIMALS,

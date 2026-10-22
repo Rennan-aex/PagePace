@@ -116,8 +116,18 @@ export function hyphenJoinDecision(left: string, right: string): HyphenJoinDecis
 export function hyphenSiteBetween(previous: string, next: string): HyphenSite | null {
   if (!previous.endsWith("-")) return null;
   const left = LETTER_OR_DIGIT_END.exec(previous.slice(0, -1))?.[1];
+  if (left === undefined || left === "") return null;
+  // A compound broken at its own hyphen reprints the hyphen on both sides of
+  // the break (`não-` + `-teórico`, backlog 3A). The hyphen is content, not a
+  // break mark: keep exactly one and report the whole compound. A dash that
+  // opens a list item (`- item`) never reaches here — its right side is blank.
+  if (next.startsWith("-")) {
+    const compound = LETTER_OR_DIGIT_START.exec(next.slice(1))?.[1];
+    if (compound === undefined || compound === "") return null;
+    return { left, right: compound, decision: "keep", word: `${left}-${compound}` };
+  }
   const right = LETTER_OR_DIGIT_START.exec(next)?.[1];
-  if (left === undefined || right === undefined || left === "" || right === "") return null;
+  if (right === undefined || right === "") return null;
   const decision = hyphenJoinDecision(left, right);
   return { left, right, decision, word: decision === "join" ? left + right : `${left}-${right}` };
 }
@@ -156,8 +166,13 @@ export function joinHyphenatedLines(lines: readonly string[]): HyphenJoinResult 
       sites.push(site);
       if (site.decision === "uncertain") uncertain = true;
       // The printed hyphen already ends `output`: `join` drops it, `keep` and
-      // `uncertain` leave it in place — neither takes the joining space.
-      output = site.decision === "join" ? output.slice(0, -1) + line : output + line;
+      // `uncertain` leave it in place — neither takes the joining space. A
+      // `keep` site whose next line re-opens with `-` is a compound broken at
+      // its own hyphen (`não-` + `-teórico`): drop that reprint so the reader
+      // gets a single hyphen (backlog 3A).
+      if (site.decision === "join") output = output.slice(0, -1) + line;
+      else if (site.decision === "keep" && line.startsWith("-")) output += line.slice(1);
+      else output += line;
     }
   }
   return { text: output, sites, uncertain };

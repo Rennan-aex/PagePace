@@ -145,6 +145,14 @@ function dropTrailingHyphen(segments: Segment[]): void {
   if (last.text === "") segments.pop();
 }
 
+/** Drops the leading character (a reprinted hyphen) from the incoming segments. */
+function dropLeadingHyphen(segments: Segment[]): void {
+  const first = segments[0];
+  if (first === undefined) return;
+  first.text = first.text.slice(1);
+  if (first.text === "") segments.shift();
+}
+
 /**
  * Line join with the hyphen decisions of `joinHyphenatedLines` (E3-T03),
  * kept segment by segment so every character stays attached to the item it
@@ -170,6 +178,13 @@ function joinLineSegments(lines: readonly Segment[][]): Segment[] {
       dropTrailingHyphen(accumulated);
       accumulated.push(...segments.map((segment) => ({ ...segment })));
       accumulatedText = accumulatedText.slice(0, -1) + lineText;
+    } else if (site.decision === "keep" && lineText.startsWith("-")) {
+      // A compound broken at its own hyphen reprints the hyphen on both sides
+      // of the break (`não-` + `-teórico`, backlog 3A): the reprint is dropped
+      // so the reader gets a single hyphen, exactly like the plain join.
+      dropLeadingHyphen(segments);
+      accumulated.push(...segments.map((segment) => ({ ...segment })));
+      accumulatedText += lineText.slice(1);
     } else {
       accumulated.push(...segments.map((segment) => ({ ...segment })));
       accumulatedText += lineText;

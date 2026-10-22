@@ -156,6 +156,16 @@ describe("paragraphRuns", () => {
     expect(runs).toEqual([{ text: "A palavra continua." }]);
   });
 
+  it("collapses a compound broken at its hyphen across styled lines (backlog 3A)", () => {
+    // The reprint of the compound hyphen is dropped, like the plain join.
+    const runs = lineRuns([
+      item("uma atitude não-", MARGIN, 100),
+      item("-teórico, sem dogmas.", MARGIN, 115),
+    ]);
+    expect(runs.map((run) => run.text).join("")).toBe("uma atitude não-teórico, sem dogmas.");
+    expect(runs).toEqual([{ text: "uma atitude não-teórico, sem dogmas." }]);
+  });
+
   it("drops every style when styles are off (OCR text layer, ADR-019)", () => {
     const runs = lineRuns([
       item("Um aviso com ", MARGIN, 100),

@@ -1,6 +1,6 @@
 import type { RawPage, RawTextItem } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
-import { composeAccentItems } from "./accents";
+import { composeAccentItems, stripOrnamentItems } from "./accents";
 
 /**
  * E3-T01b — spacing-accent recomposition.
@@ -18,6 +18,7 @@ interface ItemSpec {
   y?: number;
   height?: number;
   fontSize?: number;
+  fontName?: string;
   hasEOL?: boolean;
 }
 
@@ -34,7 +35,7 @@ function pageOf(...specs: ItemSpec[]): RawPage {
         y: spec.y ?? 100,
         width: spec.width,
         height: spec.height ?? 12,
-        fontName: "Helvetica",
+        fontName: spec.fontName ?? "Helvetica",
         fontSize: spec.fontSize ?? 12,
         ...(spec.hasEOL === true ? { hasEOL: true } : {}),
       }),
@@ -168,6 +169,60 @@ describe("traps the rule must not touch", () => {
 
     expect(textsOf(composeAccentItems(dotlessI))).toEqual(["G", "", "íso"]);
     expect(textsOf(composeAccentItems(dotlessJ))).toEqual(["x", "", "j̃umps"]);
+  });
+});
+
+describe("symbol-font ornaments (backlog 3A)", () => {
+  it("drops a lone spacing-accent item drawn in a symbol font", () => {
+    // The SciELO section ornament of n3-pt-scielo-wittgenstein: a Wingdings3
+    // glyph pdf.js maps to "`" by codepoint collision, sitting right before
+    // the heading text. Composition never claims it; the reader must not see it.
+    const input = pageOf(
+      { text: "`", x: 187.65, width: 7.95, fontName: "Wingdings3", fontSize: 15 },
+      { text: "1 Considerações iniciais", x: 197.1, width: 120, fontName: "MyriadPro-Bold" },
+    );
+
+    const result = stripOrnamentItems(input);
+
+    expect(textsOf(result)).toEqual(["", "1 Considerações iniciais"]);
+    expect(result.items[0]).toMatchObject({ x: 187.65, width: 7.95, text: "" });
+  });
+
+  it("drops a whitespace-only item drawn in a symbol font", () => {
+    // The same producer leaves a Wingdings3 space after the ornament and at
+    // the end of a heading run; neither is reader text.
+    const input = pageOf(
+      { text: " ", x: 195.6, width: 0.11, fontName: "Wingdings3", fontSize: 15 },
+      { text: "Artigo", x: 197.1, width: 40, fontName: "MyriadPro-Bold" },
+    );
+
+    expect(textsOf(stripOrnamentItems(input))).toEqual(["", "Artigo"]);
+  });
+
+  it("keeps a spacing accent drawn in a text font", () => {
+    // The math tilde of n4 p131 is text-font content: composition decides it.
+    const input = pageOf(
+      { text: "n", x: 0, width: 10 },
+      { text: "~", x: 9.5, width: 10, fontName: "CMMI12" },
+      { text: "2", x: 10, width: 10 },
+    );
+
+    expect(stripOrnamentItems(input)).toBe(input);
+  });
+
+  it("keeps a real glyph of a symbol font (a math sum)", () => {
+    const input = pageOf(
+      { text: "∑", x: 0, width: 10, fontName: "Symbol" },
+      { text: " x", x: 12, width: 10 },
+    );
+
+    expect(stripOrnamentItems(input)).toBe(input);
+  });
+
+  it("returns the same page when there is no ornament", () => {
+    const plain = pageOf({ text: "abc", x: 0, width: 30 }, { text: "def", x: 40, width: 30 });
+
+    expect(stripOrnamentItems(plain)).toBe(plain);
   });
 });
 

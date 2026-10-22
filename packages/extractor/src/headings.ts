@@ -235,17 +235,25 @@ function isHeading(features: HeadingFeatures, context: HeadingContext): boolean 
   if (features.lines.length > HEADING_MAX_LINES) return false;
   if (features.fontSize < body * HEADING_MIN_SIZE_FACTOR) return false;
   const centered = isCentered(features);
-  // A centered block sits in the middle of the measure, so its left edge
-  // looks deeply indented: only a flush-left block answers the indent rule.
-  if (!centered && features.indentEm > HEADING_INDENT_MAX_FACTOR) return false;
-  if (features.italicShare > HEADING_ITALIC_MAX_SHARE) return false;
-  if (HEADING_CAPTION_MARKER.test(features.text)) return false;
   // A line that opens like a list item (`1.`, `•`) only becomes a heading
   // when the type itself says so — size or weight, never "short and alone"
   // and never "centered" (E5-T05: a bullet block can sit on the measure's
   // centre by accident — the Helvetica widths of a synthetic item did — and
   // must stay a list item).
   const listed = HEADING_LIST_MARKER.test(features.text);
+  // A centered block sits in the middle of the measure, so its left edge
+  // looks deeply indented: only a flush-left block answers the indent rule.
+  // A display face (large or bold) outranks that rule: SciELO sets a section
+  // number in the left rail and the title one space right of it, so the bold
+  // line reads as indented but is a heading (backlog 3A). A printed list
+  // marker never outranks it.
+  if (!centered && features.indentEm > HEADING_INDENT_MAX_FACTOR) {
+    const display =
+      features.fontSize >= body * HEADING_SIZE_FACTOR || features.boldShare >= HEADING_BOLD_SHARE;
+    if (!display || listed) return false;
+  }
+  if (features.italicShare > HEADING_ITALIC_MAX_SHARE) return false;
+  if (HEADING_CAPTION_MARKER.test(features.text)) return false;
   return (
     features.fontSize >= body * HEADING_SIZE_FACTOR ||
     features.boldShare >= HEADING_BOLD_SHARE ||

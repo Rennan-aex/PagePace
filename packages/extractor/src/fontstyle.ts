@@ -81,7 +81,17 @@ const LIGHT_WORDS: ReadonlySet<string> = new Set(["light", "thin", "narrow", "co
 const MEDIUM_WORDS: ReadonlySet<string> = new Set(["medium", "medi", "mediummt"]);
 
 /** Families whose pictographic glyphs are never bold/italic text. */
-const SYMBOL_FAMILIES = /^(Symbol|ZapfDingbats|Dingbats|Marlett)/i;
+const SYMBOL_FAMILIES = /^(Symbol|ZapfDingbats|Dingbats|Marlett|Wingdings|Webdings)/i;
+
+/**
+ * Whether a font is a symbol/dingbat family whose glyphs are ornaments or
+ * pictographs, not reader text (backlog 3A): pdf.js maps a Wingdings3 arrow
+ * to `` ` `` and a Wingdings square to a plain space by codepoint collision,
+ * so the item's text is not what the typesetter meant.
+ */
+export function isSymbolFontName(rawName: string): boolean {
+  return SYMBOL_FAMILIES.test(rawName.replace(SUBSET_PREFIX, ""));
+}
 
 interface ConventionStyle {
   bold: boolean;

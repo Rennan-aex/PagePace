@@ -172,6 +172,57 @@ describe("detectQuotes", () => {
     expect(quotes[0]?.kind).toBe("epigraph");
   });
 
+  it("keeps a front-matter label as a paragraph, never a quote (backlog 3A)", () => {
+    // A label-led line (`Keywords:`, `E-mail:`, `Abstract`) is metadata, not a
+    // display quote, even when it is short, indented and smaller.
+    for (const label of ["Keywords: skepticism, certainty", "E-mail: danieltemp@example.org"]) {
+      const decisions = decisionsOf([pageWithQuote([label], { x: MARGIN + 36, size: 9 })]);
+      expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+    }
+  });
+
+  it("keeps a one-line indented display line without quote shape as a paragraph", () => {
+    // A title/subtitle or a byline set italic and indented is not an epigraph
+    // unless it reads like a quote (attribution or sentence punctuation).
+    const decisions = decisionsOf([
+      pageWithQuote(["Wittgenstein and skepticism"], {
+        x: MARGIN + 36,
+        fontName: "Helvetica-Oblique",
+      }),
+    ]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+  });
+
+  it("still marks a one-line indented italic line with punctuation as an epigraph", () => {
+    const decisions = decisionsOf([
+      pageWithQuote(["The world is everything that is the case."], {
+        x: MARGIN + 36,
+        fontName: "Helvetica-Oblique",
+      }),
+    ]);
+    const quotes = decisions.filter((decision) => decision.quote);
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]?.kind).toBe("epigraph");
+  });
+
+  it("keeps a one-line indent-only block as a paragraph (backlog 3A)", () => {
+    // An affiliation or an e-mail line indented by the measure alone is not a
+    // quote: the indent rule only claims a real block (two or more lines).
+    const decisions = decisionsOf([
+      pageWithQuote(["Universidade Federal de Santa Maria, Santa Maria, RS, Brasil."], {
+        x: MARGIN + 24,
+      }),
+    ]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+  });
+
+  it("keeps a one-line smaller byline as a paragraph, not a quote (backlog 3A)", () => {
+    // The wittgenstein byline is a smaller face indented by the measure; a
+    // single line without attribution or punctuation is metadata, not a quote.
+    const decisions = decisionsOf([pageWithQuote(["Daniel Temp"], { x: MARGIN + 24, size: 9 })]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+  });
+
   it("keeps a long indented italic block as a blockquote, not an epigraph", () => {
     const decisions = decisionsOf([
       pageWithQuote(

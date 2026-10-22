@@ -76,6 +76,21 @@ describe("hyphenSiteBetween", () => {
     expect(hyphenSiteBetween("pala\u00AD", "vra")).toBeNull();
   });
 
+  it("collapses a compound broken at its hyphen (backlog 3A)", () => {
+    // The producer split "não-teórico" at its own hyphen and reprinted the
+    // hyphen on both sides of the break: one hyphen survives for the reader.
+    expect(hyphenSiteBetween("pré-reflexivo, não-", "-teórico, numa postura")).toEqual({
+      left: "não",
+      right: "teórico",
+      decision: "keep",
+      word: "não-teórico",
+    });
+  });
+
+  it("is null when the next line starts a dash item (a list marker)", () => {
+    expect(hyphenSiteBetween("algo que termina-", "- primeiro ponto")).toBeNull();
+  });
+
   it("reports keep for a lexicon compound and uncertain for a proper noun", () => {
     expect(hyphenSiteBetween("A guarda-", "chuva")).toEqual({
       left: "guarda",
@@ -108,6 +123,19 @@ describe("joinHyphenatedLines", () => {
     expect(joinHyphenatedLines(["Entre 1998-", "2004 tudo mudou."]).text).toBe(
       "Entre 1998-2004 tudo mudou.",
     );
+  });
+
+  it("collapses the reprinted hyphen of a compound broken at its hyphen", () => {
+    // Both sides printed the compound hyphen; the reader gets one.
+    const result = joinHyphenatedLines([
+      "numa atitude pré-reflexiva, não-",
+      "-teórico, sem dogmas.",
+    ]);
+    expect(result.text).toBe("numa atitude pré-reflexiva, não-teórico, sem dogmas.");
+    expect(result.sites).toEqual([
+      { left: "não", right: "teórico", decision: "keep", word: "não-teórico" },
+    ]);
+    expect(result.uncertain).toBe(false);
   });
 
   it("keeps and flags an uncertain hyphen", () => {
