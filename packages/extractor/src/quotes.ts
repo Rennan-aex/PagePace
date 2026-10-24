@@ -29,8 +29,12 @@ import type { JoinedParagraph } from "./pagejoin";
  * Front-matter guards (backlog 3A): a block that opens with a metadata label
  * (`Keywords:`, `E-mail:`, `Abstract`...) is never a quote; the indent rule
  * alone claims only a block of two or more lines (a lone indented line is an
- * affiliation or an e-mail); and a one-line indented face (a subtitle, a
- * byline) is an epigraph only with attribution or sentence punctuation.
+ * affiliation or an e-mail); a one-line indented face (a subtitle, a
+ * byline) is an epigraph only with attribution or sentence punctuation; and
+ * a block whose every line opens with a numbered affiliation marker
+ * (`1 The Oskar Klein Centre…`, `2 Center for…`) is the author list of a
+ * cover — indented and smaller than the body like an epigraph, but never a
+ * quote.
  *
  * Dialogue and the label's body (backlog 3A, second round): a block that
  * opens with a speech dash (`— Rom, rom, rom! — ronronou ele.`, the printed
@@ -93,6 +97,9 @@ export const QUOTE_LABEL =
  * attribution is what opens the speech (backlog 3A, second round).
  */
 export const QUOTE_DIALOGUE_DASH = /^[—–]\s*\S/;
+
+/** Line of a numbered affiliation list (`1 The Oskar Klein Centre…`). */
+export const QUOTE_AFFILIATION_LINE = /^\d{1,2}\s+\S/;
 
 /** One decision per input paragraph, in the same order. */
 export interface QuoteDecision {
@@ -212,6 +219,12 @@ function opensWithDialogue(features: QuoteFeatures): boolean {
   return QUOTE_DIALOGUE_DASH.test(firstLine.trimStart());
 }
 
+/** Every line carries an affiliation marker: the block is a cover author list. */
+function opensWithAffiliation(features: QuoteFeatures): boolean {
+  const lines = features.text.split("\n");
+  return lines.length > 0 && lines.every((line) => QUOTE_AFFILIATION_LINE.test(line.trimStart()));
+}
+
 /** Whether a block sits directly after a metadata label, so it is that entry's body. */
 function followsLabel(measured: readonly QuoteFeatures[], index: number): boolean {
   const previous = measured[index - 1];
@@ -274,6 +287,10 @@ export function detectQuotes(
     // sets them (backlog 3A, second round): the speech dash opens a turn,
     // and a block after `Abstract:` is that entry's own text.
     if (opensWithDialogue(features) || followsLabel(measured, index)) return NOT_A_QUOTE;
+    // The numbered affiliation list of a paper's cover is indented and set
+    // smaller than the body like an epigraph, but every line carries its
+    // marker (backlog 3A — n2-en-astrofisica).
+    if (opensWithAffiliation(features)) return NOT_A_QUOTE;
     if (isEpigraph(features, context)) {
       return { quote: true, kind: "epigraph" as const, uncertain: false };
     }

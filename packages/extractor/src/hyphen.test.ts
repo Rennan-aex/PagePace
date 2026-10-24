@@ -47,6 +47,13 @@ describe("hyphenJoinDecision", () => {
     expect(hyphenJoinDecision("demos", "la")).toBe("keep");
   });
 
+  it("keeps the plural/feminine enclisis pronouns (acariciou-as, levou-os)", () => {
+    // `as`/`os` were missing from the clitic list and the printed
+    // `acariciou-` + `as` of n1-pt-sofia came out as "acariciouas" (backlog 3A).
+    expect(hyphenJoinDecision("acariciou", "as")).toBe("keep");
+    expect(hyphenJoinDecision("levou", "os")).toBe("keep");
+  });
+
   it("keeps the compounds the corpus found broken at a line end (backlog 3A)", () => {
     // Read off the 40 printed line-end hyphens of `n1-pt-sofia`, whose
     // default join was mangling them (`lírios-` + `amarelos` → the reported
@@ -121,6 +128,15 @@ describe("hyphenSiteBetween", () => {
       right: "amarelos",
       decision: "keep",
       word: "lírios-amarelos",
+    });
+  });
+
+  it("gives the reader acariciou-as, not acariciouas (backlog 3A)", () => {
+    expect(hyphenSiteBetween("por um instante e acariciou-", "as com a ponta dos dedos.")).toEqual({
+      left: "acariciou",
+      right: "as",
+      decision: "keep",
+      word: "acariciou-as",
     });
   });
 

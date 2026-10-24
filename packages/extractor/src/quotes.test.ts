@@ -129,6 +129,23 @@ describe("detectQuotes", () => {
     expect(quotes[0]?.kind).toBe("blockquote");
   });
 
+  it("keeps a numbered affiliation block as a paragraph (backlog 3A)", () => {
+    // The A&A cover sets the three affiliation lines ("1 The Oskar Klein
+    // Centre…", "2 Center for…", "3 Sorbonne…") indented and smaller than the
+    // body, and the epigraph rules claimed them.
+    const decisions = decisionsOf([
+      pageWithQuote(
+        [
+          "1 The Oskar Klein Centre, Department of Physics, Stockholm",
+          "2 Center for Computational Astrophysics, Flatiron Institute",
+          "3 Sorbonne Universite, CNRS, Institut d'Astrophysique de Paris",
+        ],
+        { x: MARGIN + 24, size: 9 },
+      ),
+    ]);
+    expect(decisions.filter((decision) => decision.quote)).toHaveLength(0);
+  });
+
   it("keeps a first-line-only indent as a paragraph", () => {
     // The paragraph layer stitches the first-line indent into one block whose
     // second line sits flush left: the minimum indent is 0, not a quote.

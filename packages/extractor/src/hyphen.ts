@@ -15,7 +15,7 @@ import { lineText } from "./spaces";
  * 2. **Lexicon** — the full form `left-right` (lowercased) is in the small
  *    per-language compound list (`guarda-chuva`, `well-known`...).
  * 3. **Clitics** — the right part is a Portuguese enclisis pronoun (`lhe`,
- *    `me`...). English has none after a hyphen; its list is empty.
+ *    `me`, `as`...). English has none after a hyphen; its list is empty.
  * 4. **Uppercase right part** — usually a proper noun (`Ex-Ministro`,
  *    `McDonald`): the hyphen is kept but the site is **uncertain**, so the
  *    block gets `flags: ["uncertain-hyphen"]` and a reduced confidence.
@@ -45,12 +45,14 @@ export const UNCERTAIN_HYPHEN_FLAG = "uncertain-hyphen";
 /** Confidence of a block with at least one uncertain hyphen decision. */
 export const HYPHEN_UNCERTAIN_CONFIDENCE = 0.7;
 
-/** Portuguese enclisis pronouns that keep the hyphen (`disse-lhe`, `dá-me`). */
+/** Portuguese enclisis pronouns that keep the hyphen (`disse-lhe`, `dá-me`, `acariciou-as`). */
 export const HYPHEN_CLITICS_PT: ReadonlySet<string> = new Set([
+  "as",
   "la",
   "las",
   "lo",
   "los",
+  "os",
   "lhe",
   "lhes",
   "ma",

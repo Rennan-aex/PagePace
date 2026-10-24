@@ -117,6 +117,48 @@ describe("detectHeadings", () => {
     expect(decisions.map((decision) => decision.heading)).toEqual([false, false, false]);
   });
 
+  it("keeps an author byline with affiliation markers as a paragraph (backlog 3A)", () => {
+    // The A&A cover sets the byline at display size (12 pt over a 9.96 pt
+    // body), so the size signal alone claimed it as a level-2 heading.
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["Ludvig Doeser1, 2,⋆, Simon Ding3, Guilhem Lavaux3, and Jens Jasche1"], 155, 14),
+        ...BODY_LONG(190),
+      ]),
+    ]);
+    expect(decisions.map((decision) => decision.heading)).toEqual([false, false, false]);
+  });
+
+  it("still headings a display title that carries commas but no affiliation markers", () => {
+    const decisions = decisionsOf([
+      page([
+        ...BODY_LONG(100),
+        ...lines(["Results, data, and discussion"], 155, 14),
+        ...BODY_LONG(190),
+      ]),
+    ]);
+    expect(decisions.map((decision) => decision.heading)).toEqual([false, true, false]);
+  });
+
+  it("keeps a digits-only display line as a paragraph (n4 cover, backlog 3A)", () => {
+    // "500" (the exercise count, 72 pt) and "2020" (the year) were cover
+    // headings and polluted the fallback table of contents.
+    const decisions = decisionsOf([
+      page([...BODY_LONG(100), ...lines(["500"], 155, 20), ...BODY_LONG(190)]),
+    ]);
+    expect(decisions.map((decision) => decision.heading)).toEqual([false, false, false]);
+  });
+
+  it("keeps a short lowercase stamp word as a paragraph (n4 cover, backlog 3A)", () => {
+    // The n4 cover prints the stamp word "aqui" (36 pt, one lowercase word)
+    // below the title; a title shape it is not.
+    const decisions = decisionsOf([
+      page([...BODY_LONG(100), ...lines(["aqui"], 155, 14), ...BODY_LONG(190)]),
+    ]);
+    expect(decisions.map((decision) => decision.heading)).toEqual([false, false, false]);
+  });
+
   it("keeps a multi-line block as a paragraph even when its lines are short", () => {
     const decisions = decisionsOf([
       page([

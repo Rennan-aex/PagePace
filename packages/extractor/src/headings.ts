@@ -10,8 +10,11 @@ import { endsSentence, type JoinedParagraph } from "./pagejoin";
  * one **display signal**. The gate keeps body text out: at most
  * `HEADING_MAX_LINES` lines, never smaller than the body, flush left (a
  * centered block is exempt, because its left edge sits inside the measure),
- * not italic-dominant (an epigraph), not a caption (`Fig. 3`). The signals
- * are the ones the typesetter uses to make a title look like one: a larger
+ * not italic-dominant (an epigraph), not a caption (`Fig. 3`), not an author
+ * byline with affiliation markers (`Ludvig Doeser1, 2,⋆, Simon Ding3…`),
+ * not a bare number and not a one-word lowercase stamp (`500`, `aqui` — the
+ * n4 cover). The signals are the ones the typesetter uses to make a title
+ * look like one: a larger
  * font (`HEADING_SIZE_FACTOR`), a bold face (`HEADING_BOLD_SHARE`),
  * centering, chapter numbering (`1.2`, `Capítulo 3`) or a short line
  * isolated by extra space on both sides that does not end a sentence (a
@@ -76,6 +79,34 @@ export const HEADING_MAX_LEVEL = 6;
 /** Caption markers (`Fig. 3`, `Table 2`...) a heading never starts with. */
 export const HEADING_CAPTION_MARKER =
   /^(?:Fig(?:ure|\.)?|Figura|Table|Tabela|Quadro|Chart|Gr[aá]fico|Exhibit|Plate|Source|Fonte|Listing|Scheme)\.?\s*\d/i;
+
+/**
+ * Affiliation marker of a byline (backlog 3A): a letter glued to one or two
+ * digits (`Doeser1`, `Ding3`, `Jasche1`) — the superscript the paper prints
+ * after each author. A title keeps its digits apart (`COVID-19`, `Chapter 3`).
+ */
+export const HEADING_BYLINE_MARK = /[\p{L}]\d{1,2}(?![\p{L}\d])/gu;
+/** Affiliation markers a line needs before it reads as an author list. */
+export const HEADING_BYLINE_MIN_MARKS = 2;
+/** Commas a line needs before it reads as an author list. */
+export const HEADING_BYLINE_MIN_COMMAS = 3;
+
+/** A display line of bare digits (`500`, the exercise count on the n4 cover). */
+export const HEADING_DIGITS_ONLY = /^\d+$/;
+/**
+ * A single short word with no capital (`aqui`, the stamp on the n4 cover):
+ * pt/en book titles capitalize their words, so a lone lowercase run of at
+ * most four characters is cover furniture, not a title.
+ */
+export const HEADING_STAMP_WORD = /^[^\p{Lu}]{1,4}$/u;
+
+/** An author list: several names joined by commas, each marked with an affiliation digit. */
+function isByline(text: string): boolean {
+  const marks = text.match(HEADING_BYLINE_MARK) ?? [];
+  if (marks.length < HEADING_BYLINE_MIN_MARKS) return false;
+  const commas = text.match(/,/g)?.length ?? 0;
+  return commas >= HEADING_BYLINE_MIN_COMMAS;
+}
 
 /** Chapter/section words that open a numbered heading (`Capítulo 3`). */
 export const HEADING_NUMBERING_WORD =
@@ -278,6 +309,16 @@ function isHeading(features: HeadingFeatures, context: HeadingContext): boolean 
     return false;
   }
   if (HEADING_CAPTION_MARKER.test(features.text)) return false;
+  // Cover furniture the size signal would otherwise claim (backlog 3A): the
+  // A&A byline sits at display size, and the n4 cover prints the exercise
+  // count "500" and the stamp word "aqui" at title size.
+  if (
+    isByline(features.text) ||
+    HEADING_DIGITS_ONLY.test(features.text) ||
+    HEADING_STAMP_WORD.test(features.text)
+  ) {
+    return false;
+  }
   return (
     features.fontSize >= body * HEADING_SIZE_FACTOR ||
     features.boldShare >= HEADING_BOLD_SHARE ||
