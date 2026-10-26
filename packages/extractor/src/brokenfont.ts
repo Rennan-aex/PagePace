@@ -16,10 +16,27 @@
  * the reduced `BROKEN_FONT_CONFIDENCE` and the document-level warning code of
  * the same name (same contract as `ocr-text-layer`, ADR-019).
  *
- * Known limits: a mapping that shifts glyphs onto ordinary letters (plausible
- * looking, wrong) carries no signature here and stays undetected; one or two
- * stray private-use glyphs in an otherwise clean paragraph are ignored by
- * design (the floor plus the share are both required).
+ * A second signature (ADR-084) catches a mapping that shifts glyphs onto
+ * **ordinary letters** instead of leaving them unmapped: the Calibre-produced
+ * `n1-pt-sofia` has an incomplete ToUnicode that turns the fi/fl ligatures
+ * into "à" (0xE0 falls back to the default encoding), so the text reads
+ * plausible but wrong and carries no U+FFFD nor private use character. What
+ * betrays it is **"à" inside a word** (`\p{L}à\p{L}`) — Portuguese, English,
+ * French and Spanish never write it (crase is a word of its own) — with a
+ * floor of `BROKEN_FONT_MIN_INTERNAL_ACCENTS` occurrences per block and no
+ * share gate (the "à" is rare inside a paragraph, so a share would never
+ * fire; measured 0 false positives in 17 digital + 12 synthetic documents,
+ * 44 blocks in the sofia). Both signatures feed `brokenFontText`, the one
+ * predicate `buildBook` asks.
+ *
+ * Known limits: a mapping that shifts glyphs onto ordinary letters without
+ * producing internal "à" (e.g. "fl"→"á", inseparable from the legitimate
+ * Portuguese "á") stays undetected until another block of the document trips
+ * the "à" rule; one or two stray private-use glyphs in an otherwise clean
+ * paragraph are ignored by design (the floor plus the share are both
+ * required); Catalan does write "à" inside words, so the second signature
+ * would false-positive on a Catalan book (revisit with a language gate if
+ * the corpus grows one).
  */
 
 /** `U+FFFD REPLACEMENT CHARACTER` — no unicode for the glyph. */
@@ -45,6 +62,13 @@ export const BROKEN_FONT_CONFIDENCE = 0.3;
 export const BROKEN_FONT_MIN_SUSPECT_CHARS = 3;
 /** Share of non-whitespace characters that must be suspect to flag a block. */
 export const BROKEN_FONT_MIN_SUSPECT_SHARE = 0.05;
+/**
+ * Internal "à" occurrences needed before a block counts as a common-letter
+ * swap (ADR-084). Measured on the corpus: the sofia PDF has 44 blocks at ≥ 3,
+ * the single typing slip "atràs" of the curinga dies at the floor, every
+ * other digital and synthetic document has zero.
+ */
+export const BROKEN_FONT_MIN_INTERNAL_ACCENTS = 3;
 
 /** True for the replacement character and for the private use areas. */
 export function isSuspectCodePoint(codePoint: number): boolean {
@@ -69,6 +93,8 @@ export interface BrokenFontSignal {
 }
 
 const WHITESPACE = /\s/u;
+/** "à" (U+00E0) between two letters — never legitimate in pt/en/fr/es. */
+const INTERNAL_ACCENT = /\p{L}à\p{L}/gu;
 
 /** Counts the scrambled characters of `text` and says if the text is garbage. */
 export function brokenFontSignal(text: string): BrokenFontSignal {
@@ -83,4 +109,20 @@ export function brokenFontSignal(text: string): BrokenFontSignal {
   const broken =
     suspectChars >= BROKEN_FONT_MIN_SUSPECT_CHARS && share >= BROKEN_FONT_MIN_SUSPECT_SHARE;
   return { suspectChars, readableChars, share, broken };
+}
+
+/**
+ * Counts the occurrences of "à" inside a word (`\p{L}à\p{L}`) in `text` —
+ * the signature a Calibre-style ToUnicode swap leaves on common letters
+ * (ADR-084). The crase of Portuguese ("à mesa") and a lone "à" never count.
+ */
+export function internalAccentSwaps(text: string): number {
+  return text.match(INTERNAL_ACCENT)?.length ?? 0;
+}
+
+/** True when either signature of a broken font mapping is present in `text`. */
+export function brokenFontText(text: string): boolean {
+  return (
+    brokenFontSignal(text).broken || internalAccentSwaps(text) >= BROKEN_FONT_MIN_INTERNAL_ACCENTS
+  );
 }

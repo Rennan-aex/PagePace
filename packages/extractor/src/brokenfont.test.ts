@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   BROKEN_FONT_CONFIDENCE,
   BROKEN_FONT_MAPPING,
+  BROKEN_FONT_MIN_INTERNAL_ACCENTS,
   BROKEN_FONT_MIN_SUSPECT_CHARS,
   BROKEN_FONT_MIN_SUSPECT_SHARE,
   brokenFontSignal,
+  brokenFontText,
+  internalAccentSwaps,
   isSuspectCodePoint,
 } from "./brokenfont";
 
@@ -126,5 +129,55 @@ describe("brokenFontSignal", () => {
     const text = `texto ${PUA(0xe010)}${PUA(0xe011)}${PUA(0xe012)}${PUA(0xe013)}${FFFD}`;
     expect(brokenFontSignal(text)).toEqual(brokenFontSignal(text));
     expect(text).toContain(PUA(0xe010));
+  });
+});
+
+describe("internalAccentSwaps", () => {
+  it("counts à inside words — the Calibre ligature swap of the sofia PDF (ADR-084)", () => {
+    // "Sofia"→"Soàa", "mais"→"maàs", "paços"→"paàos": letter+à+letter.
+    expect(internalAccentSwaps("Soàa maàe paàos")).toBe(3);
+    // The leading à of "ànal" never counts; two swaps in "càràter" cannot
+    // overlap (the r of "càr" is already consumed), so the word counts 1.
+    expect(internalAccentSwaps("ànal do càràter")).toBe(1);
+  });
+
+  it("ignores the legitimate Portuguese crase and a lone à", () => {
+    expect(internalAccentSwaps("A menina foi à praia e voltou à casa.")).toBe(0);
+    expect(internalAccentSwaps("à")).toBe(0);
+    expect(internalAccentSwaps("à mesa do jantar, à noite.")).toBe(0);
+  });
+
+  it("ignores à behind punctuation, digits or whitespace", () => {
+    expect(internalAccentSwaps("(à) 1à2 a à b à-à")).toBe(0);
+  });
+
+  it("counts only the lowercase à, the swap the Calibre map emits", () => {
+    expect(internalAccentSwaps("ÀCASA ÀMESA ÀNOS")).toBe(0);
+  });
+
+  it("keeps the floor as a named constant of 3", () => {
+    expect(BROKEN_FONT_MIN_INTERNAL_ACCENTS).toBe(3);
+  });
+
+  it("is pure and deterministic", () => {
+    expect(internalAccentSwaps("Soàa maàe paàos")).toBe(internalAccentSwaps("Soàa maàe paàos"));
+  });
+});
+
+describe("brokenFontText", () => {
+  it("is true for the FFFD/PUA signature alone", () => {
+    expect(brokenFontText(`${FFFD}${FFFD}${FFFD}${FFFD}${FFFD} ABCD`)).toBe(true);
+  });
+
+  it("is true for three internal à without any unmapped glyph", () => {
+    expect(brokenFontText("O càràter dasà coàas doànal fim.")).toBe(true);
+  });
+
+  it("stays false below the floor of internal à", () => {
+    expect(brokenFontText("Soàa e ànal nada mais.")).toBe(false);
+  });
+
+  it("stays false on ordinary text", () => {
+    expect(brokenFontText("O coração não sabe de nada — the heart knows. αβγ")).toBe(false);
   });
 });

@@ -16,9 +16,12 @@ export type { BrokenFontSignal } from "./brokenfont";
 export {
   BROKEN_FONT_CONFIDENCE,
   BROKEN_FONT_MAPPING,
+  BROKEN_FONT_MIN_INTERNAL_ACCENTS,
   BROKEN_FONT_MIN_SUSPECT_CHARS,
   BROKEN_FONT_MIN_SUSPECT_SHARE,
   brokenFontSignal,
+  brokenFontText,
+  internalAccentSwaps,
   isSuspectCodePoint,
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";

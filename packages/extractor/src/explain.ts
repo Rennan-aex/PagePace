@@ -1,7 +1,11 @@
 import type { BBox, Block, RawDocument } from "@pagepace/schema";
 import { linePageMap } from "./bbox";
 import { buildBook, paragraphMeasures } from "./book";
-import { brokenFontSignal } from "./brokenfont";
+import {
+  BROKEN_FONT_MIN_INTERNAL_ACCENTS,
+  brokenFontSignal,
+  internalAccentSwaps,
+} from "./brokenfont";
 import { detectCaptions } from "./captions";
 import { detectDocumentColumns } from "./columns";
 import { detectEndnotes } from "./endnotes";
@@ -280,7 +284,6 @@ function explainParagraph(input: ExplainParagraphInput): ExplainedParagraph {
   const caption = captions[paragraphIndex];
   const reference = references[paragraphIndex]?.reference === true;
   const side = paragraph.lines.length > 0 && paragraph.lines.every((line) => line.side === true);
-  const broken = brokenFontSignal(text).broken;
 
   const layers: ExplainedLayer[] = [
     {
@@ -357,7 +360,11 @@ function explainParagraph(input: ExplainParagraphInput): ExplainedParagraph {
     },
     {
       layer: "broken-font",
-      decision: broken ? "sim — muitos caracteres de substituição" : "não",
+      decision: brokenFontSignal(text).broken
+        ? "sim — muitos caracteres de substituição"
+        : internalAccentSwaps(text) >= BROKEN_FONT_MIN_INTERNAL_ACCENTS
+          ? 'sim — 3+ "à" dentro de palavra (troca de letra comum, ADR-084)'
+          : "não",
     },
     {
       layer: "note-link",

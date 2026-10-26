@@ -89,6 +89,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-082 | Rodapé de revista vira sequência de fólio e a faixa lateral vira blocos | accepted |
 | ADR-083 | Colunas sob uma faixa de largura total: duas passagens com corte condicional | accepted |
 | ADR-084 | Spike S6: sinal de "à" interno para fonte quebrada em letras comuns | accepted |
+| ADR-085 | Heurística de letras comuns: "à" interno marca o bloco como fonte quebrada | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -685,3 +686,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A - sinal textual de "à" interno por bloco (barato; medido: 44 blocos no sofia com piso >= 3, 0 FP em 17 digitais + 12 sintéticos; depende de idioma e não pega "fl"→"á" sozinho) · B - parsear ToUnicode/encoding na ingestão (fiel e independente de idioma, mas exige parser de PDF novo no pipeline) · C - não sinalizar (texto errado com conf 0.90 continua passando).
 **Decisão:** A agora - piso >= 3 por bloco **sem** gate de share (o share 5% da regra atual nunca dispara nessa classe, medido), agregação documental para o aviso; `brokenFontSignal` (FFFD/PUA) fica intacto.
 **Consequências:** vira tarefa com teste vermelho antes e A/B no corpus (skill add-heuristic); limite anotado: catalão tem "à" interno; se o sinal de texto não bastar, reabrir B. Tabelas e renders em `docs/extractor/spikes/S6-broken-font.md`.
+
+### ADR-085 · Heurística de letras comuns: "à" interno marca o bloco como fonte quebrada · accepted · 2026-10-26
+**Contexto:** a tarefa da BACKLOG 26 materializa a alternativa A da ADR-084: o `n1-pt-sofia` sai do pipeline sem flag (0 blocos pelo `brokenFontSignal` FFFD/PUA) porque o ToUnicode do Calibre troca as ligaduras fi/fl por "à" (U+00E0) — texto plausível mas errado, conf 0.90.
+**Alternativas:** A - predicado novo `brokenFontText` (FFFD/PUA **ou** 3+ "à" interno por bloco) reaproveitando o contrato E3-T05 inteiro (flag `broken-font-mapping`, conf 0.3, warning documental) · B - código/warning próprio (`common-letter-swap`) com peso próprio em confidence.ts · C - só aviso documental sem marcar bloco.
+**Decisão:** A - piso 3 por bloco sem gate de share (medido: 49 blocos no sofia pelo A/B `buildBook`, 0 falsos positivos em 16 digitais + 12 sintéticos); sem mudança de esquema nem de confidence.ts; warning com 1+ bloco (o piso já é o gate).
+**Consequências:** catalão gera falso positivo se o corpus crescer para o idioma (rever com gating por idioma); "fl"→"á" sozinho continua indetectável (confundível com o "á" legítimo — o mesmo bloco cai pelo "à"); o parse de ToUnicode (alternativa B da ADR-084) segue aberto se o sinal de texto não bastar.

@@ -1,7 +1,7 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { linePageMap, paragraphBBoxes } from "./bbox";
-import { BROKEN_FONT_MAPPING, brokenFontSignal } from "./brokenfont";
+import { BROKEN_FONT_MAPPING, brokenFontText } from "./brokenfont";
 import { detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
 import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
 import { detectEndnotes } from "./endnotes";
@@ -93,8 +93,10 @@ export { BOOK_BLOCK_CONFIDENCE, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
  * text but carries `flags: ["broken-font-mapping"]` (the heaviest doubt
  * weight) and the document-level warning of the same name —
  * the reader is told instead of being handed silent garbage. The detection
- * and its thresholds live in `brokenFontSignal`. `extraction.avgConfidence`
- * is the mean of the block confidences, so one broken chapter moves it.
+ * and its thresholds live in `brokenFontText`, which also asks the
+ * common-letter signature of ADR-084 ("à" inside words, the Calibre swap
+ * that leaves no unmapped glyph). `extraction.avgConfidence` is the mean
+ * of the block confidences, so one broken chapter moves it.
  *
  * Headings (E4-T02 — layer 4, "semântica"): the paragraph list is classified
  * before the blocks are built, and a paragraph the layout marks as display
@@ -394,7 +396,7 @@ export function buildBook(document: RawDocument): Book {
     if (hyphen.uncertain) {
       flags.push(UNCERTAIN_HYPHEN_FLAG);
     }
-    if (brokenFontSignal(text).broken) {
+    if (brokenFontText(text)) {
       flags.push(BROKEN_FONT_MAPPING);
       brokenBlocks += 1;
     }

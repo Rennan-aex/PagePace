@@ -377,6 +377,30 @@ describe("buildBook", () => {
     expect(book.blocks[0]?.confidence).toBe(MIN_BLOCK_CONFIDENCE);
   });
 
+  it("flags a block of common-letter swaps (à inside words) and warns the document (ADR-084)", () => {
+    // Calibre's incomplete ToUnicode turns fi/fl ligatures into à/á; the
+    // text is plausible-looking but wrong, and no glyph is unmapped.
+    const swapped = page([
+      item("Soàa maàe paàos doànal", MARGIN, 100, BODY),
+      item("A clean paragraph to compare.", MARGIN, 140, BODY),
+    ]);
+    const book = buildBook(doc([swapped]));
+    expect(book.blocks).toHaveLength(2);
+    expect(book.blocks[0]?.flags).toEqual([BROKEN_FONT_MAPPING]);
+    expect(book.blocks[0]?.confidence).toBe(BROKEN_FONT_CONFIDENCE);
+    expect(book.blocks[1]?.flags).toEqual([]);
+    expect(book.blocks[1]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
+    expect(book.extraction.warnings).toEqual([BROKEN_FONT_MAPPING]);
+  });
+
+  it("keeps a block below the floor of internal à unflagged (ADR-084)", () => {
+    const few = page([item("Soàa e ànal nada mais no bloco.", MARGIN, 100, BODY)]);
+    const book = buildBook(doc([few]));
+    expect(book.blocks[0]?.flags).toEqual([]);
+    expect(book.blocks[0]?.confidence).toBe(BOOK_BLOCK_CONFIDENCE);
+    expect(book.extraction.warnings).toEqual([]);
+  });
+
   it("carries bold/italic in the runs, from the font name (E4-T01)", () => {
     const styled = page([
       item("Um aviso com ", MARGIN, 100, BODY),
