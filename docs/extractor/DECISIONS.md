@@ -88,6 +88,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-081 | Fila 3A restante: clítico "as/os", byline, afiliação e capa do n4 | accepted |
 | ADR-082 | Rodapé de revista vira sequência de fólio e a faixa lateral vira blocos | accepted |
 | ADR-083 | Colunas sob uma faixa de largura total: duas passagens com corte condicional | accepted |
+| ADR-084 | Spike S6: sinal de "à" interno para fonte quebrada em letras comuns | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -678,3 +679,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — excluir itens > 0,6 da largura na projeção (colapsa pico/threshold, medido) · C — corte das faixas de largura total sem gate (10+ falsos positivos e regressões 2→1) · M — segunda passagem só em página lida como 1 coluna.
 **Decisão:** M em `columns.ts`: o baseline roda primeiro e qualquer página ≥ 2 colunas volta intocada (zero regressão por construção); a segunda passagem usa `projectColumns` com corte de faixa e só o aceita se as linhas visíveis carregam vão interno ≥ 0,75×corpo na calha, em ≥ 35% das linhas e ≥ 3 linhas (`COLUMNS_LINE_GAP_MIN_*`; alvo medido 0,53 vs ≤ 0,25 nos falsos positivos).
 **Consequências:** A/B do corpus com ganhos só: `n2-astrofisica` p1 1→2 (alvo) e `phobos` p1 1→2 (mesmo layout A&A, genuíno); colunas cujas baselines nunca se alinham continuam lidas como 1 coluna (limite consciente); revisar se surgir PDF com calha larga e corpo sem alinhamento.
+
+### ADR-084 · Spike S6: sinal de "à" interno para fonte quebrada em letras comuns · accepted · 2026-10-26
+**Contexto:** BACKLOG 26: no `n1-pt-sofia` (Calibre 1.26.0) "fi"→"à" e "fl"→"á" sem flag. O spike S6 mediu que o ToUnicode gravado pelo Calibre está incompleto/trocado (U+00C6→"à"; só 24/128 códigos em 0x80-0xFF) e os códigos sem entrada caem na codificação padrão do pdf.js (0xE0→"à") — o render está certo, o texto errado está no PDF e é irrecuperável por extração. O caso "?" do n4 é má-diagnóstico: os 30 "?" avulsos são perguntas legítimas e a citação "F (d) ? F (R)" não existe em PDFs nem nos 5 relatórios inspect.
+**Alternativas:** A - sinal textual de "à" interno por bloco (barato; medido: 44 blocos no sofia com piso >= 3, 0 FP em 17 digitais + 12 sintéticos; depende de idioma e não pega "fl"→"á" sozinho) · B - parsear ToUnicode/encoding na ingestão (fiel e independente de idioma, mas exige parser de PDF novo no pipeline) · C - não sinalizar (texto errado com conf 0.90 continua passando).
+**Decisão:** A agora - piso >= 3 por bloco **sem** gate de share (o share 5% da regra atual nunca dispara nessa classe, medido), agregação documental para o aviso; `brokenFontSignal` (FFFD/PUA) fica intacto.
+**Consequências:** vira tarefa com teste vermelho antes e A/B no corpus (skill add-heuristic); limite anotado: catalão tem "à" interno; se o sinal de texto não bastar, reabrir B. Tabelas e renders em `docs/extractor/spikes/S6-broken-font.md`.
