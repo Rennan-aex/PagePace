@@ -151,6 +151,23 @@ describe("splitSideRegions: gates", () => {
     expect(result.main).toHaveLength(16);
   });
 
+  it("claims each contiguous cluster of a band as its own region", () => {
+    // The wittgenstein shape (ADR-081): one narrow band whose items are a
+    // third of the page in total (the column-share gate would refuse the
+    // band) but which holds three blocks separated by big vertical gaps —
+    // an editorial panel, a two-line stamp and a citation box. The stamp
+    // stays in the main flow; each block of at least the minimum lines is
+    // claimed on its own.
+    const upper = sideItems(3, 100);
+    const stamp = sideItems(2, 400);
+    const lower = sideItems(4, 550);
+    const result = split([...upper, ...stamp, ...lower, ...mainItems(27)]);
+    expect(result.regions.map((region) => region.items.length)).toEqual([3, 4]);
+    expect(result.regions.every((region) => region.side === "left")).toBe(true);
+    expect(result.main).toHaveLength(29);
+    expect(result.main.filter((entry) => entry.x === SIDE_X)).toHaveLength(2);
+  });
+
   it("keeps a band whose lines are not contiguous (scattered margin notes)", () => {
     // Wide enough for the width gate but one line every four body lines: the
     // vertical gaps dwarf the leading, so the run is not a text block.

@@ -36,13 +36,27 @@ import { normalizeForReader } from "./unicode";
  * sequence is removed as one region and feeds `pageLabels` like a numbered
  * foot.
  *
+ * A journal foot ("Filosofia Unisinos, 27(1):1-11, 2026 | e27103 3") carries
+ * far more decoration than `PAGE_LABEL_DECORATION_MAX` allows, so its digits
+ * never mask into one signature and every page looks unique — the signature
+ * can not cluster it. It still qualifies as an edge candidate when it sits on
+ * the **bottom** edge, starts or ends in a digit run and floats a blank line
+ * above the text (the shape of furniture, never of a body line that happens
+ * to end in a number): the sequence of printed values proves it, and each
+ * page keeps its folio as a label. The value of any numbered line is the
+ * digit run closest to the physical page (`page + 1`), which is what lets a
+ * foot whose decoration contains its own numbers ("27(1):1-11 … 3") label
+ * with the folio instead of the range.
+ *
  * Known limits: only the first and the last line of a page are edge
  * candidates, and only isolated numbered lines are flow candidates, so a
- * repeated line that is neither is never found; a page whose only line
- * repeats with the neighbours loses it; a document with fewer than
- * `REPEATED_MIN_PAGES` pages keeps everything; and every public entry point
- * strips once — feed these functions the raw document, never one that already
- * went through `stripRepeatedRegions`.
+ * repeated line that is neither is never found; the digit-at-the-foot rule
+ * never fires on a head, so a folio printed at the top of the page relies on
+ * its exact signature alone; a page whose only line repeats with the
+ * neighbours loses it; a document with fewer than `REPEATED_MIN_PAGES` pages
+ * keeps everything; and every public entry point strips once — feed these
+ * functions the raw document, never one that already went through
+ * `stripRepeatedRegions`.
  */
 
 /** Smallest number of pages a region must appear on before it is removed. */
@@ -100,6 +114,8 @@ interface Candidate {
   text: string;
   signature: string;
   numbered: boolean;
+  /** Bottom edge whose long decoration still ends in a folio (see `isFolioFoot`). */
+  edgeFolio: boolean;
 }
 
 interface RemovedLine {
@@ -119,8 +135,26 @@ function normalizeForCompare(text: string): string {
   return normalizeForReader(text).replace(/\s+/g, " ").trim();
 }
 
-function labelOf(text: string): string | null {
-  return /\d+/.exec(normalizeForCompare(text))?.[0] ?? null;
+/**
+ * Printed page number of a line: the digit run whose value sits closest to
+ * the physical position of the page (`page + 1`); the first run wins ties, so
+ * a single-run line labels exactly as a first-run pick would, while a foot
+ * that also carries the journal range ("27(1):1-11 … 3") labels with the
+ * folio instead of the range.
+ */
+function labelOf(text: string, page: number): string | null {
+  const normalized = normalizeForCompare(text);
+  const target = page + 1;
+  let label: string | null = null;
+  let closest = Number.POSITIVE_INFINITY;
+  for (const match of normalized.matchAll(/\d+/g)) {
+    const distance = Math.abs(Number(match[0]) - target);
+    if (distance < closest) {
+      label = match[0];
+      closest = distance;
+    }
+  }
+  return label;
 }
 
 /**
@@ -139,6 +173,27 @@ function signatureOf(text: string): { signature: string; numbered: boolean } {
 }
 
 const contentOf = (line: TextLine): string => lineText(line.items);
+
+/**
+ * A foot whose decoration is too long for the digit mask of `signatureOf`
+ * but which still carries a folio: the bottom edge, a digit run touching the
+ * start or the end of the line, and a blank line between it and the text
+ * above. The blank line is what keeps a body line that happens to end in a
+ * number ("… see Table 3") out of the sequence — furniture floats free of the
+ * text block, body lines touch their neighbours.
+ */
+function isFolioFoot(
+  band: RepeatedBand,
+  line: TextLine,
+  lines: readonly TextLine[],
+  isolation: number,
+): boolean {
+  if (band !== "bottom") return false;
+  const normalized = normalizeForCompare(contentOf(line));
+  if (!/^\d/.test(normalized) && !/\d$/.test(normalized)) return false;
+  const previous = lines[lines.length - 2] as TextLine;
+  return line.top - previous.bottom >= isolation;
+}
 
 /**
  * Edge candidates (first and last line of each page) plus the mid-flow
@@ -173,7 +228,8 @@ function candidatesOf(
       // furniture — a lettered sequence must never strip as a region.
       if (isMarginRefText(text)) continue;
       const { signature, numbered } = signatureOf(text);
-      candidates.push({ band, page, line, text, signature, numbered });
+      const edgeFolio = !numbered && isFolioFoot(band, line, lines, isolation);
+      candidates.push({ band, page, line, text, signature, numbered, edgeFolio });
     }
     lines.forEach((line, index) => {
       if (index === 0 || index === lines.length - 1) return;
@@ -187,7 +243,7 @@ function candidatesOf(
       const above = line.top - (lines[index - 1] as TextLine).bottom;
       const below = (lines[index + 1] as TextLine).top - line.bottom;
       if (above < isolation && below < isolation) return;
-      candidates.push({ band: "flow", page, line, text, signature, numbered });
+      candidates.push({ band: "flow", page, line, text, signature, numbered, edgeFolio: false });
     });
   });
   return candidates;
@@ -241,7 +297,7 @@ function flowRuns(candidates: readonly Candidate[], minimum: number): Candidate[
   let run: Candidate[] = [];
   let previousValue = Number.NaN;
   for (const candidate of sorted) {
-    const value = Number(labelOf(candidate.text));
+    const value = Number(labelOf(candidate.text, candidate.page));
     const continues =
       run.length > 0 && value > previousValue && value - previousValue <= FLOW_FOLIO_MAX_STEP;
     if (!continues && run.length >= minimum) runs.push(run);
@@ -253,21 +309,31 @@ function flowRuns(candidates: readonly Candidate[], minimum: number): Candidate[
   return runs;
 }
 
-/** Turns accepted candidates into a region, in reading order, and records the removal. */
+/**
+ * Turns accepted candidates into a region, in reading order, and records the
+ * removal. A line removed by the sequence is a proven page label even when
+ * its decoration is too long for the digit mask; a line removed by the
+ * signature alone only labels when the mask made it numbered.
+ */
 function acceptRegion(
   band: RepeatedBand,
   candidates: readonly Candidate[],
   regions: RepeatedRegion[],
   removedLines: RemovedLine[],
+  sequenceProven: boolean,
 ): void {
   const occurrences: RepeatedOccurrence[] = [];
   for (const candidate of [...candidates].sort(
     (a, b) => a.page - b.page || a.line.top - b.line.top,
   )) {
+    const pageLabel =
+      candidate.numbered || (sequenceProven && candidate.edgeFolio)
+        ? labelOf(candidate.text, candidate.page)
+        : null;
     const occurrence: RepeatedOccurrence = {
       page: candidate.page,
       text: candidate.text,
-      pageLabel: candidate.numbered ? labelOf(candidate.text) : null,
+      pageLabel,
     };
     occurrences.push(occurrence);
     removedLines.push({ page: candidate.page, line: candidate.line, occurrence });
@@ -294,7 +360,7 @@ function analyze(document: RawDocument): Analysis {
       flowCandidates.push(candidate);
       continue;
     }
-    if (candidate.numbered) numberedEdges.push(candidate);
+    if (candidate.numbered || candidate.edgeFolio) numberedEdges.push(candidate);
     const key = `${candidate.band}|${candidate.signature}`;
     const bucket = groups.get(key);
     if (bucket === undefined) groups.set(key, [candidate]);
@@ -306,12 +372,13 @@ function analyze(document: RawDocument): Analysis {
   for (const bucket of groups.values()) {
     const cluster = stableCluster(bucket, tolerance);
     if (cluster.length < minimum) continue;
-    acceptRegion((bucket[0] as Candidate).band, cluster, regions, removedLines);
+    acceptRegion((bucket[0] as Candidate).band, cluster, regions, removedLines, false);
   }
   // An edge folio whose baseline wanders (a chapter opening pushes it down)
-  // can not cluster like a running head: the sequence picks up the numbered
-  // edges the edge pass left behind — except on a page whose only line it
-  // is, which no region may ever empty.
+  // or whose decoration defeats the signature (a journal foot) can not
+  // cluster like a running head: the sequence picks up the numbered edges
+  // the edge pass left behind — except on a page whose only line it is,
+  // which no region may ever empty.
   const removedLineSet = new Set(removedLines.map((entry) => entry.line));
   const singleLinePages = new Set<number>();
   pages.forEach((lines, page) => {
@@ -322,7 +389,7 @@ function analyze(document: RawDocument): Analysis {
     if (!removedLineSet.has(candidate.line)) flowCandidates.push({ ...candidate, band: "flow" });
   }
   for (const run of flowRuns(flowCandidates, minimum)) {
-    acceptRegion("flow", run, regions, removedLines);
+    acceptRegion("flow", run, regions, removedLines, true);
   }
   regions.sort(compareRegions);
   removedLines.sort((a, b) => a.page - b.page);

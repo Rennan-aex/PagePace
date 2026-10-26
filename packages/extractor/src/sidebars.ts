@@ -1,6 +1,6 @@
 import type { RawTextItem } from "@pagepace/schema";
 import { COLUMNS_MIN_COLUMN_SHARE } from "./columns";
-import { groupItemLines } from "./lines";
+import { groupItemLines, type TextLine } from "./lines";
 
 /**
  * Side regions and sidebars (E6-T03 — layer 3, "layout").
@@ -24,15 +24,19 @@ import { groupItemLines } from "./lines";
  * 2. **Main band** — the band holding the most items (ties: the widest);
  *    it must hold at least `SIDEBAR_MIN_MAIN_SHARE` of the items or the page
  *    is a multi-band layout and nothing is claimed.
- * 3. **Side band** — any other band that clears every gate at once: width
- *    between `SIDEBAR_MIN_WIDTH_FACTOR` body fonts (a margin-number column
- *    is narrower — E5-T07 keeps it) and `SIDEBAR_MAX_WIDTH_SHARE` of the
- *    content width (wider is a real column — E6-T01/T04's turf), fewer items
- *    than `COLUMNS_MIN_COLUMN_SHARE` of the page (a band with more is a
- *    column, and columns belong to `detectColumns`), at least
- *    `SIDEBAR_MIN_LINES` visual lines, and those lines contiguous
- *    (consecutive gaps ≤ `SIDEBAR_MAX_LINE_GAP_FACTOR` times the typical
- *    leading — scattered margin notes are not a text block).
+ * 3. **Side band** — any other band whose width clears
+ *    `SIDEBAR_MIN_WIDTH_FACTOR` body fonts (a margin-number column is
+ *    narrower — E5-T07 keeps it) and `SIDEBAR_MAX_WIDTH_SHARE` of the
+ *    content width (wider is a real column — E6-T01/T04's turf). The band
+ *    is then cut into contiguous blocks (consecutive gaps ≤
+ *    `SIDEBAR_MAX_LINE_GAP_FACTOR` times the typical leading) and each
+ *    block is claimed on its own when it holds at least
+ *    `SIDEBAR_MIN_LINES` visual lines and fewer items than
+ *    `COLUMNS_MIN_COLUMN_SHARE` of the page (a block with a column's share
+ *    is a column, and columns belong to `detectColumns`): an editorial
+ *    panel and a citation box separated by big gaps are two side regions of
+ *    one band, while scattered margin notes — single lines with gaps
+ *    dwarfing the leading — claim nothing (ADR-081).
  *
  * The split runs **before** the column detector (`groupPageParagraphs`
  * calls it on every page, then `detectColumns` on what is left): a real
@@ -40,12 +44,12 @@ import { groupItemLines } from "./lines";
  * E6-T01/T02 cannot regress — a two-column page comes out of the splitter
  * untouched and is read exactly as E6-T02 read it.
  *
- * Known limits: a band holding a column's share of the items
+ * Known limits: a block holding a column's share of the items
  * (≥ `COLUMNS_MIN_COLUMN_SHARE`) is left to the column detector, even when
- * it is narrow enough to look like a sidebar; a side paragraph still goes
- * through the kind heuristics of `buildBook` (a smaller side band at the
- * page foot may read as a footnote); a margin number that sits inside the
- * side band moves to the page end with it (the corpus has no such page
+ * its band is narrow enough to look like a sidebar; a side paragraph still
+ * goes through the kind heuristics of `buildBook` (a smaller side band at
+ * the page foot may read as a footnote); a margin number that sits inside
+ * the side band moves to the page end with it (the corpus has no such page
  * today).
  */
 
@@ -110,18 +114,26 @@ function bandsOf(items: readonly RawTextItem[], minGap: number): Band[] {
   return bands;
 }
 
-/** Whether the lines of a band form one contiguous text block. */
-function contiguous(lines: ReturnType<typeof groupItemLines>, lineHeight: number): boolean {
-  if (lines.length < SIDEBAR_MIN_LINES) return false;
-  if (!(lineHeight > 0)) return true;
-  const limit = SIDEBAR_MAX_LINE_GAP_FACTOR * lineHeight;
+/**
+ * The lines of a band cut into runs whose inner gaps stay within the limit;
+ * runs shorter than `SIDEBAR_MIN_LINES` are not text blocks and drop out.
+ * The whole-band contiguity rule, now per block: a band holding an
+ * editorial panel and a citation box separated by big gaps claims each
+ * block, while scattered margin notes (one line every few body lines) yield
+ * only single-line runs and claim nothing.
+ */
+function clustersOf(lines: readonly TextLine[], lineHeight: number): TextLine[][] {
+  if (lines.length === 0) return [];
+  const limit =
+    lineHeight > 0 ? SIDEBAR_MAX_LINE_GAP_FACTOR * lineHeight : Number.POSITIVE_INFINITY;
+  const clusters: TextLine[][] = [[lines[0] as TextLine]];
   for (let index = 1; index < lines.length; index++) {
-    const previous = lines[index - 1];
-    const next = lines[index];
-    if (previous === undefined || next === undefined) continue;
-    if (next.top - previous.bottom > limit) return false;
+    const previous = lines[index - 1] as TextLine;
+    const next = lines[index] as TextLine;
+    if (next.top - previous.bottom > limit) clusters.push([]);
+    (clusters[clusters.length - 1] as TextLine[]).push(next);
   }
-  return true;
+  return clusters.filter((cluster) => cluster.length >= SIDEBAR_MIN_LINES);
 }
 
 /**
@@ -168,11 +180,14 @@ export function splitSideRegions(
     if (index === mainIndex || band === undefined) continue;
     const width = band.right - band.x;
     if (width < minWidth || width > maxWidth) continue;
-    // A band with a column's share of the items is a column (E6-T01's
-    // detector decides), never a sidebar.
-    if (band.items.length >= COLUMNS_MIN_COLUMN_SHARE * items.length) continue;
-    if (!contiguous(groupItemLines(band.items), options.lineHeight)) continue;
-    regions.push({ side: band.x < mainBand.x ? "left" : "right", items: band.items });
+    const side: SideBand = band.x < mainBand.x ? "left" : "right";
+    for (const cluster of clustersOf(groupItemLines(band.items), options.lineHeight)) {
+      const clusterItems = cluster.flatMap((line) => line.items);
+      // A block with a column's share of the page's items is a column
+      // (`COLUMNS_MIN_COLUMN_SHARE`), and columns belong to E6-T01.
+      if (clusterItems.length >= COLUMNS_MIN_COLUMN_SHARE * items.length) continue;
+      regions.push({ side, items: clusterItems });
+    }
   }
   if (regions.length === 0) return { main: [...items], regions: [] };
   regions.sort((a, b) => (a.side === b.side ? 0 : a.side === "left" ? -1 : 1));

@@ -312,6 +312,60 @@ describe("stripRepeatedRegions", () => {
   });
 });
 
+/**
+ * The n3-pt-scielo-wittgenstein foot: long decoration with the folio at the
+ * trailing edge on odd pages, at the leading edge on even pages, and after a
+ * URL on page 1 — no two lines share a signature, so only the sequence of
+ * printed values can prove they are one region.
+ */
+function journalFootBook(): RawDocument {
+  const foot = (index: number): string => {
+    const folio = index + 1;
+    if (folio === 1) {
+      return "https://revistas.unisinos.br/index.php/ Filosofia Unisinos, 27(1):1-11, 2026 | e27103 1";
+    }
+    const core = "Filosofia Unisinos, 27(1):1-11, 2026 | e27103";
+    return folio % 2 === 0 ? `${folio} ${core}` : `${core} ${folio}`;
+  };
+  return doc(
+    Array.from({ length: 11 }, (_, index) => fixturePage(index, { head: null, foot: foot(index) })),
+  );
+}
+
+describe("a foot the signature can not cluster", () => {
+  it("removes the journal foot of every page by its folio sequence", () => {
+    const stripped = stripRepeatedRegions(journalFootBook());
+    expect(stripped.removed.map((occurrence) => occurrence.text)).toEqual([
+      ...Array.from({ length: 11 }, (_, index) => {
+        const folio = index + 1;
+        if (folio === 1) {
+          return "https://revistas.unisinos.br/index.php/ Filosofia Unisinos, 27(1):1-11, 2026 | e27103 1";
+        }
+        const core = "Filosofia Unisinos, 27(1):1-11, 2026 | e27103";
+        return folio % 2 === 0 ? `${folio} ${core}` : `${core} ${folio}`;
+      }),
+    ]);
+    expect(stripped.pageLabels).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
+    expect(stripped.regions.map((region) => region.band)).toEqual(["flow"]);
+    expect(itemsText((stripped.document.pages[0] as RawPage).items)).toContain(
+      "Body line 1.1 of the page text.",
+    );
+  });
+
+  it("keeps a body line that ends with a number when the line above it touches", () => {
+    const tablePage = (index: number, label: string): RawPage => {
+      const items = bodyLines(index);
+      items.push(item(`See Table ${label}`, MARGIN, 715, BODY, { width: 400 }));
+      return page(items, index);
+    };
+    const stripped = stripRepeatedRegions(
+      doc([tablePage(0, "3"), tablePage(1, "4"), tablePage(2, "5")]),
+    );
+    expect(stripped.removed).toEqual([]);
+    expect(itemsText((stripped.document.pages[0] as RawPage).items)).toContain("See Table 3");
+  });
+});
+
 describe("mid-flow folios (the flow band)", () => {
   it("removes the folio sequence in the middle of the flow and fills the page labels", () => {
     const stripped = stripRepeatedRegions(flowFolioBook());

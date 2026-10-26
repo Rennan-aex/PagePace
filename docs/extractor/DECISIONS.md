@@ -85,6 +85,9 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-078 | CLI: caminho normalizado textualmente e `--out` raiz recusado | accepted |
 | ADR-079 | Frente-mater do wittgenstein: ornamento, hífen duplo e tipos | accepted |
 | ADR-080 | Fila 3A dos pequenos: diálogo, subheads itálicos, capa do n4 e compostos | accepted |
+| ADR-081 | Fila 3A restante: clítico "as/os", byline, afiliação e capa do n4 | accepted |
+| ADR-082 | Rodapé de revista vira sequência de fólio e a faixa lateral vira blocos | accepted |
+| ADR-083 | Colunas sob uma faixa de largura total: duas passagens com corte condicional | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -663,3 +666,15 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Decisão:** (1) `HYPHEN_CLITICS_PT` ganha `as`/`os` — mesma classe de `la`/`lo`; quebra silábica não produz lado direito "as"/"os" (`casas` quebra `ca-`+`sas`), então o falso positivo é desprezível; (2) `detectHeadings` recusa byline: `HEADING_BYLINE_MARK` (letra+1–2 dígitos, o sobrescrito de afiliação) com ≥2 marcas e ≥3 vírgulas — um título mantém os dígitos separados (`COVID-19`, `Capítulo 3`); (3) `detectQuotes` recusa bloco em que **todas** as linhas abrem com marcador numerado (`QUOTE_AFFILIATION_LINE`, `/^\d{1,2}\s+\S/`) — a lista de afiliações da capa do A&A; (4) `detectHeadings` recusa linha só de dígitos (`500`, `2020`) e palavra-carimbo de 1–4 letras sem maiúscula (`aqui`) — títulos pt/en capitalizam.
 **Consequências:** sofia entrega "acariciou-as"; byline e afiliação do n2 viram `paragraph`; o TOC do n4 cai 327→320 sem "500"/"2020"/"aqui" (níveis do miolo sobem 1: PREFÁCIO 5→4). Limite conhecido: "DE ASTROFÍSICA txto" permanece — o produtor imprimiu o carimbo "txto" **dentro** do mesmo item de texto do título e nenhum sinal de layout os separa. Side-detection do witt **adiada**: causa raiz medida — o rodapé com folio (linha de aresta terminada em dígitos) escapa do strip (a assinatura exata difere pelo folio e o resto > 4 caracteres barra a máscara), a página vira **uma faixa só** e os gates de sidebar nunca rodam; exige primeiro o strip de mobília (BACKLOG linha 23) e depois segmentação das faixas em blocos contíguos. 6 testes novos vermelhos antes; `pnpm verify` verde (983 testes, +7); `pnpm eval` idêntico antes/depois (nenhuma métrica mudou; baseline intacta).
 
+
+### ADR-082 · Rodapé de revista vira sequência de fólio e a faixa lateral vira blocos · accepted · 2026-10-26
+**Contexto:** ADR-081 mediu o witt: o rodapé "Filosofia Unisinos, ... | e27103 N" é linha de aresta com resto > 4 caracteres, então a assinatura nunca mascara e o strip não roda; na p1 a faixa lateral era recusada por `COLUMNS_MIN_COLUMN_SHARE` (22/88 = 0,25) e por contiguidade (vazios de 236/195 pt entre painel, carimbo e caixa).
+**Alternativas:** A — mascarar só a ponta do fólio na assinatura (o prefixo da URL da p1 não agrupa e o rótulo sai errado) · B — prova de sequência com valor por proximidade à página + isolamento por vão >= 1 leading.
+**Decisão:** B: `numbered` só na borda de baixo com dígito na ponta e vão acima, `labelOf` escolhe o dígito mais próximo de `page + 1`; em `sidebars.ts` a faixa é cortada em blocos contíguos e a cota de coluna passou a valer por bloco, cada bloco com >= `SIDEBAR_MIN_LINES` linhas é reivindicado.
+**Consequências:** witt p1 vira 2 regiões laterais (aceite do BACKLOG 2026-10-22), rebus e climatejustice também perdem rodapés da mesma classe (A/B só com ganhos, eval exit 0); fólio no topo continua dependendo da assinatura exata; revisar se um bloco lateral com >= 25% dos itens da página for recusado como coluna.
+
+### ADR-083 · Colunas sob uma faixa de largura total: duas passagens com corte condicional · accepted · 2026-10-26
+**Contexto:** a p1 do `n2-en-astrofisica` (paper A&A de 2 colunas) lia 1 coluna: um resumo de largura total projeta uma calha sólida e o baseline do `detectColumns` lê a página como faixa única; piorar métrica é proibido, então a regra foi medida no corpus antes de aceitar.
+**Alternativas:** A — excluir itens > 0,6 da largura na projeção (colapsa pico/threshold, medido) · C — corte das faixas de largura total sem gate (10+ falsos positivos e regressões 2→1) · M — segunda passagem só em página lida como 1 coluna.
+**Decisão:** M em `columns.ts`: o baseline roda primeiro e qualquer página ≥ 2 colunas volta intocada (zero regressão por construção); a segunda passagem usa `projectColumns` com corte de faixa e só o aceita se as linhas visíveis carregam vão interno ≥ 0,75×corpo na calha, em ≥ 35% das linhas e ≥ 3 linhas (`COLUMNS_LINE_GAP_MIN_*`; alvo medido 0,53 vs ≤ 0,25 nos falsos positivos).
+**Consequências:** A/B do corpus com ganhos só: `n2-astrofisica` p1 1→2 (alvo) e `phobos` p1 1→2 (mesmo layout A&A, genuíno); colunas cujas baselines nunca se alinham continuam lidas como 1 coluna (limite consciente); revisar se surgir PDF com calha larga e corpo sem alinhamento.

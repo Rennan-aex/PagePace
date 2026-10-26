@@ -226,6 +226,58 @@ describe("detectColumns: false-positive guards", () => {
   });
 });
 
+describe("detectColumns: spanning band above a two-column body", () => {
+  // `n2-en-astrofisica` p1: title/abstract/footer rows are full width and
+  // vote on every bin, so the crossing gate refuses the real gutter of the
+  // two-column body below. The row cut removes those rows from the
+  // projection; the line-gap gate then checks that the body lines actually
+  // break at the gutter (a single-column page of full-width lines does not).
+  it("reads a two-column page under a full-width abstract as two columns", () => {
+    const spanning = Array.from({ length: 12 }, (_, index) =>
+      item(
+        "A full width abstract line of the manuscript that crosses.",
+        MARGIN,
+        300 + index * 15,
+        BODY,
+        {
+          width: 400,
+        },
+      ),
+    );
+    const result = detect([
+      ...spanning,
+      ...columnItems(COL1_X, 12, 500),
+      ...columnItems(COL2_X, 12, 500),
+    ]);
+    expect(result.count).toBe(2);
+    expect(result.gutters).toEqual([{ x: COL1_X + COL_W, width: GUTTER_W }]);
+    expect(result.spanningItems.slice(0, 12).every((flag) => flag === true)).toBe(true);
+  });
+
+  it("keeps one column when the cut's gutter carries no line gap", () => {
+    const fullWidth = Array.from({ length: 14 }, (_, index) =>
+      item(
+        "A full width line of a single column page of the journal.",
+        MARGIN,
+        300 + index * 15,
+        BODY,
+        {
+          width: 400,
+        },
+      ),
+    );
+    const left = [700, 730, 760].map((baseline) =>
+      item("Short fragment", MARGIN, baseline, BODY, { width: 120 }),
+    );
+    const right = [710, 740, 770].map((baseline) =>
+      item("Short fragment", 352, baseline, BODY, { width: 120 }),
+    );
+    const result = detect([...fullWidth, ...left, ...right]);
+    expect(result.count).toBe(1);
+    expect(result.gutters).toEqual([]);
+  });
+});
+
 describe("detectColumns: purity and helpers", () => {
   it("is deterministic and does not mutate the input", () => {
     const items = [...columnItems(COL1_X, 8), ...columnItems(COL2_X, 8)];
