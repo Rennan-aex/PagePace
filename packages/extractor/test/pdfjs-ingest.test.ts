@@ -5,10 +5,17 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { discardFontData, ingestPdfjs, PDFJS_DIST_VERSION, sha256Hex } from "@pagepace/extractor";
+import {
+  DEFAULT_CLEANUP_EVERY_PAGES,
+  discardFontData,
+  ingestPdfjs,
+  PDFJS_DIST_VERSION,
+  releasePdfjsCaches,
+  sha256Hex,
+} from "@pagepace/extractor";
 import { parseRawDocument, SCHEMA_VERSION } from "@pagepace/schema";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildPdf, textStream } from "./minipdf";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -272,6 +279,78 @@ describe("ingestPdfjs - font.data discard (E8-T03, ADR-086)", () => {
     expect(resolved.name).toBe("Real-Name");
     expect(plain.data).toBeDefined(); // no clearData to call: left untouched
   });
+});
+
+describe("ingestPdfjs - pdf.js cache sweep (E8-T03, ADR-087)", () => {
+  it("releases the document caches through pdf.cleanup()", async () => {
+    const cleanup = vi.fn(async () => undefined);
+    await releasePdfjsCaches({ cleanup } as never);
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a cleanupEveryPages that is not an integer >= 0", async () => {
+    for (const cleanupEveryPages of [-1, 1.5, Number.NaN]) {
+      await expect(
+        ingestPdfjs(helveticaPdf(), { fileName: "x.pdf", cleanupEveryPages }),
+      ).rejects.toThrow(RangeError);
+    }
+  });
+
+  it("sweeps the caches on the configured cadence and 0 disables the sweep", async () => {
+    const bytes = buildPdf(Array.from({ length: 5 }, (_, i) => textStream(`page ${i + 1}`)));
+    const firstTask = getDocument({ data: bytes.slice(), verbosity: 0 });
+    const firstPdf = await firstTask.promise;
+    const proto = Object.getPrototypeOf(firstPdf) as { cleanup: () => Promise<unknown> };
+    await firstTask.destroy();
+    const cleanupSpy = vi.spyOn(proto, "cleanup");
+
+    try {
+      const swept = await ingestPdfjs(bytes, { fileName: "cadence.pdf", cleanupEveryPages: 2 });
+      expect(swept.pages).toHaveLength(5);
+      // 5 pages, sweep after pages 2 and 4 — never after the last one.
+      expect(cleanupSpy).toHaveBeenCalledTimes(2);
+
+      cleanupSpy.mockClear();
+      await ingestPdfjs(bytes, { fileName: "cadence-off.pdf", cleanupEveryPages: 0 });
+      expect(cleanupSpy).not.toHaveBeenCalled();
+    } finally {
+      cleanupSpy.mockRestore();
+    }
+  });
+
+  it("keeps DEFAULT_CLEANUP_EVERY_PAGES a positive integer", () => {
+    expect(Number.isInteger(DEFAULT_CLEANUP_EVERY_PAGES)).toBe(true);
+    expect(DEFAULT_CLEANUP_EVERY_PAGES).toBeGreaterThan(0);
+  });
+
+  const entries = availableCorpus().filter((entry) => entry.id === "n2-en-arxiv-phobos");
+
+  it.skipIf(entries.length === 0)(
+    "sweeps after every page without changing the extracted document",
+    async () => {
+      const bytes = new Uint8Array(
+        await readFile(path.join(publicCorpus, "n2-en-arxiv-phobos.pdf")),
+      );
+      const base = await ingestPdfjs(bytes, {
+        fileName: "n2-en-arxiv-phobos.pdf",
+        cleanupEveryPages: 0,
+      });
+      const swept = await ingestPdfjs(bytes, {
+        fileName: "n2-en-arxiv-phobos.pdf",
+        cleanupEveryPages: 1,
+      });
+
+      expect(JSON.stringify(swept)).toBe(JSON.stringify(base));
+      // Later pages still resolve real font names after the caches were swept.
+      const laterNamed = swept.pages
+        .slice(1)
+        .flatMap((page) => page.items)
+        .filter((item) => item.fontName !== "unknown");
+      expect(laterNamed.length).toBeGreaterThan(0);
+    },
+    180_000,
+  );
 });
 
 describe("ingestPdfjs - public corpus (needs `corpus/public`, skipped until E1-T05)", () => {

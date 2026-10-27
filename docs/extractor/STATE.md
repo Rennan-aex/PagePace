@@ -3,19 +3,20 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E8 EM ANDAMENTO** (plano em `phases/E8-performance.md`). **E8-T03 fatia 1 (descartar `font.data`) DONE (2026-10-27, ADR-086)**; faltam da E8-T03: liberar páginas do PDF.js, limite de memória e docs de estresse; depois E8-T01 (streaming), E8-T02 (cache), E8-T04 (benchmarks). E7 CONCLUÍDA (2026-10-21, ADR-071–077); E6 (ADR-070); E5/E4/E3 fechadas.
-- **Tarefa atual:** **nenhuma em curso** — próxima sessão continua E8 (provável E8-T03 fatia 2 ou E8-T01). Branch `e8-t03-discard-font-data` mesclada nesta sessão.
+- **Fase atual:** **E8 EM ANDAMENTO** (plano em `phases/E8-performance.md`). **E8-T03 fatias 1 e 2 DONE (2026-10-27, ADR-086/087)**; faltam da E8-T03: limite duro de memória (fatia 3) e docs de estresse (medir no E8-T04); depois E8-T01 (streaming), E8-T02 (cache), E8-T04 (benchmarks). E7 CONCLUÍDA (2026-10-21, ADR-071–077); E6 (ADR-070); E5/E4/E3 fechadas.
+- **Tarefa atual:** **nenhuma em curso** — próxima sessão continua E8 (provável E8-T01 streaming, que é a maior, ou fatia 3 da E8-T03 com os docs de estresse privados).
 - **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (1004 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacto — descarte de `font.data` não muda a saída).
-- **Última atualização:** 2026-10-27 (E8-T03 fatia 1 fechada, ADR-086).
+- **Status:** `pnpm verify` verde (1009 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacto — a varredura de caches não muda a saída).
+- **Última atualização:** 2026-10-27 (E8-T03 fatia 2 fechada, ADR-087).
 
-## Tarefa fechada nesta sessão — E8-T03 fatia 1: descartar `font.data`
-- `discardFontData(page, Object.keys(styles))` em `readPage` chama `font.clearData()` (API do pdf.js 6) depois de ler nome/métricas — `data` é getter, `delete` não funciona (**ADR-086**).
-- Medição corrigida: bytes de `data` = 0,4 MB (n4-pt) · 6,4 MB (n2-astrofisica) · 0,8 MB (lostworld); os "308 MB"/"+35 MB" antigos eram o custo total da flag `fontExtraProperties` (inclui `extra`), não só `data` — a E8-T03 não planejar em cima de 308 MB.
-- Testes: integração com pdf.js real (bytes somem, `name`/`ascent` ficam, páginas seguintes resolvem o nome) + unitário; BACKLOG linha 7 marcada; `pnpm eval --ci` exit 0.
+## Tarefa fechada nesta sessão — E8-T03 fatia 2: varredura dos caches do pdf.js
+- `releasePdfjsCaches(pdf)` (exportado) chama `pdf.cleanup()`: limpa fontes traduzidas do worker, `globalImageCache`, CMaps e o `commonObjs` da main thread (**ADR-087**).
+- Opção `cleanupEveryPages` em `PdfjsIngestOptions` (inteiro ≥ 0; default `DEFAULT_CLEANUP_EVERY_PAGES = 32`; `0` desliga; senão `RangeError`); varredura no loop de `ingestPdfjs` após cada página.
+- Testes: saída byte-idêntica com cadência 1 no `n2-en-arxiv-phobos` (fontes re-resolvem após a varredura); cadência espiada em sintético de 5 páginas (2 chamadas com `2`, nenhuma com `0`).
+- Medição: custo ~+3% (ruído) no default em `n1-en-rebus-philosophy-mind` (99p); +51% na cadência 1 no phobos; ganho de pico não mensurável no corpus público (piso ~295 MB = carregamento dos módulos) — confirmar com os docs de estresse no E8-T04.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-27 — E8-T03 fatia 1 (descartar `font.data`) — CONCLUÍDA** · branch `e8-t03-discard-font-data`, **ADR-086**. **(1) Código:** `ingest/pdfjs.ts` ganhou `discardFontData` (exportado no índice) chamado em `readPage` após resolver os nomes — `font.clearData()` libera os bytes; `delete` não funciona (`data` é getter do `FontFaceObject`). **(2) Testes:** vermelho antes, verde depois — 3 novos em `pdfjs-ingest.test.ts` (integração pdf.js real + páginas seguintes + unitário). **(3) Medição:** `data` = 0,4 MB n4-pt / 6,4 MB n2-astro / 0,8 MB lostworld (os 308 MB antigos eram o custo total da flag, inclui `extra`). **(4) Gates:** `pnpm verify` verde (**1004 testes**), `pnpm eval --ci` exit 0. **Próx.:** E8 — fatia 2 da E8-T03 (liberar páginas/limite de memória) ou E8-T01 (streaming `AsyncIterable`); planejar a E8 inteira se a sessão for de planejamento.
+- **Sessão 2026-10-27b — E8-T03 fatia 2 (varredura dos caches do pdf.js) — CONCLUÍDA** · branch `e8-t03-release-pdfjs-caches`, **ADR-087**. **(1) Código:** `ingest/pdfjs.ts` ganhou `releasePdfjsCaches` (`pdf.cleanup()`), a opção `cleanupEveryPages` (default 32, 0 = off, valida inteiro ≥ 0) e a chamada no loop de leitura; exports no índice. **(2) Testes:** vermelho antes (+4 testes novos em `pdfjs-ingest.test.ts`: helper, validação, cadência espiada, identidade no corpus com cadência 1). **(3) Medição:** default ~+3% (ruído) em 99p; cadência 1 +51% de tempo; pico sem ganho mensurável no corpus público — os alvos reais (astrofisica/filosofia2) são privados. **(4) Gates:** `pnpm verify` verde (**1009 testes**), `pnpm eval --ci` exit 0. **Próx.:** E8-T01 (streaming `AsyncIterable`, planejar com a skill `plan-task` — mexe em API pública, CLI e junção entre páginas) ou fatia 3 da E8-T03 (limite duro de memória, exige API de plataforma) — decidir no início da sessão.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
@@ -31,7 +32,7 @@
 | E5 | done (T01 PR #45; T02 PR #46; T03 PR #48; T04 PR #50; T05 PR #51; T06 PR #52; T07 PR #53; T08 PR #54 — fase fechada 2026-10-18) |
 | E6 | done (T01 PR #56, T02 PR #57, T03, T04 — fase fechada 2026-10-19, ADR-070) |
 | E7 | done (T01–T05 done 2026-10-20/21, ADR-071/072/073/074/075/076/077 — fase fechada 2026-10-21) |
-| E8 | em andamento (T03 fatia 1 done 2026-10-27, ADR-086; resto: T03 fatias 2+, T01, T02, T04) |
+| E8 | em andamento (T03 fatias 1+2 done 2026-10-27, ADR-086/087; resto: T03 fatia 3, T01, T02, T04) |
 | E9, E10, SEG | todo (E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
@@ -40,8 +41,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-10-27 · **E8-T03 fatia 2: varredura dos caches do pdf.js — CONCLUÍDO** · `releasePdfjsCaches` + `cleanupEveryPages` (default 32) no loop de leitura; **ADR-087**; identidade byte-a-byte com cadência 1 no corpus público; **1009 testes** (+5), `pnpm eval --ci` exit 0.
 - 2026-10-27 · **E8-T03 fatia 1: descartar `font.data` — CONCLUÍDO** · `discardFontData` (`clearData()` do pdf.js por página em `readPage`); **ADR-086**; medição corrigida (0,4–6,4 MB de `data`; "308 MB" era o custo total da flag); **1004 testes** (+3), `pnpm eval --ci` exit 0; BACKLOG linha 7 marcada.
-- 2026-10-26 · **Heurística fonte quebrada (BACKLOG 26) — CONCLUÍDO** · `brokenFontText` = FFFD/PUA ou 3+ "à" interno (sem share), mesma flag/warning/confidence de E3-T05; **ADR-085**; A/B: sofia 0→49 blocos, 0 FP em 16 digitais + 12 sintéticos; **1001 testes** (+12), `pnpm eval --ci` exit 0; BACKLOG 26 marcada.
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67).
 
 Histórico completo: docs/extractor/archive/

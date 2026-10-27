@@ -21,6 +21,13 @@ import { countRenderModeChars, isOcrTextLayer, ScannedPdfError } from "./text-la
 /** Exact `pdfjs-dist` version this adapter was written against (ADR-015). */
 export const PDFJS_DIST_VERSION = "6.4.299";
 
+/**
+ * Default pages read between pdf.js cache sweeps (E8-T03 / ADR-087). The
+ * sweep bounds how much the worker keeps for a long book; `0` in
+ * {@link PdfjsIngestOptions.cleanupEveryPages} disables it entirely.
+ */
+export const DEFAULT_CLEANUP_EVERY_PAGES = 32;
+
 /** Name reported when pdf.js cannot resolve a font to a real PostScript name. */
 const UNKNOWN_FONT = "unknown";
 
@@ -39,6 +46,12 @@ export interface PdfjsIngestOptions {
   pageRange?: { from: number; to: number };
   /** Where pdf.js finds fonts, CMaps and WASM. Omit to run without them. */
   assets?: PdfjsAssets;
+  /**
+   * Pages read between pdf.js cache sweeps (E8-T03 / ADR-087). Must be an
+   * integer >= 0; 0 disables the sweep. Defaults to
+   * {@link DEFAULT_CLEANUP_EVERY_PAGES}.
+   */
+  cleanupEveryPages?: number;
 }
 
 interface PdfjsTextItem {
@@ -147,6 +160,18 @@ export function discardFontData(page: PDFPageProxy, internalNames: Iterable<stri
     }
     font?.clearData?.();
   }
+}
+
+/**
+ * Sweeps the caches pdf.js keeps per document (E8-T03 fatia 2 / ADR-087):
+ * worker-side translated fonts, decoded cross-page images and CMaps, plus the
+ * main-thread `commonObjs` and font loader. Fonts translate again on the next
+ * page that uses them, so the sweep is a memory-versus-CPU trade — the caller
+ * chooses the cadence. The extracted text is unaffected (measured in
+ * `pdfjs-ingest.test.ts` against the public corpus).
+ */
+export async function releasePdfjsCaches(pdf: PDFDocumentProxy): Promise<void> {
+  await pdf.cleanup();
 }
 
 function fontFlagsOf(
@@ -413,6 +438,13 @@ export async function ingestPdfjs(
     }
     const lastPage = Math.min(to, pageCount);
 
+    const cleanupEvery = options.cleanupEveryPages ?? DEFAULT_CLEANUP_EVERY_PAGES;
+    if (!Number.isInteger(cleanupEvery) || cleanupEvery < 0) {
+      throw new RangeError(
+        `ingestPdfjs: cleanupEveryPages ${cleanupEvery} must be an integer >= 0`,
+      );
+    }
+
     // Detector A (ADR-018): a document without a text layer is a scan, not an
     // empty book — refuse here, before anything else is assembled.
     if (!(await documentHasText(pdf))) throw new ScannedPdfError();
@@ -430,6 +462,11 @@ export async function ingestPdfjs(
       pages.push(stripOrnamentItems(composeAccentItems(page)));
       tagPages.push(tagInput);
       if (chars) renderChars.push(chars);
+      // E8-T03: sweep the pdf.js caches so a long book does not keep every
+      // translated font and image alive until task.destroy() (ADR-087).
+      if (cleanupEvery > 0 && (pageNumber - from + 1) % cleanupEvery === 0) {
+        await releasePdfjsCaches(pdf);
+      }
     }
 
     const tagHints = buildTagHints({ marked: tagged, pages: tagPages });

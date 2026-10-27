@@ -91,6 +91,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-084 | Spike S6: sinal de "à" interno para fonte quebrada em letras comuns | accepted |
 | ADR-085 | Heurística de letras comuns: "à" interno marca o bloco como fonte quebrada | accepted |
 | ADR-086 | Descarte de `font.data` por `clearData()` depois de ler os nomes | accepted |
+| ADR-087 | Varredura periódica dos caches do pdf.js durante a leitura | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -699,3 +700,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A · `delete font.data` (não funciona: é getter) · B · `font.clearData()` por página depois de ler os nomes (mesma chamada oficial do pdf.js) · C · `fontExtraProperties: false` (perde o nome real da fonte — ADR-015/S2).
 **Decisão:** B — `discardFontData(page, Object.keys(styles))` em `readPage` após resolver todos os nomes da página; id não resolvido ou fonte sem `clearData` é pulado.
 **Consequências:** medição corrigida: os bytes de `data` valem **0,4 MB (n4-pt) · 6,4 MB (n2-astrofisica) · 0,8 MB (lostworld)** — os "308 MB"/"+35 MB" antigos eram o custo total da flag (inclui `extra`: widths/differences), que permanece; a E8-T03 (limite de memória) não deve planejar sobre 308 MB de `data`. Saída idêntica: `pnpm eval --ci` exit 0.
+
+### ADR-087 · Varredura periódica dos caches do pdf.js durante a leitura · accepted · 2026-10-27
+**Contexto:** E8-T03 fatia 2 — o worker do pdf.js mantém fontes traduzidas, imagens decodificadas (`globalImageCache`, teto 50 MB) e CMaps até `task.destroy()`, acumulando página a página num livro longo; o `PDFDocumentProxy.cleanup()` (API pública do pdf.js 6) limpa esses caches nos dois threads a cada chamada.
+**Alternativas:** A · varrer a cada página (medido: +51% de tempo no phobos, ganho de pico não mensurável no corpus público) · B · cadência fixa de N páginas, configurável e desligável · C · limite duro de memória com degradação (`process.memoryUsage`/`performance.memory`) — exige API de plataforma fora do núcleo portátil (regra 6).
+**Decisão:** B — opção `cleanupEveryPages` (inteiro ≥ 0; default `DEFAULT_CLEANUP_EVERY_PAGES = 32`; `0` desliga; senão `RangeError`) chama `releasePdfjsCaches(pdf)` → `pdf.cleanup()` no loop de `readPage`; fontes re-traduzem no sweep seguinte, texto byte-idêntico comprovado (cadência 1 no `n2-en-arxiv-phobos` + `pnpm eval --ci` exit 0).
+**Consequências:** custo no default ~+3% (ruído) em `n1-en-rebus-philosophy-mind` (99p); ganho de pico só é mensurável nos documentos de estresse privados — medir no E8-T04 e ajustar o default lá; o limite duro (alternativa C) e o destravamento da janela do E8-T01 (streaming) seguem abertos como fatias da E8-T03.

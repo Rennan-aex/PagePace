@@ -106,9 +106,11 @@ export {
 } from "./hyphen";
 export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export {
+  DEFAULT_CLEANUP_EVERY_PAGES,
   discardFontData,
   ingestPdfjs,
   PDFJS_DIST_VERSION,
+  releasePdfjsCaches,
   stripSubsetPrefix,
 } from "./ingest/pdfjs";
 export { sha256Hex } from "./ingest/sha256";
