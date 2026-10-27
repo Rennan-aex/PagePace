@@ -1,7 +1,12 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildBook, ingestPdfjs, SCANNED_PDF_MESSAGE } from "@pagepace/extractor";
+import {
+  buildBook,
+  extractionCacheKeyFor,
+  ingestPdfjs,
+  SCANNED_PDF_MESSAGE,
+} from "@pagepace/extractor";
 import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
@@ -316,6 +321,93 @@ describe("extract", () => {
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");
     expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+  });
+});
+
+describe("extract --cache-dir (E8-T02)", () => {
+  const cachedPdf = (): Uint8Array =>
+    buildPdf([
+      [
+        textStream("cache line one", { x: 72, y: 400, size: 12 }),
+        textStream("cache line two", { x: 72, y: 370, size: 12 }),
+      ].join("\n"),
+    ]);
+
+  it("reprocesses on the first opening and serves the second from the cache", async () => {
+    const bytes = cachedPdf();
+    const file = await writePdf("cache-a.pdf", bytes);
+    const cacheDir = path.join(dir, "cache-a");
+
+    const first = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], first.io)).toBe(EXIT_OK);
+    expect(first.err()).toContain("Página 1 lida");
+
+    const second = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], second.io)).toBe(EXIT_OK);
+    // A hit never opens the PDF: no page progress, only the cache key.
+    expect(second.err()).not.toContain("Página");
+    expect(second.err()).toContain(extractionCacheKeyFor(bytes));
+    // The stdout of the hit is the byte-identical JSON of the miss.
+    expect(second.out()).toBe(first.out());
+
+    const entries = await readdir(cacheDir);
+    expect(entries).toEqual([`${extractionCacheKeyFor(bytes)}.json`]);
+  });
+
+  it("invalidates the entry when the extractor or schema version changes", async () => {
+    const bytes = cachedPdf();
+    const file = await writePdf("cache-b.pdf", bytes);
+    const cacheDir = path.join(dir, "cache-b");
+
+    const first = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], first.io)).toBe(EXIT_OK);
+    const key = extractionCacheKeyFor(bytes);
+
+    // Simulate a build with other versions: the entry exists with its content
+    // but under the key those versions derived — the current build must miss.
+    const versionParts = key.split("-");
+    const staleName = `${versionParts[0]}-9.9.9-9.9.9.json`;
+    await writeFile(
+      path.join(cacheDir, staleName),
+      await readFile(path.join(cacheDir, `${key}.json`), "utf8"),
+    );
+    await rm(path.join(cacheDir, `${key}.json`));
+
+    const second = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], second.io)).toBe(EXIT_OK);
+    expect(second.err()).toContain("Página 1 lida");
+    expect(await readdir(cacheDir)).toContain(`${key}.json`);
+  });
+
+  it("treats a corrupt entry as a miss, warns and reprocesses", async () => {
+    const bytes = cachedPdf();
+    const file = await writePdf("cache-c.pdf", bytes);
+    const cacheDir = path.join(dir, "cache-c");
+
+    const first = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], first.io)).toBe(EXIT_OK);
+    const key = extractionCacheKeyFor(bytes);
+    await writeFile(path.join(cacheDir, `${key}.json`), "not json {");
+
+    const second = capture();
+    expect(await run(["extract", file, "--cache-dir", cacheDir], second.io)).toBe(EXIT_OK);
+    expect(second.err()).toContain("Página 1 lida");
+    expect(second.out()).toBe(first.out());
+    const repaired = await readFile(path.join(cacheDir, `${key}.json`), "utf8");
+    expect(JSON.parse(repaired)).toEqual(JSON.parse(first.out()));
+  });
+
+  it("keeps the default behavior without --cache-dir and rejects a missing value", async () => {
+    const file = await writePdf("cache-d.pdf", cachedPdf());
+
+    const plain = capture();
+    expect(await run(["extract", file], plain.io)).toBe(EXIT_OK);
+    expect(plain.err()).toContain("Página 1 lida");
+    expect(plain.err()).not.toContain("Cache:");
+
+    const missing = capture();
+    expect(await run(["extract", file, "--cache-dir"], missing.io)).toBe(EXIT_USAGE);
+    expect(missing.err()).toContain("Valor ausente para --cache-dir");
   });
 });
 

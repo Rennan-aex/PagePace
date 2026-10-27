@@ -25,6 +25,15 @@ export {
   isSuspectCodePoint,
   REPLACEMENT_CHARACTER,
 } from "./brokenfont";
+export type { CachedExtraction, ExtractionCacheKey, ExtractionCacheStore } from "./cache";
+export {
+  extractCached,
+  extractionCacheKey,
+  extractionCacheKeyFor,
+  MemoryExtractionCache,
+  readCachedBook,
+  writeCachedBook,
+} from "./cache";
 export type { ColumnDetectionOptions, ColumnRange, PageColumns } from "./columns";
 export {
   COLUMNS_BIN_WIDTH,

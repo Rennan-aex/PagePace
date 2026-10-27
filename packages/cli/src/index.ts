@@ -7,13 +7,17 @@ import {
   documentStats,
   ExplainPageError,
   explainPage,
+  extractionCacheKeyFor,
   extractStream,
   ingestPdfjs,
+  readCachedBook,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
   StatsError,
+  writeCachedBook,
 } from "@pagepace/extractor";
 import { SchemaValidationError } from "@pagepace/schema";
+import { FileExtractionCache } from "./cache-file";
 import { renderPagesPng } from "./render-pdf";
 import {
   formatExplainText,
@@ -40,7 +44,7 @@ type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
 
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf>
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -50,7 +54,7 @@ export const HELP = `pagepace — extrator de PDF do PagePace
 
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf>
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -59,7 +63,10 @@ Uso:
 Comandos:
   dump-raw <arquivo.pdf>    Lê o PDF e escreve o RawDocument (JSON) no console
   extract <arquivo.pdf>     Gera o Book (JSON) e escreve no console; o progresso
-                            por página sai no stderr (o JSON continua limpo)
+                            por página sai no stderr (o JSON continua limpo);
+                            com --cache-dir, a segunda abertura do mesmo arquivo
+                            sai do cache sem reprocessar (chave: sha256 do PDF +
+                            versão do extrator + versão do esquema)
   inspect <arquivo.pdf>     Relatório da extração: resumo do documento e os blocos
                             de cada página, com tipo, confiança e flags de dúvida
   explain-page <pdf> <n>    Explica a página n (1-based): a decisão de cada camada
@@ -79,6 +86,9 @@ Opções:
   --format html             Relatório HTML lado a lado com as imagens embutidas;
                             exige --out
   --out <arquivo>           Grava o relatório em arquivo em vez do console
+  --cache-dir <pasta>       Pasta do cache de extração do extract: um arquivo
+                            <chave>.json por livro; mudar a versão do extrator ou
+                            do esquema muda a chave e invalida a entrada
   -h, --help                Mostra esta ajuda
 
 Códigos de saída:
@@ -362,11 +372,26 @@ async function inspect(args: readonly string[], io: CliIo): Promise<number> {
 
 async function extract(args: readonly string[], io: CliIo): Promise<number> {
   let file: string | undefined;
+  let cacheDir: string | undefined;
 
-  for (const arg of args) {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index] as string;
     if (arg === "-h" || arg === "--help") {
       io.out(HELP);
       return EXIT_OK;
+    }
+    if (arg === "--cache-dir" || arg.startsWith("--cache-dir=")) {
+      const inline = arg.startsWith("--cache-dir=") ? arg.slice("--cache-dir=".length) : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        io.err(
+          `Valor ausente para --cache-dir. Use --cache-dir <pasta> (o cache guarda um Book por chave sha256+versões).\n`,
+        );
+        return EXIT_USAGE;
+      }
+      cacheDir = normalizeCliPath(value);
+      continue;
     }
     if (arg.startsWith("-")) {
       io.err(`Opção desconhecida: ${arg}\n\n${USAGE}\n`);
@@ -390,6 +415,22 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     return bytes.code;
   }
 
+  const cache = cacheDir === undefined ? null : new FileExtractionCache(cacheDir);
+  const cacheKey = cache === null ? null : extractionCacheKeyFor(bytes);
+  if (cache !== null && cacheKey !== null) {
+    try {
+      const cached = await readCachedBook(cache, cacheKey);
+      if (cached !== null) {
+        io.err(`Cache: ${cacheKey}\n`);
+        io.out(`${JSON.stringify(cached, null, 2)}\n`);
+        return EXIT_OK;
+      }
+    } catch (error) {
+      // A cache that cannot be read must not sink the extraction: warn and reprocess.
+      io.err(`Aviso: cache ilegível (${messageOf(error)}); extraindo de novo\n`);
+    }
+  }
+
   try {
     // E8-T01 fatia 3: the streaming pipeline (ADR-088) reports one page of
     // progress on stderr per page read; stdout keeps the exact JSON the batch
@@ -398,6 +439,13 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     for await (const event of extractStream(bytes, { fileName: basename(file) })) {
       if (event.type === "page") io.err(`Página ${event.page.index + 1} lida\n`);
       else if (event.type === "book") bookJson = `${JSON.stringify(event.book, null, 2)}\n`;
+      if (event.type === "book" && cache !== null && cacheKey !== null) {
+        try {
+          await writeCachedBook(cache, cacheKey, event.book);
+        } catch (error) {
+          io.err(`Aviso: não foi possível gravar o cache (${messageOf(error)})\n`);
+        }
+      }
     }
     if (bookJson === undefined) {
       io.err(`Não foi possível gerar o Book de ${file}: o pipeline terminou sem o livro\n`);

@@ -93,6 +93,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-086 | Descarte de `font.data` por `clearData()` depois de ler os nomes | accepted |
 | ADR-087 | Varredura periódica dos caches do pdf.js durante a leitura | accepted |
 | ADR-088 | Protocolo do `extractStream`: páginas na leitura, blocos na construção, `book` final idêntico | accepted |
+| ADR-089 | Cache de extração por (sha256, extractorVersion, schemaVersion) atrás de interface | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -713,3 +714,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — blocos provisórios durante a leitura, reescritos no fim (mostra cedo, mas o consumidor vê blocos que mudam e o payload intermediário não é o contrato) · B — emitir páginas lidas durante a leitura e blocos durante a construção, `book` no fim (primeiro evento antes do livro todo, nenhum bloco reescrito depois de emitido).
 **Decisão:** B — `extractStream` é um `AsyncGenerator` com três eventos: `page` (durante a leitura — decisão 5 da ARCHITECTURE, "o app começa a ler enquanto o resto processa"), `blocks` (por página, na construção, antes da finalização) e `book` (final, profundo igual a `buildBook(ingestPdfjs(bytes))`). O consumidor cacheia o `book`; `blocks` serve exibição progressiva.
 **Consequências:** a leitura inteira antecede o primeiro bloco (o ganho de latência é da camada 1, medido no S4); o stream não reduz o pico de memória do `RawDocument` (isso é da E8-T03); revisar se os passes de documento inteiro virarem incrementais.
+
+### ADR-089 · Cache de extração por (sha256, extractorVersion, schemaVersion) atrás de interface · accepted · 2026-10-27
+**Contexto:** E8-T02 / REQ-EXT-15 — a segunda abertura de um PDF não deve reprocessar; o artefato cacheado é o `book` final (ADR-088), porque a ingestão e o pipeline de heurísticas são o caro. A chave precisa invalidar sozinha quando o código muda, sem passe de limpeza.
+**Alternativas:** A — chave só do sha256 + limpeza manual quando a versão muda (limpeza esquecida = book velho servido) · B — chave `(sha256, extractorVersion, schemaVersion)`: mudança de versão muda a chave e a entrada velha simplesmente nunca mais é lida.
+**Decisão:** B, com o armazenamento atrás de `ExtractionCacheStore` (get/set de string JSON): `MemoryExtractionCache` no núcleo portátil (app: IndexedDB/SQLite depois — decisão 4 da ARCHITECTURE do app) e `FileExtractionCache` na CLI (`--cache-dir`, opt-in; um `<chave>.json` por livro, escrita atômica via tmp+rename). Entrada corrompida ou de esquema velho = miss (reprocessa e regrava), nunca crash. `extractCached` é a fachada em lote; a CLI compõe `readCachedBook` + `extractStream` + `writeCachedBook` para manter o progresso por página no miss.
+**Consequências:** mudar heurística exige bump de `EXTRACTOR_VERSION` (hoje 0.0.0, espelho do package — revisar no primeiro release); mudar esquema exige bump de `SCHEMA_VERSION`; sem GC das entradas velhas (ficam órfãs no diretório — aceitável para o CLI, revisar se o app sofrer); bytes idênticos com fileName diferente compartilham a entrada (o `source.fileName` gravado é o da primeira abertura).
