@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ingestPdfjs, PDFJS_DIST_VERSION, sha256Hex } from "@pagepace/extractor";
+import { discardFontData, ingestPdfjs, PDFJS_DIST_VERSION, sha256Hex } from "@pagepace/extractor";
 import { parseRawDocument, SCHEMA_VERSION } from "@pagepace/schema";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
@@ -180,6 +180,98 @@ describe("ingestPdfjs - standard fonts (ADR-020 / S5)", () => {
       await rm(emptyDir, { recursive: true, force: true });
     }
   }, 30_000);
+});
+
+describe("ingestPdfjs - font.data discard (E8-T03, ADR-086)", () => {
+  const entries = availableCorpus().filter((entry) => entry.id === "n2-en-arxiv-phobos");
+
+  it.skipIf(entries.length === 0)(
+    "releases the font bytes via clearData while name and metrics survive",
+    async () => {
+      const bytes = new Uint8Array(
+        await readFile(path.join(publicCorpus, "n2-en-arxiv-phobos.pdf")),
+      );
+      const task = getDocument({ data: bytes.slice(), fontExtraProperties: true, verbosity: 0 });
+      try {
+        const pdf = await task.promise;
+        const page = await pdf.getPage(1);
+        const text = await page.getTextContent({ includeMarkedContent: true });
+        await page.getOperatorList();
+        const names = Object.keys(text.styles ?? {});
+        expect(names.length).toBeGreaterThan(0);
+
+        const retained = names
+          .map((name) => page.commonObjs.get(name) as { data?: Uint8Array })
+          .filter((font) => (font?.data?.length ?? 0) > 0);
+        // The retention the discard exists to remove (S1: 308 MB in n4).
+        expect(retained.length).toBeGreaterThan(0);
+
+        const font = retained[0] as { data?: Uint8Array; name?: unknown; ascent?: unknown };
+        const realName = font.name;
+        const realAscent = font.ascent;
+
+        discardFontData(page, names);
+
+        for (const id of names) {
+          expect((page.commonObjs.get(id) as { data?: Uint8Array }).data).toBeUndefined();
+        }
+        expect(font.name).toBe(realName);
+        expect(font.ascent).toBe(realAscent);
+        // Unresolved ids and a second run are safe no-ops.
+        expect(() => discardFontData(page, [...names, "g_d0_never-resolved"])).not.toThrow();
+      } finally {
+        await task.destroy();
+      }
+    },
+    60_000,
+  );
+
+  it.skipIf(entries.length === 0)(
+    "still resolves real font names on later pages after the first page discarded its fonts",
+    async () => {
+      const bytes = new Uint8Array(
+        await readFile(path.join(publicCorpus, "n2-en-arxiv-phobos.pdf")),
+      );
+      const document = await ingestPdfjs(bytes, { fileName: "n2-en-arxiv-phobos.pdf" });
+
+      const laterItems = document.pages.slice(1).flatMap((page) => page.items);
+      const named = laterItems.filter((item) => item.fontName !== "unknown");
+      expect(named.length).toBeGreaterThan(0);
+    },
+    120_000,
+  );
+
+  it("skips unresolved ids and tolerates fonts without clearData", () => {
+    interface FakeFont {
+      name: string;
+      data?: Uint8Array;
+      clearData?: () => void;
+    }
+    const resolved: FakeFont = {
+      name: "Real-Name",
+      data: new Uint8Array(8),
+      clearData() {
+        delete this.data;
+      },
+    };
+    const plain: FakeFont = { name: "No-ClearData", data: new Uint8Array(4) };
+    const fonts: Record<string, FakeFont> = { resolved, plain };
+    const fakePage = {
+      commonObjs: {
+        get(id: string): FakeFont {
+          const font = fonts[id];
+          if (!font) throw new Error(`Object "${id}" does not exist in cache.`);
+          return font;
+        },
+      },
+    } as never;
+
+    discardFontData(fakePage, ["resolved", "plain", "never-resolved"]);
+
+    expect(resolved.data).toBeUndefined();
+    expect(resolved.name).toBe("Real-Name");
+    expect(plain.data).toBeDefined(); // no clearData to call: left untouched
+  });
 });
 
 describe("ingestPdfjs - public corpus (needs `corpus/public`, skipped until E1-T05)", () => {

@@ -62,6 +62,8 @@ interface PdfjsFontStyle {
 
 interface PdfjsFont {
   name?: unknown;
+  data?: Uint8Array;
+  clearData?: () => void;
 }
 
 type PdfjsOutlineNode = {
@@ -125,6 +127,26 @@ function resolveFontName(
   const family = styles[internalName]?.fontFamily;
   if (typeof family === "string" && family.trim()) return family.trim();
   return UNKNOWN_FONT;
+}
+
+/**
+ * Releases the font bytes pdf.js keeps on the main thread while
+ * `fontExtraProperties` is on (E8-T03 / BACKLOG 2026-10-04; ADR-086). The
+ * name and metrics already read stay available, but `data` is a getter over
+ * a binary buffer — `delete` does nothing — so `clearData()` (the same call
+ * pdf.js makes when the flag is off) is what actually frees the bytes.
+ * Unresolved ids and fonts without the method are skipped.
+ */
+export function discardFontData(page: PDFPageProxy, internalNames: Iterable<string>): void {
+  for (const internalName of internalNames) {
+    let font: PdfjsFont | undefined;
+    try {
+      font = page.commonObjs.get(internalName) as PdfjsFont | undefined;
+    } catch {
+      continue;
+    }
+    font?.clearData?.();
+  }
 }
 
 function fontFlagsOf(
@@ -289,6 +311,10 @@ async function readPage(
       if (textItem.hasEOL === true) rawItem.hasEOL = true;
       items.push(rawItem);
     }
+
+    // E8-T03: every font name on the page is read; release the bytes
+    // `fontExtraProperties` retained (S1 measured 308 MB on n4).
+    discardFontData(page, Object.keys(styles));
 
     const outputPage: RawPage = {
       index: pageNumber - 1,

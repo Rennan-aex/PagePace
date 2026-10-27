@@ -90,6 +90,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-083 | Colunas sob uma faixa de largura total: duas passagens com corte condicional | accepted |
 | ADR-084 | Spike S6: sinal de "à" interno para fonte quebrada em letras comuns | accepted |
 | ADR-085 | Heurística de letras comuns: "à" interno marca o bloco como fonte quebrada | accepted |
+| ADR-086 | Descarte de `font.data` por `clearData()` depois de ler os nomes | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -692,3 +693,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A - predicado novo `brokenFontText` (FFFD/PUA **ou** 3+ "à" interno por bloco) reaproveitando o contrato E3-T05 inteiro (flag `broken-font-mapping`, conf 0.3, warning documental) · B - código/warning próprio (`common-letter-swap`) com peso próprio em confidence.ts · C - só aviso documental sem marcar bloco.
 **Decisão:** A - piso 3 por bloco sem gate de share (medido: 49 blocos no sofia pelo A/B `buildBook`, 0 falsos positivos em 16 digitais + 12 sintéticos); sem mudança de esquema nem de confidence.ts; warning com 1+ bloco (o piso já é o gate).
 **Consequências:** catalão gera falso positivo se o corpus crescer para o idioma (rever com gating por idioma); "fl"→"á" sozinho continua indetectável (confundível com o "á" legítimo — o mesmo bloco cai pelo "à"); o parse de ToUnicode (alternativa B da ADR-084) segue aberto se o sinal de texto não bastar.
+
+### ADR-086 · Descarte de `font.data` por `clearData()` depois de ler os nomes · accepted · 2026-10-27
+**Contexto:** com `fontExtraProperties: true` (ADR-015) o pdf.js mantém os bytes da fonte (`data`) no `commonObjs` até `task.destroy()`; a BACKLOG de 2026-10-04 pedia descartá-los após ler `name`/métricas (E8-T03). Probe: `data` é getter sobre buffer binário no `FontFaceObject` — `delete font.data` não remove nada; o pdf.js 6.4.299 já chama `font.clearData()` quando a flag está desligada.
+**Alternativas:** A · `delete font.data` (não funciona: é getter) · B · `font.clearData()` por página depois de ler os nomes (mesma chamada oficial do pdf.js) · C · `fontExtraProperties: false` (perde o nome real da fonte — ADR-015/S2).
+**Decisão:** B — `discardFontData(page, Object.keys(styles))` em `readPage` após resolver todos os nomes da página; id não resolvido ou fonte sem `clearData` é pulado.
+**Consequências:** medição corrigida: os bytes de `data` valem **0,4 MB (n4-pt) · 6,4 MB (n2-astrofisica) · 0,8 MB (lostworld)** — os "308 MB"/"+35 MB" antigos eram o custo total da flag (inclui `extra`: widths/differences), que permanece; a E8-T03 (limite de memória) não deve planejar sobre 308 MB de `data`. Saída idêntica: `pnpm eval --ci` exit 0.
