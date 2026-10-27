@@ -36,6 +36,7 @@ pnpm -s pagepace extract <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf > $env:TEMP\sofia.
 ```
 
 Deve terminar sem mensagem de erro e criar o arquivo em `C:\Users\<voce>\AppData\Local\Temp`.
+As linhas `Página N lida` que aparecem no console são o progresso (stderr), não erro — o JSON gravado continua limpo.
 Se der erro: cole a mensagem inteira. Livros usados nos checklists:
 `n1-pt-sofia`, `n1-en-curinga` (E2) · `n1-pt-curinga`, `n1-en-sofia` (E3).
 

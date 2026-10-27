@@ -7,6 +7,7 @@ import {
   documentStats,
   ExplainPageError,
   explainPage,
+  extractStream,
   ingestPdfjs,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
@@ -57,7 +58,8 @@ Uso:
 
 Comandos:
   dump-raw <arquivo.pdf>    Lê o PDF e escreve o RawDocument (JSON) no console
-  extract <arquivo.pdf>     Gera o Book (JSON) e escreve no console
+  extract <arquivo.pdf>     Gera o Book (JSON) e escreve no console; o progresso
+                            por página sai no stderr (o JSON continua limpo)
   inspect <arquivo.pdf>     Relatório da extração: resumo do documento e os blocos
                             de cada página, com tipo, confiança e flags de dúvida
   explain-page <pdf> <n>    Explica a página n (1-based): a decisão de cada camada
@@ -382,21 +384,46 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     return EXIT_USAGE;
   }
 
-  const loaded = await loadDocument(file);
-  if ("error" in loaded) {
-    io.err(loaded.error);
-    return loaded.code;
+  const bytes = await loadBytes(file);
+  if ("error" in bytes) {
+    io.err(bytes.error);
+    return bytes.code;
   }
 
   try {
-    io.out(`${JSON.stringify(buildBook(loaded.document), null, 2)}\n`);
+    // E8-T01 fatia 3: the streaming pipeline (ADR-088) reports one page of
+    // progress on stderr per page read; stdout keeps the exact JSON the batch
+    // path printed — `book` is deep-equal to `buildBook(ingestPdfjs(bytes))`.
+    let bookJson: string | undefined;
+    for await (const event of extractStream(bytes, { fileName: basename(file) })) {
+      if (event.type === "page") io.err(`Página ${event.page.index + 1} lida\n`);
+      else if (event.type === "book") bookJson = `${JSON.stringify(event.book, null, 2)}\n`;
+    }
+    if (bookJson === undefined) {
+      io.err(`Não foi possível gerar o Book de ${file}: o pipeline terminou sem o livro\n`);
+      return EXIT_ERROR;
+    }
+    io.out(bookJson);
     return EXIT_OK;
   } catch (error) {
+    if (error instanceof ScannedPdfError) {
+      io.err(`${SCANNED_PDF_MESSAGE}\n`);
+      return EXIT_SCANNED;
+    }
+    if (error instanceof RangeError) {
+      io.err(`Faixa de páginas inválida: ${messageOf(error)}\n`);
+      return EXIT_USAGE;
+    }
     if (error instanceof BookError || error instanceof SchemaValidationError) {
       io.err(`Não foi possível gerar o Book de ${file}: ${messageOf(error)}\n`);
       return EXIT_ERROR;
     }
-    throw error;
+    if (error instanceof StatsError) {
+      io.err(`Não foi possível medir o documento ${file}: ${error.message}\n`);
+      return EXIT_ERROR;
+    }
+    io.err(describeIngestError(file, error));
+    return EXIT_ERROR;
   }
 }
 

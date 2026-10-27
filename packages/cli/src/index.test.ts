@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SCANNED_PDF_MESSAGE } from "@pagepace/extractor";
+import { buildBook, ingestPdfjs, SCANNED_PDF_MESSAGE } from "@pagepace/extractor";
 import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
@@ -245,7 +245,8 @@ describe("extract", () => {
     const code = await run(["extract", file], streams.io);
 
     expect(code).toBe(EXIT_OK);
-    expect(streams.err()).toBe("");
+    // E8-T01 fatia 3: progress goes to stderr, never to the JSON on stdout.
+    expect(streams.err()).toContain("Página 1 lida");
     const book = parseBook(JSON.parse(streams.out()));
     expect(book.schemaVersion).toBe("1.2.0");
     expect(book.source).toEqual({ fileName: "extract.pdf", pageCount: 1 });
@@ -275,6 +276,21 @@ describe("extract", () => {
     const two = JSON.parse(second.out()) as { blocks: { id: string }[] };
     expect(two.blocks.map((block) => block.id)).toEqual(one.blocks.map((block) => block.id));
     expect(second.out()).toBe(first.out());
+  });
+
+  it("prints per-page progress on stderr and keeps the batch stdout byte-identical (E8-T01)", async () => {
+    const bytes = buildPdf([textStream("one"), textStream("two"), textStream("three")]);
+    const file = await writePdf("progress.pdf", bytes);
+
+    const streams = capture();
+    const code = await run(["extract", file], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).toBe("Página 1 lida\nPágina 2 lida\nPágina 3 lida\n");
+
+    // The stdout of the streaming CLI is exactly what the batch path prints.
+    const document = await ingestPdfjs(bytes, { fileName: "progress.pdf" });
+    expect(streams.out()).toBe(`${JSON.stringify(buildBook(document), null, 2)}\n`);
   });
 
   it("reports usage errors without printing a book", async () => {
