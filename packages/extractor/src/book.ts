@@ -2,28 +2,28 @@ import type { Block, Book, RawDocument } from "@pagepace/schema";
 import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
 import { linePageMap, paragraphBBoxes } from "./bbox";
 import { BROKEN_FONT_MAPPING, brokenFontText } from "./brokenfont";
-import { detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
+import { type CaptionDecision, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
 import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
-import { detectEndnotes } from "./endnotes";
-import { detectFootnotes, UNCERTAIN_FOOTNOTE_FLAG } from "./footnotes";
+import { detectEndnotes, type EndnoteDecision } from "./endnotes";
+import { detectFootnotes, type FootnoteDecision, UNCERTAIN_FOOTNOTE_FLAG } from "./footnotes";
 import { tagGreekRuns } from "./greek";
-import { detectHeadings, type PageMeasure, pageMeasureOf } from "./headings";
+import { detectHeadings, type HeadingDecision, type PageMeasure, pageMeasureOf } from "./headings";
 import { paragraphHyphenText, UNCERTAIN_HYPHEN_FLAG } from "./hyphen";
 import { sha256Hex } from "./ingest/sha256";
 import type { TextLine } from "./lines";
-import { detectLists, UNCERTAIN_LIST_FLAG } from "./lists";
-import { bodyMeasures, detectMarginRefs } from "./marginrefs";
+import { detectLists, type ListDecision, UNCERTAIN_LIST_FLAG } from "./lists";
+import { bodyMeasures, detectMarginRefs, type MarginRefDecision } from "./marginrefs";
 import { buildMetadata } from "./metadata";
 import { CALL_WITHOUT_NOTE_FLAG, linkFootnoteCalls, NOTE_WITHOUT_CALL_FLAG } from "./notelinks";
 import type { JoinedParagraph } from "./pagejoin";
 import { joinCrossPageParagraphs } from "./pagejoin";
 import { groupDocumentParagraphs } from "./paragraphs";
-import { detectQuotes, UNCERTAIN_QUOTE_FLAG } from "./quotes";
-import { detectReferences } from "./references";
-import { stripRepeatedRegions } from "./repeated";
+import { detectQuotes, type QuoteDecision, UNCERTAIN_QUOTE_FLAG } from "./quotes";
+import { detectReferences, type ReferenceDecision } from "./references";
+import { type StrippedDocument, stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
 import { SIDEBAR_FLAG } from "./sidebars";
-import { documentStats } from "./stats";
+import { type DocumentStats, documentStats } from "./stats";
 import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
 
@@ -315,11 +315,50 @@ export function paragraphMeasures(
 }
 
 /**
- * Builds the `Book` for a `RawDocument` and validates it against the schema
- * (throws `SchemaValidationError` if the assembled book is invalid, and
- * `BookError` when there is no text at all).
+ * Everything the block builder and the finalization read out of the
+ * document-wide passes (E8-T01, fatia 1). Built once by
+ * {@link analyzeDocument}: the streaming pipeline analyzes after the full
+ * read and then builds the blocks page by page over this same object, which
+ * is what keeps the streamed result byte-identical to the batch one.
  */
-export function buildBook(document: RawDocument): Book {
+export interface BookAnalysis {
+  /** The document as given: metadata and outline feed the finalization. */
+  document: RawDocument;
+  /** Repeated regions stripped, with the page labels the foot left behind. */
+  stripped: StrippedDocument;
+  /** Document statistics; `null` when the document has no text at all. */
+  stats: DocumentStats | null;
+  /** Lines grouped per page in reading order (column-aware). */
+  pages: TextLine[][][];
+  /** Page number of every line — the `origin.bbox` pass (E7-T04). */
+  linePages: Map<TextLine, number>;
+  /** Paragraphs with the cross-page join applied, in reading order. */
+  paragraphs: JoinedParagraph[];
+  /** Per-paragraph decisions, all indexed like `paragraphs`. */
+  marginRefs: MarginRefDecision[];
+  marginRefLines: Set<TextLine>;
+  measures: PageMeasure[];
+  headings: HeadingDecision[];
+  footnotes: FootnoteDecision[];
+  endnotes: EndnoteDecision[];
+  quotes: QuoteDecision[];
+  lists: ListDecision[];
+  captions: CaptionDecision[];
+  references: ReferenceDecision[];
+  /** `source.ocrTextLayer === true` on the original document. */
+  fromOcr: boolean;
+  /** Base confidence before the doubt flags (E7-T01). */
+  base: number;
+}
+
+/**
+ * Stage 1 of the pipeline (E8-T01, fatia 1): every document-wide pass, in
+ * the order `buildBook` always ran them — strip repeated regions, statistics,
+ * grouping, the cross-page join, margin numbers, measures and the
+ * per-paragraph decisions. Pure: the same document always yields the same
+ * analysis, and nothing here touches the clock or any ambient state.
+ */
+export function analyzeDocument(document: RawDocument): BookAnalysis {
   const stripped = stripRepeatedRegions(document);
   const hasText = stripped.document.pages.some((page) => page.items.length > 0);
   const stats = hasText ? documentStats(stripped.document) : null;
@@ -380,12 +419,67 @@ export function buildBook(document: RawDocument): Book {
   // clamped at the minimum and rounded.
   const base = fromOcr ? OCR_TEXT_LAYER_CONFIDENCE : BOOK_BLOCK_CONFIDENCE;
 
-  const blocks: Block[] = [];
-  // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote pass.
-  const endnoteBlocks: boolean[] = [];
-  let brokenBlocks = 0;
+  return {
+    document,
+    stripped,
+    stats,
+    pages,
+    linePages,
+    paragraphs,
+    marginRefs,
+    marginRefLines,
+    measures,
+    headings,
+    footnotes,
+    endnotes,
+    quotes,
+    lists,
+    captions,
+    references,
+    fromOcr,
+    base,
+  };
+}
+
+/** One page's worth of blocks out of {@link buildBlockChunks} (E8-T01). */
+export interface BlockChunk {
+  /** `origin.pageFrom` of every block in the chunk (0-based page index). */
+  pageIndex: number;
+  blocks: Block[];
+  /** Parallel to `blocks`: `true` when the block came from the endnote pass. */
+  endnoteFlags: boolean[];
+}
+
+/**
+ * Stage 2 (E8-T01, fatia 1): the block loop as a generator that yields one
+ * chunk per page that produced blocks, in reading order. The running state
+ * of the loop (the per-page ordinals and the endnote flags) lives inside the
+ * generator, so concatenating the chunks gives exactly the block list the
+ * batch loop always built — the document-wide finalization runs after them.
+ */
+export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk> {
+  const {
+    stripped,
+    linePages,
+    paragraphs,
+    marginRefs,
+    headings,
+    footnotes,
+    endnotes,
+    quotes,
+    lists,
+    captions,
+    references,
+    fromOcr,
+    base,
+  } = analysis;
   const ordinals = new Map<number, number>();
+  let chunk: BlockChunk | undefined;
   for (const [index, paragraph] of paragraphs.entries()) {
+    if (chunk === undefined || chunk.pageIndex !== paragraph.pageFrom) {
+      if (chunk !== undefined && chunk.blocks.length > 0) yield chunk;
+      chunk = { pageIndex: paragraph.pageFrom, blocks: [], endnoteFlags: [] };
+    }
     const hyphen = paragraphHyphenText(paragraph.lines);
     const text = normalizeForReader(hyphen.text);
     if (text.trim() === "") continue;
@@ -398,7 +492,6 @@ export function buildBook(document: RawDocument): Book {
     }
     if (brokenFontText(text)) {
       flags.push(BROKEN_FONT_MAPPING);
-      brokenBlocks += 1;
     }
     // E5-T07: a margin number outranks every kind — the short isolated
     // shape would read as a heading (E4-T02) and the foot of a Stephanus
@@ -447,7 +540,7 @@ export function buildBook(document: RawDocument): Book {
       flags.push(UNCERTAIN_LIST_FLAG);
     }
     const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
-    blocks.push({
+    chunk.blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: marginRef
         ? "margin_ref"
@@ -481,9 +574,28 @@ export function buildBook(document: RawDocument): Book {
       confidence: blockConfidence(base, flags),
       flags,
     });
-    // E5-T03: `endnoteBlocks[i]` says whether block `i` came from the endnote
-    // pass — a block the reference kind won (E5-T06) is no longer a note.
-    endnoteBlocks.push(endnote && !reference);
+    // E5-T03: the chunk says whether the block came from the endnote pass —
+    // a block the reference kind won (E5-T06) is no longer a note.
+    chunk.endnoteFlags.push(endnote && !reference);
+  }
+  if (chunk !== undefined && chunk.blocks.length > 0) yield chunk;
+}
+
+/**
+ * Stage 3 (E8-T01, fatia 1): the document-wide finalization. Concatenates
+ * the chunks (throwing `BookError` when no block survives, exactly as
+ * `buildBook` always did), runs the passes that may still touch any block —
+ * footnote calls (E5-T02) and toc levels (E4-T03) — and assembles the
+ * validated `Book` with metadata (E4-T04) and warnings.
+ */
+export function finalizeBook(analysis: BookAnalysis, chunks: Iterable<BlockChunk>): Book {
+  const { document, fromOcr, base } = analysis;
+  const blocks: Block[] = [];
+  // Parallel to `blocks`: `true` when the block came from the endnote pass.
+  const endnoteBlocks: boolean[] = [];
+  for (const chunk of chunks) {
+    blocks.push(...chunk.blocks);
+    endnoteBlocks.push(...chunk.endnoteFlags);
   }
 
   if (blocks.length === 0) {
@@ -529,7 +641,12 @@ export function buildBook(document: RawDocument): Book {
   }
 
   const warnings: string[] = fromOcr ? ["ocr-text-layer"] : [];
-  if (brokenBlocks > 0) warnings.push(BROKEN_FONT_MAPPING);
+  // The batch loop counted broken blocks as it went; after the E8-T01 split
+  // the same test reads the flag off the blocks (pushed under the very same
+  // condition in `buildBlockChunks`, never removed afterwards).
+  if (blocks.some((block) => block.flags.includes(BROKEN_FONT_MAPPING))) {
+    warnings.push(BROKEN_FONT_MAPPING);
+  }
   warnings.push(...toc.warnings);
 
   return parseBook({
@@ -546,4 +663,18 @@ export function buildBook(document: RawDocument): Book {
       warnings,
     },
   });
+}
+
+/**
+ * Builds the `Book` for a `RawDocument` and validates it against the schema
+ * (throws `SchemaValidationError` if the assembled book is invalid, and
+ * `BookError` when there is no text at all).
+ *
+ * Since E8-T01 (fatia 1) this is the composition of the three stages —
+ * `analyzeDocument` → `buildBlockChunks` → `finalizeBook` — exactly the
+ * pipeline `extractStream` runs event by event (fatia 2, ADR-088).
+ */
+export function buildBook(document: RawDocument): Book {
+  const analysis = analyzeDocument(document);
+  return finalizeBook(analysis, buildBlockChunks(analysis));
 }

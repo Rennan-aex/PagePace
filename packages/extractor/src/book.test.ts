@@ -2,14 +2,17 @@ import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
 import { parseBook } from "@pagepace/schema";
 import { describe, expect, it } from "vitest";
 import {
+  analyzeDocument,
   BLOCK_ID_HASH_CHARS,
   BLOCK_ID_HASH_LENGTH,
   BOOK_BLOCK_CONFIDENCE,
   BookError,
   blockId,
+  buildBlockChunks,
   buildBook,
   EXTRACTOR_TOOL,
   EXTRACTOR_VERSION,
+  finalizeBook,
   OCR_TEXT_LAYER_CONFIDENCE,
 } from "./book";
 import { BROKEN_FONT_CONFIDENCE, BROKEN_FONT_MAPPING } from "./brokenfont";
@@ -638,5 +641,52 @@ describe("block ids", () => {
     expect(plain).not.toBe(blockId(3, 4, text));
     expect(plain).not.toBe(blockId(2, 5, text));
     expect(plain).not.toBe(blockId(2, 4, "The light came fast."));
+  });
+});
+
+describe("staged pipeline (E8-T01)", () => {
+  it("produces the same Book through analyze/chunks/finalize as buildBook", () => {
+    const raw = doc([
+      page([
+        item("Alpha beta gamma.", MARGIN, 100, BODY),
+        item("The paragraph that runs", MARGIN, 115, BODY),
+      ]),
+      page([item("out of room resumes here.", MARGIN, 100, BODY)], 1),
+    ]);
+    const analysis = analyzeDocument(raw);
+    const chunks = [...buildBlockChunks(analysis)];
+    expect(finalizeBook(analysis, chunks)).toEqual(buildBook(raw));
+  });
+
+  it("yields one chunk per page in reading order, endnote flags in parallel", () => {
+    const raw = doc([
+      page([...twoParagraphs.items].reverse(), 0),
+      page([item("Later.", MARGIN, 150, BODY), item("Earlier.", MARGIN, 100, BODY)], 1),
+    ]);
+    const chunks = [...buildBlockChunks(analyzeDocument(raw))];
+    expect(chunks.map((chunk) => chunk.pageIndex)).toEqual([0, 1]);
+    for (const chunk of chunks) {
+      expect(chunk.blocks.length).toBeGreaterThan(0);
+      expect(chunk.blocks.every((block) => block.origin.pageFrom === chunk.pageIndex)).toBe(true);
+      expect(chunk.endnoteFlags).toHaveLength(chunk.blocks.length);
+    }
+    expect(chunks.flatMap((chunk) => chunk.blocks).map((block) => block.runs[0]?.text)).toEqual([
+      "Alpha Beta gamma delta Epsilon.",
+      "Alone.",
+      "Earlier.",
+      "Later.",
+    ]);
+  });
+
+  it("puts a paragraph joined across pages in the chunk of the page it starts on", () => {
+    const raw = doc([
+      page([item("The paragraph that runs", MARGIN, 100, BODY)]),
+      page([item("out of room resumes here.", MARGIN, 100, BODY)], 1),
+    ]);
+    const chunks = [...buildBlockChunks(analyzeDocument(raw))];
+    // Page 1 has no block of its own: its only line joined page 0's paragraph.
+    expect(chunks.map((chunk) => chunk.pageIndex)).toEqual([0]);
+    expect(chunks[0]?.blocks).toHaveLength(1);
+    expect(chunks[0]?.blocks[0]?.origin).toMatchObject({ pageFrom: 0, pageTo: 1 });
   });
 });

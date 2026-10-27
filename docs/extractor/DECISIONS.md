@@ -92,6 +92,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-085 | Heurística de letras comuns: "à" interno marca o bloco como fonte quebrada | accepted |
 | ADR-086 | Descarte de `font.data` por `clearData()` depois de ler os nomes | accepted |
 | ADR-087 | Varredura periódica dos caches do pdf.js durante a leitura | accepted |
+| ADR-088 | Protocolo do `extractStream`: páginas na leitura, blocos na construção, `book` final idêntico | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -706,3 +707,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A · varrer a cada página (medido: +51% de tempo no phobos, ganho de pico não mensurável no corpus público) · B · cadência fixa de N páginas, configurável e desligável · C · limite duro de memória com degradação (`process.memoryUsage`/`performance.memory`) — exige API de plataforma fora do núcleo portátil (regra 6).
 **Decisão:** B — opção `cleanupEveryPages` (inteiro ≥ 0; default `DEFAULT_CLEANUP_EVERY_PAGES = 32`; `0` desliga; senão `RangeError`) chama `releasePdfjsCaches(pdf)` → `pdf.cleanup()` no loop de `readPage`; fontes re-traduzem no sweep seguinte, texto byte-idêntico comprovado (cadência 1 no `n2-en-arxiv-phobos` + `pnpm eval --ci` exit 0).
 **Consequências:** custo no default ~+3% (ruído) em `n1-en-rebus-philosophy-mind` (99p); ganho de pico só é mensurável nos documentos de estresse privados — medir no E8-T04 e ajustar o default lá; o limite duro (alternativa C) e o destravamento da janela do E8-T01 (streaming) seguem abertos como fatias da E8-T03.
+
+### ADR-088 · Protocolo do `extractStream`: páginas na leitura, blocos na construção, `book` final idêntico · accepted · 2026-10-27
+**Contexto:** a E8-T01 pede "primeiro bloco emitido antes de processar o livro todo" junto com "resultado final idêntico ao modo em lote". Identidade byte-a-byte impede emitir bloco antes da ingestão completa: `documentStats` é mediana do livro inteiro, `stripRepeatedRegions` precisa de todas as páginas e `buildToc`/`linkFootnoteCalls` são passes de documento inteiro que mutam blocos (`level`, `noteRef`, flags de órfão).
+**Alternativas:** A — blocos provisórios durante a leitura, reescritos no fim (mostra cedo, mas o consumidor vê blocos que mudam e o payload intermediário não é o contrato) · B — emitir páginas lidas durante a leitura e blocos durante a construção, `book` no fim (primeiro evento antes do livro todo, nenhum bloco reescrito depois de emitido).
+**Decisão:** B — `extractStream` é um `AsyncGenerator` com três eventos: `page` (durante a leitura — decisão 5 da ARCHITECTURE, "o app começa a ler enquanto o resto processa"), `blocks` (por página, na construção, antes da finalização) e `book` (final, profundo igual a `buildBook(ingestPdfjs(bytes))`). O consumidor cacheia o `book`; `blocks` serve exibição progressiva.
+**Consequências:** a leitura inteira antecede o primeiro bloco (o ganho de latência é da camada 1, medido no S4); o stream não reduz o pico de memória do `RawDocument` (isso é da E8-T03); revisar se os passes de documento inteiro virarem incrementais.
