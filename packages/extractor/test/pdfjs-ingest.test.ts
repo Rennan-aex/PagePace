@@ -8,11 +8,13 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_CLEANUP_EVERY_PAGES,
   discardFontData,
+  ingestPages,
   ingestPdfjs,
   PDFJS_DIST_VERSION,
   releasePdfjsCaches,
   sha256Hex,
 } from "@pagepace/extractor";
+import type { RawPage } from "@pagepace/schema";
 import { parseRawDocument, SCHEMA_VERSION } from "@pagepace/schema";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it, vi } from "vitest";
@@ -156,6 +158,25 @@ describe("ingestPdfjs - synthetic PDFs", () => {
     await expect(
       ingestPdfjs(bytes, { fileName: "x.pdf", pageRange: { from: 5, to: 9 } }),
     ).rejects.toThrow(RangeError);
+  });
+});
+
+describe("ingestPages (E8-T01 fatia 2, ADR-088)", () => {
+  it("yields every page in order and returns the document ingestPdfjs builds", async () => {
+    const bytes = buildPdf([textStream("first"), textStream("second")]);
+    const iterator = ingestPages(bytes, { fileName: "pages.pdf" });
+    const pages: RawPage[] = [];
+    let step = await iterator.next();
+    while (step.done !== true) {
+      pages.push(step.value);
+      step = await iterator.next();
+    }
+
+    const batch = await ingestPdfjs(bytes, { fileName: "pages.pdf" });
+    expect(JSON.stringify(step.value)).toBe(JSON.stringify(batch));
+    expect(pages.map((page) => page.index)).toEqual([0, 1]);
+    // The yielded pages are deep-equal to the pages of the returned document.
+    expect(pages).toEqual(step.value.pages);
   });
 });
 

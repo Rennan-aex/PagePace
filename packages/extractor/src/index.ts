@@ -108,6 +108,7 @@ export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export {
   DEFAULT_CLEANUP_EVERY_PAGES,
   discardFontData,
+  ingestPages,
   ingestPdfjs,
   PDFJS_DIST_VERSION,
   releasePdfjsCaches,
@@ -176,6 +177,8 @@ export {
   PARAGRAPH_MEASURE_TOLERANCE,
   paragraphText,
 } from "./paragraphs";
+export type { BlocksEvent, BookEvent, ExtractStreamEvent, PageEvent } from "./pipeline";
+export { extractStream } from "./pipeline";
 export type { QuoteContext, QuoteDecision } from "./quotes";
 export {
   detectQuotes,

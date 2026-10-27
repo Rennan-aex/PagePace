@@ -388,23 +388,32 @@ async function documentHasText(pdf: PDFDocumentProxy): Promise<boolean> {
 }
 
 /**
- * Reads a PDF from memory and returns a `RawDocument` that passes the
- * `@pagepace/schema` validator (throws `SchemaValidationError` otherwise).
- * Every page first goes through `composeAccentItems` (E3-T01b) and then
- * `stripOrnamentItems` (backlog 3A): the LaTeX spacing-accent items are
- * recomposed and the symbol-font ornaments are dropped here so the CLI, the
- * evaluation and the tests all see the same text.
+ * Reads a PDF from memory as a stream of pages (E8-T01, fatia 2): every page
+ * is yielded as soon as it is read — the `page` layer of the `extractStream`
+ * protocol (ADR-088, "o app começa a ler enquanto o resto processa") — and the
+ * assembled, validated `RawDocument` is the generator's return value, so the
+ * batch path and the streaming path share one single implementation.
+ *
+ * The returned document passes the `@pagepace/schema` validator (throws
+ * `SchemaValidationError` otherwise). Every page goes through
+ * `composeAccentItems` (E3-T01b) and then `stripOrnamentItems` (backlog 3A)
+ * before it is yielded: the LaTeX spacing-accent items are recomposed and the
+ * symbol-font ornaments are dropped here so the CLI, the evaluation and the
+ * tests all see the same text. The yielded page is deep-equal to the page the
+ * returned document holds (the schema validator rebuilds the document on the
+ * way out), and nothing downstream mutates either copy.
  *
  * Throws `ScannedPdfError` when the file has no text layer (ADR-018), and
  * flags `source.ocrTextLayer` when most characters come from an invisible
- * OCR layer (ADR-019).
+ * OCR layer (ADR-019). A consumer that stops iterating early still gets the
+ * pdf.js task torn down (the `finally` below runs on `.return()`).
  */
-export async function ingestPdfjs(
+export async function* ingestPages(
   bytes: Uint8Array,
   options: PdfjsIngestOptions,
-): Promise<RawDocument> {
-  if (bytes.length === 0) throw new RangeError("ingestPdfjs: empty input");
-  if (!options.fileName.trim()) throw new RangeError("ingestPdfjs: fileName is required");
+): AsyncGenerator<RawPage, RawDocument> {
+  if (bytes.length === 0) throw new RangeError("ingestPages: empty input");
+  if (!options.fileName.trim()) throw new RangeError("ingestPages: fileName is required");
 
   const digest = sha256Hex(bytes);
   // pdf.js may transfer the buffer to its worker: give it a copy so callers
@@ -431,17 +440,17 @@ export async function ingestPdfjs(
     const from = options.pageRange?.from ?? 1;
     const to = options.pageRange?.to ?? pageCount;
     if (!Number.isInteger(from) || from < 1 || from > pageCount) {
-      throw new RangeError(`ingestPdfjs: pageRange.from ${from} outside 1..${pageCount}`);
+      throw new RangeError(`ingestPages: pageRange.from ${from} outside 1..${pageCount}`);
     }
     if (!Number.isInteger(to) || to < from) {
-      throw new RangeError(`ingestPdfjs: pageRange.to ${to} before pageRange.from ${from}`);
+      throw new RangeError(`ingestPages: pageRange.to ${to} before pageRange.from ${from}`);
     }
     const lastPage = Math.min(to, pageCount);
 
     const cleanupEvery = options.cleanupEveryPages ?? DEFAULT_CLEANUP_EVERY_PAGES;
     if (!Number.isInteger(cleanupEvery) || cleanupEvery < 0) {
       throw new RangeError(
-        `ingestPdfjs: cleanupEveryPages ${cleanupEvery} must be an integer >= 0`,
+        `ingestPages: cleanupEveryPages ${cleanupEvery} must be an integer >= 0`,
       );
     }
 
@@ -459,9 +468,13 @@ export async function ingestPdfjs(
     const renderChars: RenderModeChars[] = [];
     for (let pageNumber = from; pageNumber <= lastPage; pageNumber++) {
       const { page, tagInput, chars } = await readPage(pdf, pageNumber);
-      pages.push(stripOrnamentItems(composeAccentItems(page)));
+      const ingested = stripOrnamentItems(composeAccentItems(page));
+      pages.push(ingested);
       tagPages.push(tagInput);
       if (chars) renderChars.push(chars);
+      // E8-T01 / ADR-088: the page leaves the adapter the moment it is read,
+      // before the pages that follow it and before the document is assembled.
+      yield ingested;
       // E8-T03: sweep the pdf.js caches so a long book does not keep every
       // translated font and image alive until task.destroy() (ADR-087).
       if (cleanupEvery > 0 && (pageNumber - from + 1) % cleanupEvery === 0) {
@@ -504,5 +517,32 @@ export async function ingestPdfjs(
     return parseRawDocument(document);
   } finally {
     await task.destroy().catch(() => undefined);
+  }
+}
+
+/**
+ * Reads a PDF from memory and returns a `RawDocument` that passes the
+ * `@pagepace/schema` validator (throws `SchemaValidationError` otherwise).
+ * Every page first goes through `composeAccentItems` (E3-T01b) and then
+ * `stripOrnamentItems` (backlog 3A): the LaTeX spacing-accent items are
+ * recomposed and the symbol-font ornaments are dropped here so the CLI, the
+ * evaluation and the tests all see the same text.
+ *
+ * Throws `ScannedPdfError` when the file has no text layer (ADR-018), and
+ * flags `source.ocrTextLayer` when most characters come from an invisible
+ * OCR layer (ADR-019).
+ *
+ * Since E8-T01 (fatia 2) this is the batch facade over {@link ingestPages}:
+ * it drains the stream of pages and returns the document the generator
+ * assembled — byte-identical to what the batch loop always produced.
+ */
+export async function ingestPdfjs(
+  bytes: Uint8Array,
+  options: PdfjsIngestOptions,
+): Promise<RawDocument> {
+  const pages = ingestPages(bytes, options);
+  for (;;) {
+    const step = await pages.next();
+    if (step.done === true) return step.value;
   }
 }
