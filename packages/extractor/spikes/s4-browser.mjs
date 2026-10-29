@@ -11,7 +11,7 @@
 // Saída: .pagepace-cache/spikes/S4/browser.json (nunca commitar).
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -50,13 +50,36 @@ const MIME = {
   ".woff2": "font/woff2",
 };
 
+// O pnpm não mais traz pdfjs-dist para node_modules na raiz: resolve de
+// verdade (pacote do extrator, raiz ou store .pnpm) e falha com aviso claro
+// em vez de 404 misterioso no /vendor/pdfjs/*.
+function findPdfjsDist() {
+  const candidates = [
+    path.join(repoRoot, "node_modules", "pdfjs-dist"),
+    path.join(repoRoot, "packages", "extractor", "node_modules", "pdfjs-dist"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(path.join(candidate, "build", "pdf.mjs"))) return candidate;
+  }
+  const store = path.join(repoRoot, "node_modules", ".pnpm");
+  if (existsSync(store)) {
+    for (const entry of readdirSync(store)) {
+      if (!entry.startsWith("pdfjs-dist@")) continue;
+      const candidate = path.join(store, entry, "node_modules", "pdfjs-dist");
+      if (existsSync(path.join(candidate, "build", "pdf.mjs"))) return candidate;
+    }
+  }
+  return null;
+}
+const pdfjsDistDir = findPdfjsDist();
+
 function resolveRequest(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
   if (decoded === "/") return path.join(repoRoot, "packages", "extractor", "spikes", "s4-bench.html");
   if (decoded.startsWith("/vendor/pdfjs/")) {
     const rel = decoded.slice("/vendor/pdfjs/".length).replace(/\\/g, "/");
-    if (rel.includes("..")) return null;
-    return path.join(repoRoot, "node_modules", "pdfjs-dist", rel);
+    if (rel.includes("..") || pdfjsDistDir === null) return null;
+    return path.join(pdfjsDistDir, rel);
   }
   if (decoded.startsWith("/corpus/")) {
     const rel = decoded.slice("/corpus/".length).replace(/\\/g, "/");
@@ -72,6 +95,11 @@ function resolveRequest(urlPath) {
 }
 
 async function startServer({ logRequests = false } = {}) {
+  if (pdfjsDistDir === null) {
+    console.error(
+      "aviso: pdfjs-dist nao encontrado (node_modules) - /vendor/pdfjs/* vai responder 404; rode `pnpm install`",
+    );
+  }
   const server = createServer(async (req, res) => {
     const filePath = resolveRequest(req.url ?? "/");
     const startedAt = Date.now();
