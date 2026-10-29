@@ -283,6 +283,44 @@ describe("extract", () => {
     expect(second.out()).toBe(first.out());
   });
 
+  it("extract --memory-limit-mb: under budget completes identical to a run without the flag (E8-T03)", async () => {
+    const file = await writePdf("budget-ok.pdf", buildPdf([textStream("budgeted block")]));
+    const plain = capture();
+    expect(await run(["extract", file], plain.io)).toBe(EXIT_OK);
+    const budgeted = capture();
+    expect(await run(["extract", file, "--memory-limit-mb", "4096"], budgeted.io)).toBe(EXIT_OK);
+    expect(budgeted.out()).toBe(plain.out());
+  });
+
+  it("extract --memory-limit-mb: rejects missing or invalid values (E8-T03)", async () => {
+    const file = await writePdf("budget-bad.pdf", buildPdf([textStream("x")]));
+    for (const args of [
+      ["extract", file, "--memory-limit-mb"],
+      ["extract", file, "--memory-limit-mb", "0"],
+      ["extract", file, "--memory-limit-mb", "-5"],
+      ["extract", file, "--memory-limit-mb", "abc"],
+      ["extract", file, "--memory-limit-mb", "1.5"],
+    ]) {
+      const streams = capture();
+      expect(await run(args, streams.io)).toBe(EXIT_USAGE);
+      expect(streams.err()).toContain("--memory-limit-mb");
+    }
+  });
+
+  it("extract --memory-limit-mb: a limit the process cannot hold fails with EXIT_ERROR and explains (E8-T03)", async () => {
+    const bytes = buildPdf(
+      Array.from({ length: 4 }, (_, i) => textStream(`over budget page ${i + 1}`)),
+    );
+    const file = await writePdf("budget-fail.pdf", bytes);
+    const streams = capture();
+    const code = await run(["extract", file, "--memory-limit-mb", "1"], streams.io);
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toContain("limite de memória");
+    expect(streams.err()).toContain("--memory-limit-mb");
+  });
+
   it("prints per-page progress on stderr and keeps the batch stdout byte-identical (E8-T01)", async () => {
     const bytes = buildPdf([textStream("one"), textStream("two"), textStream("three")]);
     const file = await writePdf("progress.pdf", bytes);

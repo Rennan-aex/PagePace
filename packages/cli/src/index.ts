@@ -10,6 +10,8 @@ import {
   extractionCacheKeyFor,
   extractStream,
   ingestPdfjs,
+  MB,
+  MemoryLimitError,
   readCachedBook,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
@@ -44,7 +46,7 @@ type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
 
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>]
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -54,7 +56,7 @@ export const HELP = `pagepace — extrator de PDF do PagePace
 
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>]
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -89,6 +91,11 @@ Opções:
   --cache-dir <pasta>       Pasta do cache de extração do extract: um arquivo
                             <chave>.json por livro; mudar a versão do extrator ou
                             do esquema muda a chave e invalida a entrada
+  --memory-limit-mb <n>     Orçamento de memória residente do extract, em MB
+                            (E8-T03): se duas fronteiras de página seguidas
+                            passarem do orçamento, a extração para com erro
+                            explicando o limite e o observado (padrão: sem
+                            orçamento — a memória não é limitada)
   -h, --help                Mostra esta ajuda
 
 Códigos de saída:
@@ -373,6 +380,7 @@ async function inspect(args: readonly string[], io: CliIo): Promise<number> {
 async function extract(args: readonly string[], io: CliIo): Promise<number> {
   let file: string | undefined;
   let cacheDir: string | undefined;
+  let memoryLimitMb: number | undefined;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index] as string;
@@ -391,6 +399,28 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
         return EXIT_USAGE;
       }
       cacheDir = normalizeCliPath(value);
+      continue;
+    }
+    if (arg === "--memory-limit-mb" || arg.startsWith("--memory-limit-mb=")) {
+      const inline = arg.startsWith("--memory-limit-mb=")
+        ? arg.slice("--memory-limit-mb=".length)
+        : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        io.err(
+          `Valor ausente para --memory-limit-mb. Use --memory-limit-mb <número inteiro em MB>.\n`,
+        );
+        return EXIT_USAGE;
+      }
+      const parsedMb = Number(value);
+      if (!Number.isInteger(parsedMb) || parsedMb <= 0) {
+        io.err(
+          `Valor inválido para --memory-limit-mb: ${value}. Use um inteiro maior que 0 (MB).\n`,
+        );
+        return EXIT_USAGE;
+      }
+      memoryLimitMb = parsedMb;
       continue;
     }
     if (arg.startsWith("-")) {
@@ -435,8 +465,18 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     // E8-T01 fatia 3: the streaming pipeline (ADR-088) reports one page of
     // progress on stderr per page read; stdout keeps the exact JSON the batch
     // path printed — `book` is deep-equal to `buildBook(ingestPdfjs(bytes))`.
+    // E8-T03 fatia 3: with --memory-limit-mb the CLI is the platform adapter
+    // that plugs `process.memoryUsage` into the core budget (rule 6).
     let bookJson: string | undefined;
-    for await (const event of extractStream(bytes, { fileName: basename(file) })) {
+    const options =
+      memoryLimitMb === undefined
+        ? { fileName: basename(file) }
+        : {
+            fileName: basename(file),
+            memoryLimitBytes: memoryLimitMb * MB,
+            memoryUsage: () => process.memoryUsage(),
+          };
+    for await (const event of extractStream(bytes, options)) {
       if (event.type === "page") io.err(`Página ${event.page.index + 1} lida\n`);
       else if (event.type === "book") bookJson = `${JSON.stringify(event.book, null, 2)}\n`;
       if (event.type === "book" && cache !== null && cacheKey !== null) {
@@ -457,6 +497,14 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     if (error instanceof ScannedPdfError) {
       io.err(`${SCANNED_PDF_MESSAGE}\n`);
       return EXIT_SCANNED;
+    }
+    if (error instanceof MemoryLimitError) {
+      io.err(
+        `Memória em ${file}: ${messageOf(error)}.\n` +
+          `O livro não coube no orçamento de ${memoryLimitMb} MB; tente fechar outros programas ` +
+          `ou subir o orçamento com --memory-limit-mb.\n`,
+      );
+      return EXIT_ERROR;
     }
     if (error instanceof RangeError) {
       io.err(`Faixa de páginas inválida: ${messageOf(error)}\n`);

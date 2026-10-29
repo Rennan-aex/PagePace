@@ -113,6 +113,8 @@ export {
   paragraphHyphenText,
   UNCERTAIN_HYPHEN_FLAG,
 } from "./hyphen";
+export type { BoundaryVerdict, MemorySample, MemoryUsageProbe } from "./ingest/memory";
+export { MB, MemoryGovernor, MemoryLimitError } from "./ingest/memory";
 export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export {
   DEFAULT_CLEANUP_EVERY_PAGES,

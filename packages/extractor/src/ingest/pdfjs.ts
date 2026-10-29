@@ -1,8 +1,9 @@
 import type { BBox, RawDocument, RawOutlineItem, RawPage, RawTextItem } from "@pagepace/schema";
-import { parseRawDocument, SCHEMA_VERSION } from "@pagepace/schema";
+import { parseWith, rawDocumentSchema, rawPageSchema, SCHEMA_VERSION } from "@pagepace/schema";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { composeAccentItems, stripOrnamentItems } from "../accents";
+import { MemoryGovernor } from "./memory";
 import { sha256Hex } from "./sha256";
 import type { PageTagInput } from "./tag-hints";
 import { buildTagHints } from "./tag-hints";
@@ -22,11 +23,16 @@ import { countRenderModeChars, isOcrTextLayer, ScannedPdfError } from "./text-la
 export const PDFJS_DIST_VERSION = "6.4.299";
 
 /**
- * Default pages read between pdf.js cache sweeps (E8-T03 / ADR-087). The
- * sweep bounds how much the worker keeps for a long book; `0` in
- * {@link PdfjsIngestOptions.cleanupEveryPages} disables it entirely.
+ * Default pages read between pdf.js cache sweeps (E8-T03 / ADR-087, amended
+ * by ADR-090): `0` — no document-level sweep by default. Measured on the
+ * stress corpus, the sweep *raised* the peak everywhere it was tried
+ * (`n1-en-lostworld` 446 MB vs 313 MB without, `n1-pt-sofia` ~268 vs ~262,
+ * and it was slower on every document): `pdf.cleanup()` only forces the
+ * re-decoding of fonts and images, while the per-page `page.cleanup()` inside
+ * {@link readPage} already releases each page. Callers may still pass
+ * {@link PdfjsIngestOptions.cleanupEveryPages} with a positive cadence.
  */
-export const DEFAULT_CLEANUP_EVERY_PAGES = 32;
+export const DEFAULT_CLEANUP_EVERY_PAGES = 0;
 
 /** Name reported when pdf.js cannot resolve a font to a real PostScript name. */
 const UNKNOWN_FONT = "unknown";
@@ -49,9 +55,26 @@ export interface PdfjsIngestOptions {
   /**
    * Pages read between pdf.js cache sweeps (E8-T03 / ADR-087). Must be an
    * integer >= 0; 0 disables the sweep. Defaults to
-   * {@link DEFAULT_CLEANUP_EVERY_PAGES}.
+   * {@link DEFAULT_CLEANUP_EVERY_PAGES} — and the default is `0` because the
+   * sweep was measured to *raise* the peak of every stress document
+   * (ADR-090).
    */
   cleanupEveryPages?: number;
+  /**
+   * Budget of resident memory in bytes (E8-T03, fatia 3). Sampled at every
+   * page boundary: the first sample over the budget continues the read (it
+   * may be delayed garbage collection), a second consecutive overage throws
+   * `MemoryLimitError`. Requires {@link memoryUsage}; without a probe there
+   * is nothing to sample.
+   */
+  memoryLimitBytes?: number;
+  /**
+   * Platform probe behind the budget (E8-T03): Node passes
+   * `process.memoryUsage`, the browser an adapter over `performance.memory`.
+   * The core never imports a platform API (rule 6) — with no probe the
+   * budget is not enforced.
+   */
+  memoryUsage?: () => { rss: number; heapUsed: number; external: number };
 }
 
 interface PdfjsTextItem {
@@ -399,14 +422,23 @@ async function documentHasText(pdf: PDFDocumentProxy): Promise<boolean> {
  * `composeAccentItems` (E3-T01b) and then `stripOrnamentItems` (backlog 3A)
  * before it is yielded: the LaTeX spacing-accent items are recomposed and the
  * symbol-font ornaments are dropped here so the CLI, the evaluation and the
- * tests all see the same text. The yielded page is deep-equal to the page the
- * returned document holds (the schema validator rebuilds the document on the
- * way out), and nothing downstream mutates either copy.
+ * tests all see the same text. The yielded page **is** the page the returned
+ * document holds (E8-T03, fatia 3: each page is validated as it leaves the
+ * read window — `rawPageSchema` — and the envelope is validated without its
+ * pages, so a 500-page book is never rebuilt in one piece at the end; the
+ * validator used to double the document for a moment, which pushed the peak
+ * of a long book past its memory budget).
  *
  * Throws `ScannedPdfError` when the file has no text layer (ADR-018), and
  * flags `source.ocrTextLayer` when most characters come from an invisible
  * OCR layer (ADR-019). A consumer that stops iterating early still gets the
  * pdf.js task torn down (the `finally` below runs on `.return()`).
+ *
+ * Memory budget (E8-T03, fatia 3): with `memoryLimitBytes` and `memoryUsage`
+ * the read samples the resident set at every page boundary — the first
+ * sample over the budget continues the read (it may be delayed garbage
+ * collection), a second consecutive overage throws `MemoryLimitError` out
+ * of the generator. Without a probe nothing is sampled.
  */
 export async function* ingestPages(
   bytes: Uint8Array,
@@ -454,6 +486,24 @@ export async function* ingestPages(
       );
     }
 
+    // E8-T03 (fatia 3): the memory budget is only as real as its probe — a
+    // limit without one would be a silent no-op, so it is a usage error.
+    if (options.memoryLimitBytes !== undefined && options.memoryUsage === undefined) {
+      throw new RangeError("ingestPages: memoryLimitBytes requires memoryUsage");
+    }
+    if (
+      options.memoryLimitBytes !== undefined &&
+      (!Number.isInteger(options.memoryLimitBytes) || options.memoryLimitBytes <= 0)
+    ) {
+      throw new RangeError(
+        `ingestPages: memoryLimitBytes ${options.memoryLimitBytes} must be an integer > 0`,
+      );
+    }
+    const governor =
+      options.memoryLimitBytes !== undefined && options.memoryUsage !== undefined
+        ? new MemoryGovernor(options.memoryLimitBytes, options.memoryUsage)
+        : null;
+
     // Detector A (ADR-018): a document without a text layer is a scan, not an
     // empty book — refuse here, before anything else is assembled.
     if (!(await documentHasText(pdf))) throw new ScannedPdfError();
@@ -468,7 +518,13 @@ export async function* ingestPages(
     const renderChars: RenderModeChars[] = [];
     for (let pageNumber = from; pageNumber <= lastPage; pageNumber++) {
       const { page, tagInput, chars } = await readPage(pdf, pageNumber);
-      const ingested = stripOrnamentItems(composeAccentItems(page));
+      // E8-T03 (fatia 3): the page is validated as it leaves the read window
+      // — the window holds one page of validation debt, never the whole book.
+      const ingested = parseWith(
+        rawPageSchema,
+        stripOrnamentItems(composeAccentItems(page)),
+        "RawPage",
+      );
       pages.push(ingested);
       tagPages.push(tagInput);
       if (chars) renderChars.push(chars);
@@ -476,10 +532,18 @@ export async function* ingestPages(
       // before the pages that follow it and before the document is assembled.
       yield ingested;
       // E8-T03: sweep the pdf.js caches so a long book does not keep every
-      // translated font and image alive until task.destroy() (ADR-087).
+      // translated font and image alive until task.destroy() (ADR-087; the
+      // default cadence is off, ADR-090).
       if (cleanupEvery > 0 && (pageNumber - from + 1) % cleanupEvery === 0) {
         await releasePdfjsCaches(pdf);
       }
+      // E8-T03 (fatia 3): the budget samples at the boundary — after the page
+      // was yielded and `page.cleanup()` ran. The first overage continues (it
+      // may be delayed garbage collection); a second consecutive overage
+      // throws `MemoryLimitError` out of the generator (ADR-090: there is no
+      // mid-flight degradation — the only candidate lever was measured to
+      // raise the peak on every stress document).
+      governor?.samplePageBoundary(pageNumber - from + 1);
     }
 
     const tagHints = buildTagHints({ marked: tagged, pages: tagPages });
@@ -514,7 +578,13 @@ export async function* ingestPages(
       ingest: { adapter: "pdfjs", adapterVersion: PDFJS_DIST_VERSION },
     };
 
-    return parseRawDocument(document);
+    // E8-T03 (fatia 3): the envelope is validated without its pages — every
+    // page was already validated as it left the read window — so the whole
+    // book is never rebuilt in one piece (the rebuild used to hold two copies
+    // of every item, the spike that pushed a long book past its budget).
+    const envelope = parseWith(rawDocumentSchema, { ...document, pages: [] }, "RawDocument");
+    envelope.pages = pages;
+    return envelope;
   } finally {
     await task.destroy().catch(() => undefined);
   }

@@ -1,5 +1,5 @@
 import type { RawDocument, RawTextItem } from "@pagepace/schema";
-import { documentLines, type TextLine } from "./lines";
+import { groupLines, type TextLine } from "./lines";
 import { isMarginRefText } from "./marginrefs";
 import { lineText } from "./spaces";
 import { documentStats } from "./stats";
@@ -201,50 +201,55 @@ function isFolioFoot(
  * least one side (`FLOW_FOLIO_ISOLATION_FACTOR` of the line spacing) — the
  * shape of a folio printed between paragraphs, whether or not the typesetter
  * left air on both sides of it.
+ *
+ * One page at a time (E8-T03, fatia 3): the caller builds the lines of a
+ * page, takes its candidates out and lets the rest of the lines die with the
+ * page — a document-wide line array used to stay alive here until every page
+ * had been visited, doubling the transient cost of the pass that strips the
+ * regions.
  */
-function candidatesOf(
-  pages: readonly TextLine[][],
+function candidatesOfPage(
+  lines: readonly TextLine[],
+  page: number,
   bodyFontSize: number,
   lineHeight: number,
 ): Candidate[] {
   const candidates: Candidate[] = [];
+  if (lines.length === 0) return candidates;
   const isolation = FLOW_FOLIO_ISOLATION_FACTOR * lineHeight;
-  pages.forEach((lines, page) => {
-    if (lines.length === 0) return;
-    // A page with a single line can only lose it as a header: treating it as
-    // a foot as well would let a one-line page be emptied by a page number.
-    const edges: readonly (readonly [RepeatedBand, TextLine])[] =
-      lines.length > 1
-        ? [
-            ["top", lines[0] as TextLine],
-            ["bottom", lines[lines.length - 1] as TextLine],
-          ]
-        : [["top", lines[0] as TextLine]];
-    for (const [band, line] of edges) {
-      if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) continue;
-      const text = contentOf(line);
-      if (text.trim() === "") continue;
-      // E5-T07: a Bekker/Stephanus number ("1094a") is margin numbering, not
-      // furniture — a lettered sequence must never strip as a region.
-      if (isMarginRefText(text)) continue;
-      const { signature, numbered } = signatureOf(text);
-      const edgeFolio = !numbered && isFolioFoot(band, line, lines, isolation);
-      candidates.push({ band, page, line, text, signature, numbered, edgeFolio });
-    }
-    lines.forEach((line, index) => {
-      if (index === 0 || index === lines.length - 1) return;
-      if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) return;
-      const text = contentOf(line);
-      if (text.trim() === "") return;
-      // E5-T07: same guard as the edge pass — a margin number is content.
-      if (isMarginRefText(text)) return;
-      const { signature, numbered } = signatureOf(text);
-      if (!numbered) return;
-      const above = line.top - (lines[index - 1] as TextLine).bottom;
-      const below = (lines[index + 1] as TextLine).top - line.bottom;
-      if (above < isolation && below < isolation) return;
-      candidates.push({ band: "flow", page, line, text, signature, numbered, edgeFolio: false });
-    });
+  // A page with a single line can only lose it as a header: treating it as
+  // a foot as well would let a one-line page be emptied by a page number.
+  const edges: readonly (readonly [RepeatedBand, TextLine])[] =
+    lines.length > 1
+      ? [
+          ["top", lines[0] as TextLine],
+          ["bottom", lines[lines.length - 1] as TextLine],
+        ]
+      : [["top", lines[0] as TextLine]];
+  for (const [band, line] of edges) {
+    if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) continue;
+    const text = contentOf(line);
+    if (text.trim() === "") continue;
+    // E5-T07: a Bekker/Stephanus number ("1094a") is margin numbering, not
+    // furniture — a lettered sequence must never strip as a region.
+    if (isMarginRefText(text)) continue;
+    const { signature, numbered } = signatureOf(text);
+    const edgeFolio = !numbered && isFolioFoot(band, line, lines, isolation);
+    candidates.push({ band, page, line, text, signature, numbered, edgeFolio });
+  }
+  lines.forEach((line, index) => {
+    if (index === 0 || index === lines.length - 1) return;
+    if (line.fontSize > REPEATED_FONT_MAX_FACTOR * bodyFontSize) return;
+    const text = contentOf(line);
+    if (text.trim() === "") return;
+    // E5-T07: same guard as the edge pass — a margin number is content.
+    if (isMarginRefText(text)) return;
+    const { signature, numbered } = signatureOf(text);
+    if (!numbered) return;
+    const above = line.top - (lines[index - 1] as TextLine).bottom;
+    const below = (lines[index + 1] as TextLine).top - line.bottom;
+    if (above < isolation && below < isolation) return;
+    candidates.push({ band: "flow", page, line, text, signature, numbered, edgeFolio: false });
   });
   return candidates;
 }
@@ -342,30 +347,44 @@ function acceptRegion(
 }
 
 function analyze(document: RawDocument): Analysis {
-  const pages = documentLines(document);
-  const pagesWithText = pages.filter((lines) => lines.length > 0).length;
-  if (pagesWithText === 0) {
+  // A document with no items can not carry a region. This guard keeps
+  // `documentStats` (which throws on an item-less document) out of that path,
+  // exactly like the "no page has lines" early return always did.
+  if (!document.pages.some((page) => page.items.length > 0)) {
     return { regions: [], removedLines: [], pageLabels: document.pages.map(() => null) };
   }
 
   const stats = documentStats(document);
   const tolerance = REPEATED_BASELINE_TOLERANCE_FACTOR * stats.lineHeight;
-  const minimum = Math.max(REPEATED_MIN_PAGES, Math.ceil(REPEATED_MIN_PAGE_SHARE * pagesWithText));
 
   const groups = new Map<string, Candidate[]>();
   const flowCandidates: Candidate[] = [];
   const numberedEdges: Candidate[] = [];
-  for (const candidate of candidatesOf(pages, stats.bodyFontSize, stats.lineHeight)) {
-    if (candidate.band === "flow") {
-      flowCandidates.push(candidate);
-      continue;
+  const singleLinePages = new Set<number>();
+  let pagesWithText = 0;
+  document.pages.forEach((page, index) => {
+    const lines = groupLines(page);
+    if (lines.length > 0) pagesWithText++;
+    if (lines.length <= 1) singleLinePages.add(index);
+    // E8-T03 (fatia 3): the lines of this page die with it — only the
+    // candidates keep a reference to the few lines that may still be removed.
+    for (const candidate of candidatesOfPage(lines, index, stats.bodyFontSize, stats.lineHeight)) {
+      if (candidate.band === "flow") {
+        flowCandidates.push(candidate);
+        continue;
+      }
+      if (candidate.numbered || candidate.edgeFolio) numberedEdges.push(candidate);
+      const key = `${candidate.band}|${candidate.signature}`;
+      const bucket = groups.get(key);
+      if (bucket === undefined) groups.set(key, [candidate]);
+      else bucket.push(candidate);
     }
-    if (candidate.numbered || candidate.edgeFolio) numberedEdges.push(candidate);
-    const key = `${candidate.band}|${candidate.signature}`;
-    const bucket = groups.get(key);
-    if (bucket === undefined) groups.set(key, [candidate]);
-    else bucket.push(candidate);
+  });
+  if (pagesWithText === 0) {
+    return { regions: [], removedLines: [], pageLabels: document.pages.map(() => null) };
   }
+
+  const minimum = Math.max(REPEATED_MIN_PAGES, Math.ceil(REPEATED_MIN_PAGE_SHARE * pagesWithText));
 
   const regions: RepeatedRegion[] = [];
   const removedLines: RemovedLine[] = [];
@@ -380,10 +399,6 @@ function analyze(document: RawDocument): Analysis {
   // the edge pass left behind — except on a page whose only line it is,
   // which no region may ever empty.
   const removedLineSet = new Set(removedLines.map((entry) => entry.line));
-  const singleLinePages = new Set<number>();
-  pages.forEach((lines, page) => {
-    if (lines.length <= 1) singleLinePages.add(page);
-  });
   for (const candidate of numberedEdges) {
     if (singleLinePages.has(candidate.page)) continue;
     if (!removedLineSet.has(candidate.line)) flowCandidates.push({ ...candidate, band: "flow" });

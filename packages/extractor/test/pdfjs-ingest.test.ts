@@ -335,14 +335,18 @@ describe("ingestPdfjs - pdf.js cache sweep (E8-T03, ADR-087)", () => {
       cleanupSpy.mockClear();
       await ingestPdfjs(bytes, { fileName: "cadence-off.pdf", cleanupEveryPages: 0 });
       expect(cleanupSpy).not.toHaveBeenCalled();
+
+      cleanupSpy.mockClear();
+      await ingestPdfjs(bytes, { fileName: "cadence-default.pdf" });
+      expect(cleanupSpy).not.toHaveBeenCalled();
     } finally {
       cleanupSpy.mockRestore();
     }
   });
 
-  it("keeps DEFAULT_CLEANUP_EVERY_PAGES a positive integer", () => {
+  it("keeps DEFAULT_CLEANUP_EVERY_PAGES at 0 (ADR-090: the sweep raised the peak)", () => {
     expect(Number.isInteger(DEFAULT_CLEANUP_EVERY_PAGES)).toBe(true);
-    expect(DEFAULT_CLEANUP_EVERY_PAGES).toBeGreaterThan(0);
+    expect(DEFAULT_CLEANUP_EVERY_PAGES).toBe(0);
   });
 
   const entries = availableCorpus().filter((entry) => entry.id === "n2-en-arxiv-phobos");

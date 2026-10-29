@@ -1,5 +1,5 @@
 import type { Block, Book, RawDocument } from "@pagepace/schema";
-import { parseBook, SCHEMA_VERSION } from "@pagepace/schema";
+import { blockSchema, bookSchema, parseWith, SCHEMA_VERSION } from "@pagepace/schema";
 import { linePageMap, paragraphBBoxes } from "./bbox";
 import { BROKEN_FONT_MAPPING, brokenFontText } from "./brokenfont";
 import { type CaptionDecision, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
@@ -649,20 +649,36 @@ export function finalizeBook(analysis: BookAnalysis, chunks: Iterable<BlockChunk
   }
   warnings.push(...toc.warnings);
 
-  return parseBook({
-    schemaVersion: SCHEMA_VERSION,
-    id: document.source.sha256,
-    source: { fileName: document.source.fileName, pageCount: document.source.pageCount },
-    metadata: buildMetadata(blocks, document.source),
-    toc: toc.toc,
-    blocks,
-    extraction: {
-      tool: EXTRACTOR_TOOL,
-      version: EXTRACTOR_VERSION,
-      avgConfidence: averageConfidence(blocks.map((block) => block.confidence)),
-      warnings,
+  // E8-T03 (fatia 3): validate the book envelope without its blocks and each
+  // block on its own — the same pattern the read window applies per page.
+  // Parsing the assembled book in one piece doubled it for a moment, which
+  // pushed the peak of a long book past its memory budget.
+  for (let index = 0; index < blocks.length; index++) {
+    const block = blocks[index];
+    if (block !== undefined) blocks[index] = parseWith(blockSchema, block, "Block");
+  }
+  const envelope = parseWith(
+    bookSchema,
+    {
+      schemaVersion: SCHEMA_VERSION,
+      id: document.source.sha256,
+      source: { fileName: document.source.fileName, pageCount: document.source.pageCount },
+      metadata: buildMetadata(blocks, document.source),
+      toc: toc.toc,
+      // The array must hold at least one element (schema `min(1)`); the real
+      // validated blocks attach right after the envelope is validated.
+      blocks: blocks.slice(0, 1),
+      extraction: {
+        tool: EXTRACTOR_TOOL,
+        version: EXTRACTOR_VERSION,
+        avgConfidence: averageConfidence(blocks.map((block) => block.confidence)),
+        warnings,
+      },
     },
-  });
+    "Book",
+  );
+  envelope.blocks = blocks;
+  return envelope;
 }
 
 /**
