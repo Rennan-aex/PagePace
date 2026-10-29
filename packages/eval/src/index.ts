@@ -1,6 +1,7 @@
 // @pagepace/eval - evaluation runner: corpus manifests (E1-T05, ADR-031),
 // `text_cer` metric and the `pnpm eval` runner (E1-T06, ADR-035), plus the
-// baseline and the CI regression gate (E1-T08, ADR-008).
+// baseline and the CI regression gate (E1-T08, ADR-008) and the per-document
+// speed/memory benchmark `pnpm bench` (E8-T04, ADR-091).
 export const PACKAGE_NAME = "@pagepace/eval";
 
 export {
@@ -22,6 +23,38 @@ export {
   serializeBaseline,
   writeBaseline,
 } from "./baseline";
+export {
+  type BenchDocumentResult,
+  type BenchExtractFn,
+  type BenchOptions,
+  type BenchResult,
+  type BenchStatus,
+  EXIT_ERROR as BENCH_EXIT_ERROR,
+  EXIT_OK as BENCH_EXIT_OK,
+  EXIT_USAGE as BENCH_EXIT_USAGE,
+  HELP as BENCH_HELP,
+  runBench,
+  runBenchCli,
+} from "./bench";
+export {
+  BENCH_BASELINE_FORMAT_VERSION,
+  BENCH_BASELINE_RELATIVE_PATH,
+  BENCH_METRICS,
+  BENCH_MIN_GATE_MS,
+  BENCH_REGRESSION_PCT,
+  type BenchBaseline,
+  type BenchBaselineDocuments,
+  BenchBaselineError,
+  type BenchChange,
+  type BenchComparison,
+  type BenchMetric,
+  benchBaselinePath,
+  compareBenchBaseline,
+  parseBenchBaseline,
+  readBenchBaseline,
+  serializeBenchBaseline,
+  writeBenchBaseline,
+} from "./bench-baseline";
 
 export {
   type CorpusEntry,

@@ -4,10 +4,10 @@
 
 ## Situação
 - **Fase atual:** **E8 EM ANDAMENTO** (plano em `phases/E8-performance.md`). **E8-T01 CONCLUÍDA (2026-10-27, ADR-088; 3 fatias)**; **E8-T02 CONCLUÍDA (2026-10-27, ADR-089)**; **E8-T03 CONCLUÍDA (2026-10-28, ADR-090; 3 fatias)**; segue da E8: T04 (benchmarks). E7 CONCLUÍDA (2026-10-21, ADR-071–077); E6 (ADR-070); E5/E4/E3 fechadas.
-- **Próxima tarefa:** **E8-T04 — benchmarks reproduzíveis** (fase `phases/E8-performance.md`): `pnpm bench` por documento (ms/página, MB) + roteiro Android; medições em aparelho real obrigatórias (condição da ADR-005 — se falharem, a ADR-005 é reaberta).
-- **Ação pendente do PO:** nenhuma de git — desde 2026-10-14 (**ADR-054**) o agente abre PR, confere os checks e mescla sozinho com o `gh`.
+- **Próxima tarefa:** **E8-T04 — benchmarks reproduzíveis** — em andamento: runner `pnpm bench`, testes, CI, roteiro Android e ADR-091 prontos; falta baseline calibrada no CI + medições no aparelho real (condição da ADR-005 — se falharem, a ADR-005 é reaberta).
+- **Ação pendente do PO:** medições Android pelo checklist `tests/manual/android-performance-checklist.md` (fim da E8-T04); git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`.
 - **Status:** `pnpm verify` verde (1045 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0 (baseline intacto).
-- **Última atualização:** 2026-10-28 (E8-T03 fatia 3 fechada, ADR-090).
+- **Última atualização:** 2026-10-29 (E8-T04 em andamento — runner + CI + roteiro + ADR-091).
 
 ## Tarefa fechada nesta sessão — E8-T03 fatia 3: orçamento de memória
 - `ingest/memory.ts`: `MemoryGovernor` (fronteira de página; 1ª amostra acima do orçamento = "over" e segue, 2ª consecutiva = `MemoryLimitError` com limite/observado/páginas); sonda injetada (regra 6); sem degradação em voo (medida contraproducente, ADR-090).
@@ -18,7 +18,7 @@
 - Gates: `pnpm verify` verde (**1045 testes**, +12), `pnpm eval --ci` exit 0 (31 docs). ADR-090; fase E8-performance.md marcada.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-28a — E8-T03 fatia 3 (orçamento de memória) — CONCLUÍDA** · branch `e8-t03-memory-limit`, ADR-090. **(1) Núcleo:** `ingest/memory.ts` (governor de 2 fronteiras, `MemoryLimitError`) + `pdfjs.ts` (validação incremental de página, default da varredura 0, opções `memoryLimitBytes`/`memoryUsage`) + `book.ts` (envelope + `blockSchema` por bloco) + `repeated.ts` (linhas por página). **(2) CLI:** `--memory-limit-mb` no `extract` (`process.memoryUsage`); HELP/USAGE. **(3) Testes:** 9 novos `test/memory-limit.test.ts` + default 0 em `pdfjs-ingest` + 3 na CLI → **1045**. **(4) Gates:** `pnpm verify` verde, `pnpm eval --ci` exit 0. **Próx.: E8-T04 (benchmarks reproduzíveis + roteiro Android; definir ali a metodologia oficial de medir "pico").**
+- **Sessão 2026-10-29 — E8-T04 (benchmarks reproduzíveis) — EM ANDAMENTO** · branch `e8-t04-benchmarks` (commits `c79848d` runner+testes, `d53d428` step de CI). **Feito:** `pnpm bench` (`packages/eval/src/bench.ts` + `bench-baseline.ts`): worker novo por documento, RSS natural (timer 5 ms + evento), mediana de `--runs 1..10`, baseline informativa, `--ci` **avisa** (exit 0) com piora > 25% (`ms_per_page` só acima de 5000 ms de baseline — ruído de runner compartilhado, medido +78,6% entre dois runs), `--diff`, `--update-baseline`; 38 testes novos (inclui worker real com spawn); step `Bench (speed and memory)` no ci.yml + artefato `out/bench.json`; roteiro `tests/manual/android-performance-checklist.md` (condições a/b/c da ADR-005); ADR-091 + índice (com a linha faltante da ADR-090); OPEN-QUESTIONS 3 (orçamento 300 MB vs metodologia — não bloqueia). **Próx.:** `pnpm verify` → commit docs → push → PR → CI → `gh run download` do artefato → commitar `packages/eval/bench-baseline.json` (calibrada no CI) → checks → merge → report-to-po (medições Android = ação do PO).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).

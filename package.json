@@ -22,7 +22,8 @@
     "pagepace": "tsx packages/cli/src/main.ts",
     "corpus:fetch": "tsx packages/eval/src/fetch.ts",
     "corpus:synthetic": "tsx packages/eval/src/synthetic-cli.ts",
-    "eval": "tsx packages/eval/src/eval.ts"
+    "eval": "tsx packages/eval/src/eval.ts",
+    "bench": "tsx packages/eval/src/bench.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

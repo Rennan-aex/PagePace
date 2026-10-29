@@ -67,3 +67,19 @@ jobs:
         run: |
           pnpm corpus:fetch
           pnpm eval --ci
+      # Benchmark gate (E8-T04, ADR-091): `pnpm bench --ci` prints a WARNING
+      # (never a failure - the numbers are informational) when a metric is
+      # more than 25% worse than packages/eval/bench-baseline.json; a
+      # document error still fails the step. While the baseline does not
+      # exist it just warns, so the gate turns itself on with the first
+      # calibration committed from a CI artifact (ADR-091: time and RSS are
+      # only comparable inside the same runner).
+      - name: Bench (speed and memory)
+        run: pnpm bench --ci --runs 3
+      - name: Bench report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: packages/eval/out/bench.json
+          if-no-files-found: ignore

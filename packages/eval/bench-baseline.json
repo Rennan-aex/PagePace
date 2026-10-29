@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "regressionPct": 25,
+  "documents": {
+    "n1-en-rebus-philosophy-mind": {
+      "pages": 99,
+      "ms_per_page": 10.3,
+      "peak_mb": 506.4
+    },
+    "n2-en-arxiv-phobos": {
+      "pages": 10,
+      "ms_per_page": 102.3,
+      "peak_mb": 687.7
+    },
+    "n3-en-scielo-climatejustice": {
+      "pages": 20,
+      "ms_per_page": 17.7,
+      "peak_mb": 497.1
+    },
+    "n3-pt-scielo-wittgenstein": {
+      "pages": 11,
+      "ms_per_page": 20.6,
+      "peak_mb": 525.4
+    },
+    "syn-n1-en-paragraphs": {
+      "pages": 2,
+      "ms_per_page": 7.7,
+      "peak_mb": 482.2
+    },
+    "syn-n1-pt-acentos": {
+      "pages": 2,
+      "ms_per_page": 8.9,
+      "peak_mb": 487.7
+    },
+    "syn-n1-pt-cabecalhos": {
+      "pages": 4,
+      "ms_per_page": 4.5,
+      "peak_mb": 481.9
+    },
+    "syn-n1-pt-hifenizacao": {
+      "pages": 2,
+      "ms_per_page": 5.8,
+      "peak_mb": 480.7
+    },
+    "syn-n2-en-columns": {
+      "pages": 2,
+      "ms_per_page": 6.4,
+      "peak_mb": 487.5
+    },
+    "syn-n2-en-lists": {
+      "pages": 2,
+      "ms_per_page": 6.8,
+      "peak_mb": 456.1
+    },
+    "syn-n2-en-marginrefs": {
+      "pages": 2,
+      "ms_per_page": 7.5,
+      "peak_mb": 441
+    },
+    "syn-n2-en-references": {
+      "pages": 2,
+      "ms_per_page": 6.8,
+      "peak_mb": 485
+    },
+    "syn-n2-pt-estilos": {
+      "pages": 2,
+      "ms_per_page": 6.8,
+      "peak_mb": 478.6
+    },
+    "syn-n3-en-endnotes": {
+      "pages": 2,
+      "ms_per_page": 7.6,
+      "peak_mb": 480.4
+    },
+    "syn-n3-en-footnotes": {
+      "pages": 2,
+      "ms_per_page": 7.1,
+      "peak_mb": 480.1
+    },
+    "syn-n3-en-quotes": {
+      "pages": 2,
+      "ms_per_page": 7.2,
+      "peak_mb": 480.7
+    }
+  }
+}
