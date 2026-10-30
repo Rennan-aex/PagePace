@@ -97,6 +97,8 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-090 | Orçamento de memória: limite de duas fronteiras, varredura do default para 0, sem degradação em voo | accepted |
 | ADR-091 | Benchmark oficial (`pnpm bench`): processo novo por documento, RSS natural sem GC forçado, baseline informativa no CI | accepted |
 | ADR-092 | Orçamento de 300 MB vale no que o celular mede (adb); o bench do PC é alarme relativo | accepted |
+| ADR-093 | tesseract.js como devDependency do spike de OCR (E9-T01) | accepted |
+| ADR-094 | Engine de OCR do PagePace: tesseract.js (WASM); ML Kit fica como acelerador Android opcional | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -742,3 +744,15 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A — o orçamento absoluto de 300 MB vale para o `TOTAL PSS` medido no Android via `adb dumpsys meminfo`, e o bench do PC fica como detector de regressão relativa (> 25% só avisa) · B — o número do bench vira a linha de base absoluta (orçamento ~650 MB no PC, descolado do produto).
 **Decisão:** A (PO, 2026-10-29). Evidência da E8-T04 no aparelho real (Redmi Note 13): ocioso 283 MB e **pico 282 MB** durante o scan mais pesado (`n1-en-lostworld`) — dentro dos 300 MB; o piso do Node é carregamento de biblioteca, não é o que o usuário sente.
 **Consequências:** a ARCHITECTURE (decisão 8) mantém 300 MB, avaliados no aparelho (medição oficial via `adb`); o `pnpm bench` segue informativo com gate de 25% no CI; revisar se o app real (WebView própria, sem as abas do Chrome) mudar muito a conta.
+
+### ADR-093 · tesseract.js como devDependency do spike de OCR (E9-T01) · accepted · 2026-10-30
+**Contexto:** a E9-T01 mede qualidade/tempo/tamanho de engines de OCR para comparar opções antes do adaptador da E9-T02. A medição precisa de um engine WASM que rode no mesmo processo do Node (sem binário externo, sem serviço na nuvem); a regra 5 exige licença/avaliada antes de instalar.
+**Alternativas:** A — tesseract.js@6 (Apache-2.0, WASM, também roda no navegador/WebView — o mesmo binário serve PC e app); B — binário nativo do Tesseract como única via (mais rápido, mas não roda no app nem no CI sem instalar sistema); C — serviço de OCR na nuvem (contraria "processar no dispositivo" e exige rede/chave).
+**Decisão:** A — `tesseract.js` (mais `@tesseract.js-data/eng`/`por` para dados offline) como **devDependency da raiz**, só para os probes do spike (`packages/extractor/spikes/s7-ocr-*.ts`), no mesmo espírito do `@napi-rs/canvas`. O binário nativo (UB-Mannheim, Apache-2.0) entra na medição via winget, fora do pnpm, só como linha de comparação.
+**Consequências:** nada de OCR entra no núcleo nesta tarefa (só medição); a escolha do engine de produção (E9-T02) fica para a recomendação do relatório `docs/extractor/spikes/S7-ocr.md` (o número S6 já foi do spike de fonte quebrada) + ADR própria quando o adaptador for implementado.
+
+### ADR-094 · Engine de OCR do PagePace: tesseract.js (WASM); ML Kit fica como acelerador Android opcional · accepted · 2026-10-30
+**Contexto:** E9-T01 / spike S7 — a E9-T02 precisa de um OCR que rode no app (PWA + Capacitor/WebView, A-002), no PC e no CI com a mesma qualidade; ADR-018 deixou os PDFs escaneados "aguardando OCR". Medido em páginas reais (lostworld/newton/astrofísica): CER ~1–2% contra transcrição humana e ≤ 1% contra camada OCR embutida, idêntico entre WASM e nativo; WASM 1,5–2,9 s/pág no PC (abaixo dos 5 s do orçamento ADR-005); payload ~10–12 MB na primeira carga.
+**Alternativas:** A — tesseract.js (Apache-2.0, mesmos bytes em app/PC/CI, gabaritos reprodutíveis); B — Tesseract nativo (1,5–2× mais rápido, mas 238 MB e fora do app/CI); C — ML Kit (só Android, licença Google não-OSI, qualidade não medida, resultado não reproduzível no CI; +4 MB bundled ou download Play Services).
+**Decisão:** A — `tesseract.js` como engine do adaptador da E9-T02, modelo `best_int`, `por`+`eng` locais (sem CDN), render escala 2, worker reutilizado com progresso. B vira ferramenta CLI de conferência no PC. C fica registrado como acelerador Android opcional: só reabre com medição em aparelho real (formato E8-T04) mostrando ≥ 2× mais rápido e aceite do PO sobre licença/divergência entre plataformas.
+**Consequências:** `tesseract.js`/`@tesseract.js-data/*` são devDependencies de spike (ADR-093) — a E9-T02 decide onde a dependência de produção vive (núcleo portável não pode importar worker de Node; adapter fica atrás de interface); qualidade do OCR de produção passa a ser medível no CI com os mesmos gabaritos do eval.
