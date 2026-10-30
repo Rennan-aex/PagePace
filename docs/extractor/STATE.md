@@ -3,24 +3,21 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E8 EM ANDAMENTO** (plano em `phases/E8-performance.md`). **E8-T01 CONCLUÍDA (2026-10-27, ADR-088; 3 fatias)**; **E8-T02 CONCLUÍDA (2026-10-27, ADR-089)**; **E8-T03 CONCLUÍDA (2026-10-28, ADR-090; 3 fatias)**; **E8-T04 — parte do PC CONCLUÍDA (2026-10-29, PR #80, ADR-091)**; falta só a medição em aparelho (condição da ADR-005). E7 CONCLUÍDA (2026-10-21, ADR-071–077); E6 (ADR-070); E5/E4/E3 fechadas.
-- **Próxima tarefa:** **E8-T04 (fechamento): medições Android** — o PO roda `tests/manual/android-performance-checklist.md` (condições a/b/c da ADR-005) e cola os números; com eles: registrar o resultado (ADR-005 segue fechada ou é reaberta), atualizar fase/STATE e fechar a E8. A OPEN-QUESTIONS 3 (orçamento de 300 MB) se decide junto.
-- **Ação pendente do PO:** medições Android pelo checklist (passo a passo na mensagem do report-to-po); não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`.
+- **Fase atual:** **E8 CONCLUÍDA (2026-10-29, 4 tarefas, ADR-088–092)** — fechada com as medições Android (3/3 condições da ADR-005 passaram). E7 CONCLUÍDA (2026-10-21, ADR-071–077); E6 (ADR-070); E5/E4/E3 fechadas.
+- **Próxima tarefa:** **E9-T01 (cópia de 2026-10-29) · Spike: opções de OCR** — comparar tesseract.js (WASM, Apache-2.0), OCR nativo do Android (ML Kit, via plugin) e serviços locais; medir qualidade em pt e en (livros antigos), tempo e tamanho. **Aceite:** `spikes/S6-ocr.md` com recomendação.
+- **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`.
 - **Status:** `pnpm verify` verde (1083 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline do bench no ar (16 docs, calibrada no CI).
-- **Última atualização:** 2026-10-29 (E8-T04 parte do PC fechada, PR #80).
+- **Última atualização:** 2026-10-29 (E8 fechada: medições Android 3/3, ADR-092, OPEN-QUESTIONS 3 respondida).
 
-## Tarefa fechada nesta sessão — E8-T04 (parte do PC): benchmarks reproduzíveis
-- `pnpm bench` (`packages/eval/src/bench.ts` + `bench-baseline.ts`): worker novo por documento (partida fria, como o app), RSS natural (timer 5 ms + 1 amostra por evento do pipeline), mediana de `--runs 1..10`; baseline `packages/eval/bench-baseline.json` informativa; `--ci` **avisa e nunca falha** com piora > 25% (ms/página só acima de 5000 ms de baseline — medido: runner compartilhado variou +78,6% no mesmo commit); `--diff`, `--update-baseline`.
-- CI: step `Bench (speed and memory)` (`--runs 3`) + artefato `out/bench.json`; baseline calibrada a partir do artefato do run de ubuntu-latest (16 docs públicos; 2 runs de CI confirmaram o gate estável em `peak_mb`).
-- Roteiro Android `tests/manual/android-performance-checklist.md` (condições a/b/c da ADR-005; memória real via `adb dumpsys meminfo`, não `performance.memory`).
-- ADR-091 (metodologia oficial; números do bench **não comparáveis** com os da ADR-090/S4); OPEN-QUESTIONS 3 (orçamento de 300 MB — decisão do PO no fechamento da E8).
-- Gates: `pnpm verify` verde (**1083 testes**, +38), `pnpm eval --ci` exit 0 (31 docs); PR #80 mesclado.
+## Tarefa fechada nesta sessão — E8-T04 (fechamento): medições Android e fim da fase E8
+- **Medições no aparelho real (Redmi Note 13, 2026-10-29; checklist preenchido, prints em `<CORPUS_PRIVATE_DIR>\Testes`):** (a) `n1-en-lostworld` terminou sem travar — 667 ms/pág, p95 932 ms; (b) `n2-en-astrofisica` p95 **3.133 ms < 5.000 ms**; (c) memória via `adb dumpsys meminfo` — ocioso 283 MB, **pico 282 MB** (bateria 17%, números conservadores). **As 3 passaram → ADR-005 segue `accepted`, não reaberta.**
+- **Decisão do PO (OPEN-QUESTIONS 3):** opção A → **ADR-092** — o orçamento de 300 MB vale no que o celular mede via `adb`; o `pnpm bench` do PC é só alarme de regressão (> 25%).
+- Bench (parte do PC, PR #80, ADR-091): baseline CI-calibrada + gate `--ci`; 1083 testes, `pnpm eval --ci` exit 0. Correções do dia: PR #82 (pdfjs-dist no `--serve`), PR #83 (progresso por página no bench do celular).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-10-29 — E8-T04 (benchmarks) — PARTE DO PC CONCLUÍDA** (PR #80 mesclado, main `b280a39`). **Feito:** `pnpm bench` completo (runner, baseline CI-calibrada, gate `--ci`, step no ci.yml, 38 testes), roteiro Android, ADR-091. **Bloqueio:** fechar a E8-T04 depende das medições no aparelho do PO (`tests/manual/android-performance-checklist.md`; condições a/b/c da ADR-005 — se alguma falhar, reabrir a ADR-005 com o PO). **Próx. sessão (com os números do PO):** se as 3 passaram → marcar E8-T04 [x] e fechar a E8 (fase + STATE + log); se alguma falhou → abrir decisão com o PO sobre o pior caso. OPEN-QUESTIONS 3 (orçamento 300 MB) responder no fechamento. **Armadilhas:** a baseline do bench é de ubuntu-latest — não regravá-la com números locais sem justificativa; o `--ci` do bench nunca pode virar falha (aceite da tarefa); medições antigas (ADR-090/S4) não são comparáveis com as do bench (ADR-091).
+- **Sessão 2026-10-29 — E8-T04 FECHADA, fase E8 CONCLUÍDA** (medições Android feitas com o PO na mesma sessão; ADR-092; OPEN-QUESTIONS 3 respondida). **Feito:** checklist preenchido (3/3 condições da ADR-005: lostworld 667 ms/pág sem travar, astrofisica p95 3.133 ms < 5.000, memória pico 282 MB via adb); ADR-005 com a evidência (segue `accepted`); ADR-092 criada + índice (`pnpm decisions:index` = 92 ADRs); OPEN-QUESTIONS 3 movida para o archive; fase E8 com bloco de fechamento; ARCHITECTURE decisão 8 com os números do aparelho. **Próxima tarefa:** E9-T01 (spike S6-OCR) — já copiada para "Tarefa atual". **Armadilhas:** `adb` no PC só via caminho completo `C:\Users\<usuario>\platform-tools\adb.exe` (fora do PATH); chamada direta `& $adb` congela o shell do agente — usar `Start-Process` com redirect (ou o caminho completo no PowerShell do PO); servidor do bench exige rede **Privada** no firewall e o IP `10.0.0.154` (192.168.56.1 e 172.22.192.1 são adaptadores virtuais, não servem).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
-- [ ] Medições Android (E8-T04 / condição da ADR-005): rodar `tests/manual/android-performance-checklist.md` e colar os números (fotos só das telas de números, nunca de página de livro).
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
 
 ## Progresso por marco
@@ -34,7 +31,7 @@
 | E5 | done (T01 PR #45; T02 PR #46; T03 PR #48; T04 PR #50; T05 PR #51; T06 PR #52; T07 PR #53; T08 PR #54 — fase fechada 2026-10-18) |
 | E6 | done (T01 PR #56, T02 PR #57, T03, T04 — fase fechada 2026-10-19, ADR-070) |
 | E7 | done (T01–T05 done 2026-10-20/21, ADR-071/072/073/074/075/076/077 — fase fechada 2026-10-21) |
-| E8 | em andamento (T01 done 2026-10-27 ADR-088; T02 done 2026-10-27 ADR-089; T03 done 2026-10-28 ADR-090; T04 parte do PC done 2026-10-29 PR #80 ADR-091 — falta medições Android) |
+| E8 | **done** (T01–T04 — fase fechada 2026-10-29; ADR-088/089/090/091/092; medições Android 3/3) |
 | E9, E10, SEG | todo (E9 = OCR da ADR-018; E10 = recortes da ADR-016) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
@@ -43,8 +40,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-10-29 · **E8-T04 (parte do PC): benchmarks reproduzíveis — CONCLUÍDO** · `pnpm bench` (worker novo por documento, RSS natural, baseline calibrada no CI, gate `--ci` avisa > 25%), roteiro Android, ADR-091; **1083 testes** (+38), `pnpm eval --ci` exit 0; PR #80 mesclado; falta medições do PO.
-- 2026-10-28 · **E8-T03 fatia 3: orçamento de memória — CONCLUÍDO** · governador de 2 fronteiras + `MemoryLimitError`, default da varredura 0, validação incremental (página/bloco), `--memory-limit-mb` na CLI; **1045 testes** (+12), `pnpm eval --ci` exit 0; ADR-090.
-- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088).
+- 2026-10-29 · **E8-T04 (fechamento): medições Android + fim da E8 — CONCLUÍDO** · 3/3 condições da ADR-005 passaram no aparelho do PO (lostworld 667 ms/pág sem travar; astrofisica p95 3.133 ms < 5.000; memória pico 282 MB via `adb`), ADR-005 segue `accepted`; ADR-092 (orçamento 300 MB vale no celular) + OPEN-QUESTIONS 3 respondida; **fase E8 fechada**.
+- 2026-10-29 · **E8-T04 (parte do PC): benchmarks reproduzíveis — CONCLUÍDO** · `pnpm bench` (worker novo por documento, RSS natural, baseline calibrada no CI, gate `--ci` avisa > 25%), roteiro Android, ADR-091; **1083 testes** (+38), `pnpm eval --ci` exit 0; PR #80 mesclado.
+- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088).
 
 Histórico completo: docs/extractor/archive/
