@@ -106,6 +106,7 @@
       });
       const pdf = await task.promise;
       const openMs = performance.now() - t0;
+      log(`PDF aberto em ${round(openMs)} ms · ${pdf.numPages} página(s) · lendo…`);
 
       const totalPages = Math.min(pdf.numPages, MAX_PAGES);
       let getPageMs = 0;
@@ -146,6 +147,12 @@
         page.cleanup();
         pageTimes.push(performance.now() - tPage);
         sampleHeap();
+
+        // Progresso visível no celular: sem isso o leitor só vê "iniciando"
+        // até o JSON final e não distingue leitura lenta de travamento.
+        if (pageNum === 1 || pageNum % 10 === 0 || pageNum === totalPages) {
+          log(`página ${pageNum}/${totalPages} · ${round(performance.now() - t0)} ms decorridos`);
+        }
 
         if (pageNum === 1) {
           firstPageMs = performance.now() - t0;
