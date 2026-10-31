@@ -99,6 +99,8 @@ Formato: `ADR-NNN Â· tÃ­tulo Â· status (accepted/provisional/superseded) Â· data
 | ADR-092 | OrÃ§amento de 300 MB vale no que o celular mede (adb); o bench do PC Ã© alarme relativo | accepted |
 | ADR-093 | tesseract.js como devDependency do spike de OCR (E9-T01) | accepted |
 | ADR-094 | Engine de OCR do PagePace: tesseract.js (WASM); ML Kit fica como acelerador Android opcional | accepted |
+| ADR-095 | Adaptador OCR: nÃºcleo portÃ¡vel (`ocr.ts`) + tesseract.js atrÃ¡s de interface (`ocr-tesseract.ts`), production dependency do extractor | accepted |
+| ADR-096 | Adaptador OCR seta `source.ocrTextLayer = true`: calibraÃ§Ã£o/aviso/sem-estilo herdados do pipeline, sem mexer nele | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -756,3 +758,15 @@ CritÃ©rio de detecÃ§Ã£o: se a **maior parte dos caracteres** das pÃ¡ginas estive
 **Alternativas:** A â€” tesseract.js (Apache-2.0, mesmos bytes em app/PC/CI, gabaritos reprodutÃ­veis); B â€” Tesseract nativo (1,5â€“2Ã— mais rÃ¡pido, mas 238 MB e fora do app/CI); C â€” ML Kit (sÃ³ Android, licenÃ§a Google nÃ£o-OSI, qualidade nÃ£o medida, resultado nÃ£o reproduzÃ­vel no CI; +4 MB bundled ou download Play Services).
 **DecisÃ£o:** A â€” `tesseract.js` como engine do adaptador da E9-T02, modelo `best_int`, `por`+`eng` locais (sem CDN), render escala 2, worker reutilizado com progresso. B vira ferramenta CLI de conferÃªncia no PC. C fica registrado como acelerador Android opcional: sÃ³ reabre com mediÃ§Ã£o em aparelho real (formato E8-T04) mostrando â‰¥ 2Ã— mais rÃ¡pido e aceite do PO sobre licenÃ§a/divergÃªncia entre plataformas.
 **ConsequÃªncias:** `tesseract.js`/`@tesseract.js-data/*` sÃ£o devDependencies de spike (ADR-093) â€” a E9-T02 decide onde a dependÃªncia de produÃ§Ã£o vive (nÃºcleo portÃ¡vel nÃ£o pode importar worker de Node; adapter fica atrÃ¡s de interface); qualidade do OCR de produÃ§Ã£o passa a ser medÃ­vel no CI com os mesmos gabaritos do eval.
+
+### ADR-095 · Adaptador OCR: núcleo portável + tesseract.js atrás de interface · accepted · 2026-10-31
+**Contexto:** E9-T02 precisa entregar `RawDocument` a partir de OCR (REQ-EXT-20) mantendo o núcleo portável (regra 6) — o tesseract.js puxa worker de Node, fs e download de modelos, nada disso pode entrar no coração do extrator. A ADR-094 escolheu o engine; restava onde a dependência de produção mora.
+**Alternativas:** A — tesseract.js como production dependency de `@pagepace/extractor`, com o núcleo (`ingest/ocr.ts`, puro) separado da implementação (`ingest/ocr-tesseract.ts`, atrás da interface `OcrEngine`); B — dependência só na CLI/app, com o adaptador no package deles (duplica a conversão item?documento e quebra o eval que vive no extractor); C — engine embutido no núcleo (viola a regra 6).
+**Decisão:** A. `ocr.ts` exporta `OcrWord`/`OcrLine`/`OcrPageInput`/`OcrEngine`/`ingestOcr`/`ocrPageToRawPage` sem importar tesseract.js nem APIs de plataforma; `ocr-tesseract.ts` exporta `createTesseractOcrEngine` (worker único reutilizado, OEM LSTM_ONLY, `langPath` obrigatório — sem CDN, ADR-094) e carrega a versão exata (`TESSERACT_JS_VERSION`). `tesseract.js` entra como dependency do extractor (mesmo padrão do pdfjs-dist); `@tesseract.js-data/*` e `@napi-rs/canvas` ficam devDependencies (modelos só no teste).
+**Consequências:** o app/CLI importam `createTesseractOcrEngine` de `@pagepace/extractor` e injetam o render (padrão `RenderTarget`, ADR-075); trocar de engine = nova implementação de `OcrEngine`, sem tocar no núcleo nem no pipeline; a E9-T04 plumba render pdf.js ? engine no fluxo do usuário.
+
+### ADR-096 · Adaptador OCR seta `source.ocrTextLayer = true` (calibração e aviso herdados, pipeline intocado) · accepted · 2026-10-31
+**Contexto:** o aceite da E9-T02 é "pipeline roda inalterado". `buildBook` já trata `source.ocrTextLayer === true` (ADR-019): base de confiança `OCR_TEXT_LAYER_CONFIDENCE` (0,5), warning `ocr-text-layer` e runs sem estilo. O adaptador OCR (texto que não veio de camada digital nenhuma) precisa do mesmo tratamento — mas o campo nasceu para descrever a camada invisível `Tr 3` embutida em PDFs digitalizados.
+**Alternativas:** A — o adaptador seta `ocrTextLayer = true` e o campo passa a significar "texto não digital" (camada Tr 3 embutida **ou** engine OCR); B — campo novo (`source.ocrFromEngine`) exigiria mudança de esquema (regra 4: bump + migração) e ramificação em `buildBook` — pipeline alterado, contra o aceite.
+**Decisão:** A. O adaptador grava `ocrTextLayer: true`, `tagged: false`, `ingest.adapter: "ocr"`; o pipeline inteiro (confiança, warnings, estilos, notelinks) roda sem nenhuma mudança. A E9-T03, quando trouxer estilo visual, será quem decidirá se reabilita bold/italic para OCR.
+**Consequências:** o significado do campo se alarga (registrado no schema docstring); consumidores que distinguirem "camada embutida" de "engine" usarão `ingest.adapter`; nenhum baseline muda (documentos OCR ainda não passam pelo eval).

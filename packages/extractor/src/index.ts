@@ -115,6 +115,27 @@ export {
 } from "./hyphen";
 export type { BoundaryVerdict, MemorySample, MemoryUsageProbe } from "./ingest/memory";
 export { MB, MemoryGovernor, MemoryLimitError } from "./ingest/memory";
+export type {
+  OcrEngine,
+  OcrImage,
+  OcrIngestOptions,
+  OcrLine,
+  OcrPageInput,
+  OcrWord,
+} from "./ingest/ocr";
+export {
+  ingestOcr,
+  OCR_FONT_NAME,
+  OCR_MIN_WORD_POINTS,
+  OCR_RENDER_SCALE,
+  ocrPageToRawPage,
+} from "./ingest/ocr";
+export type { TesseractOcrEngineOptions } from "./ingest/ocr-tesseract";
+export {
+  createTesseractOcrEngine,
+  OCR_DEFAULT_LANGS,
+  TESSERACT_JS_VERSION,
+} from "./ingest/ocr-tesseract";
 export type { PdfjsAssets, PdfjsIngestOptions } from "./ingest/pdfjs";
 export {
   DEFAULT_CLEANUP_EVERY_PAGES,

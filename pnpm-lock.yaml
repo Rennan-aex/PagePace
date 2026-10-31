@@ -71,6 +71,19 @@ importers:
       pdfjs-dist:
         specifier: 6.4.299
         version: 6.4.299
+      tesseract.js:
+        specifier: ^7.0.0
+        version: 7.0.0
+    devDependencies:
+      '@napi-rs/canvas':
+        specifier: ^1.0.10
+        version: 1.0.10
+      '@tesseract.js-data/eng':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@tesseract.js-data/por':
+        specifier: ^1.0.0
+        version: 1.0.0
 
   packages/schema:
     dependencies:
