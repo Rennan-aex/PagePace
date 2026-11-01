@@ -1,5 +1,7 @@
 import type { RawDocument, RawPage, RawTextItem } from "@pagepace/schema";
 import { parseWith, rawDocumentSchema, rawPageSchema, SCHEMA_VERSION } from "@pagepace/schema";
+import type { OcrRaster } from "./ocr-style";
+import { estimatePageWordStyles, OCR_STYLE_MIN_CONFIDENCE } from "./ocr-style";
 
 /**
  * OCR ingestion core (E9-T02): recognised words in, validated
@@ -20,15 +22,21 @@ import { parseWith, rawDocumentSchema, rawPageSchema, SCHEMA_VERSION } from "@pa
  * wants, only in a different unit. Dividing by the render `scale` converts
  * pixels to page points (ADR-074 keeps page coordinates in points).
  *
- * Style: none (E9-T02, to be added by E9-T03). Words carry the neutral
- * `fontName` `"unknown"` and a `fontSize` estimated from the box height;
- * there are no `fontFlags`, so `classifyFontName` sees no bold/italic signal
- * and `paragraphRuns` keeps plain runs.
+ * Style (E9-T03): when the caller also hands the page raster
+ * ({@link OcrPageInput.image}), the visual heuristic of `./ocr-style`
+ * estimates bold/italic (stroke width, shear) and the font size (x-height)
+ * per word. Confident words carry `fontFlags` and a page-calibrated
+ * `fontSize`; the rest — and every word of a raster-less page — keeps the
+ * E9-T02 plain item. `fontFlags.bold`/`italic` are the unique signal of
+ * "style estimated from the image": the pdf.js path never emits them, so
+ * `buildBook` re-enables run styles for exactly these documents while the
+ * confidence base and the `ocr-text-layer` warning stay (ADR-096 leaves the
+ * call to this task).
  *
- * Determinism (rule 7): same words, same boxes, same document — no clock, no
- * randomness. The word-level confidence the engine reports is carried to
- * `ingestOcr` callers via {@link OcrWord.confidence} but is not part of the
- * schema yet (E9-T03 calibrates it).
+ * Determinism (rule 7): same words, same boxes, same raster, same document —
+ * no clock, no randomness. The word-level confidence the engine reports
+ * gates the style (a doubtful word never gets flags) but is not part of the
+ * schema.
  */
 
 /** Render scale the adapter assumes: image pixels per page point (ADR-094). */
@@ -44,7 +52,7 @@ export const OCR_MIN_WORD_POINTS = 0.5;
 export interface OcrWord {
   text: string;
   bbox: { x0: number; y0: number; x1: number; y1: number };
-  /** Engine confidence 0–100 (kept for E9-T03; not written to the schema yet). */
+  /** Engine confidence 0–100; below the E9-T03 floor the word keeps no style. */
   confidence: number;
 }
 
@@ -75,6 +83,13 @@ export interface OcrPageInput {
   imageWidth: number;
   /** Rendered image height in pixels. */
   imageHeight: number;
+  /**
+   * The rendered page as grayscale pixels (E9-T03), same size as
+   * `imageWidth` × `imageHeight`. When present the visual heuristic
+   * estimates bold/italic/fontSize per word; absent, every word keeps the
+   * plain E9-T02 item.
+   */
+  image?: OcrRaster;
   /** Recognised lines in reading order. */
   lines: readonly OcrLine[];
 }
@@ -105,17 +120,28 @@ export interface OcrIngestOptions {
  * and empty or degenerate words are dropped. The page size is the image size
  * divided by `scale`, and the rotation is always 0 — the renderer already
  * applied any page rotation.
+ *
+ * With a raster on the page (E9-T03), each word's estimated style lands on
+ * the item: `fontFlags.bold`/`italic` and a page-calibrated `fontSize` when
+ * both the image and the engine are confident, the plain box estimate
+ * otherwise. The scale divides the pixel measurements into points.
  */
 export function ocrPageToRawPage(page: OcrPageInput, scale: number = OCR_RENDER_SCALE): RawPage {
+  const words = page.lines.flatMap((line) => line.words);
+  const estimated = page.image ? estimatePageWordStyles(page.image, words) : null;
   const items: RawTextItem[] = [];
+  let cursor = 0;
   for (const line of page.lines) {
     const last = line.words.length - 1;
     line.words.forEach((word, index) => {
+      const style = estimated?.[cursor];
+      cursor += 1;
       const text = word.text.trim();
       if (text === "") return;
       const width = (word.bbox.x1 - word.bbox.x0) / scale;
       const height = (word.bbox.y1 - word.bbox.y0) / scale;
       if (!(width >= OCR_MIN_WORD_POINTS) || !(height >= OCR_MIN_WORD_POINTS)) return;
+      const trusted = style !== undefined && style.styleConfidence >= OCR_STYLE_MIN_CONFIDENCE;
       const item: RawTextItem = {
         text,
         x: word.bbox.x0 / scale,
@@ -123,8 +149,9 @@ export function ocrPageToRawPage(page: OcrPageInput, scale: number = OCR_RENDER_
         width,
         height,
         fontName: OCR_FONT_NAME,
-        fontSize: height,
+        fontSize: trusted && style.fontSize !== undefined ? style.fontSize / scale : height,
       };
+      if (trusted) item.fontFlags = { bold: style.bold, italic: style.italic };
       if (index === last) item.hasEOL = true;
       items.push(item);
     });
@@ -144,8 +171,10 @@ export function ocrPageToRawPage(page: OcrPageInput, scale: number = OCR_RENDER_
  *
  * The document is flagged `source.ocrTextLayer: true` (ADR-096): the text did
  * not come from a digital text layer, so `buildBook` lowers the confidence
- * base to `OCR_TEXT_LAYER_CONFIDENCE`, warns `ocr-text-layer` and keeps the
- * runs plain — the pipeline runs unchanged, exactly the E9-T02 acceptance.
+ * base to `OCR_TEXT_LAYER_CONFIDENCE` and warns `ocr-text-layer` — unchanged.
+ * Runs stay plain unless the caller supplied page rasters and the visual
+ * heuristic (E9-T03) stamped `fontFlags` on the words, in which case the
+ * pipeline re-enables styles for exactly those words.
  * Every page is validated as it is built and the envelope is validated
  * without its pages (the E8-T03 pattern): a long scan is never rebuilt in
  * one piece.
@@ -160,6 +189,21 @@ export function ingestOcr(pages: readonly OcrPageInput[], options: OcrIngestOpti
   for (const page of pages) {
     if (!Number.isInteger(page.index) || page.index < 0) {
       throw new RangeError(`ingestOcr: page index ${page.index} must be an integer >= 0`);
+    }
+    if (page.image !== undefined) {
+      const { image } = page;
+      if (image.width !== page.imageWidth || image.height !== page.imageHeight) {
+        throw new RangeError(
+          `ingestOcr: page ${page.index} image ${image.width}x${image.height} ` +
+            `must match imageWidth/imageHeight ${page.imageWidth}x${page.imageHeight}`,
+        );
+      }
+      if (image.luminance.length !== image.width * image.height) {
+        throw new RangeError(
+          `ingestOcr: page ${page.index} luminance length ${image.luminance.length} ` +
+            `must equal width * height ${image.width * image.height}`,
+        );
+      }
     }
   }
 

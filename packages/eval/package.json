@@ -8,5 +8,8 @@
   "dependencies": {
     "@pagepace/extractor": "workspace:*",
     "@pagepace/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.10"
   }
 }

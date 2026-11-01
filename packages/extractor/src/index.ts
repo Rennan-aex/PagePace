@@ -130,6 +130,21 @@ export {
   OCR_RENDER_SCALE,
   ocrPageToRawPage,
 } from "./ingest/ocr";
+export type { OcrRaster, OcrWordStyle, StyleWordInput } from "./ingest/ocr-style";
+export {
+  estimatePageWordStyles,
+  OCR_BOLD_STROKE_RATIO,
+  OCR_ITALIC_MAX_SKEW_DEG,
+  OCR_ITALIC_MIN_SKEW_DEG,
+  OCR_ITALIC_PEAK_RATIO,
+  OCR_STYLE_MIN_CONFIDENCE,
+  OCR_STYLE_MIN_CONTRAST,
+  OCR_STYLE_MIN_ENGINE_CONFIDENCE,
+  OCR_STYLE_MIN_INK,
+  OCR_STYLE_MIN_MEASURED_WORDS,
+  OCR_X_HEIGHT_RATIO,
+  OCR_X_HEIGHT_ROW_SHARE,
+} from "./ingest/ocr-style";
 export type { TesseractOcrEngineOptions } from "./ingest/ocr-tesseract";
 export {
   createTesseractOcrEngine,

@@ -188,6 +188,8 @@ export interface LevelSummary {
   documents: number;
   measured: number;
   cer: number | null;
+  /** Mean `style_f1` of the level's measured documents (E9-T03: N5 scanned books get their own column). */
+  styleF1: number | null;
 }
 
 export interface EvalResult {
@@ -1143,7 +1145,14 @@ function summarizeLevels(documents: DocumentResult[]): LevelSummary[] {
         values.length === 0
           ? null
           : values.reduce((total, item) => total + (item.cer ?? 0), 0) / values.length;
-      return { level, documents: bucket.length, measured: values.length, cer };
+      // E9-T03: style_f1 reported per level as well — the acceptance asks for
+      // N5 (scanned) measured separately from the digital levels.
+      const styled = bucket.filter((item) => item.styles !== null);
+      const styleF1 =
+        styled.length === 0
+          ? null
+          : styled.reduce((total, item) => total + (item.styles?.f1 ?? 0), 0) / styled.length;
+      return { level, documents: bucket.length, measured: values.length, cer, styleF1 };
     });
 }
 
@@ -1203,6 +1212,7 @@ function renderReport(
     String(level.documents),
     String(level.measured),
     formatCer(level.cer),
+    level.styleF1 === null ? "-" : level.styleF1.toFixed(4),
   ]);
   const perLevel = renderTable(
     [
@@ -1210,6 +1220,7 @@ function renderReport(
       { name: "documents", align: "right" },
       { name: "measured", align: "right" },
       { name: "text_cer (mean)", align: "right" },
+      { name: "style_f1 (mean)", align: "right" },
     ],
     levelRows,
   );

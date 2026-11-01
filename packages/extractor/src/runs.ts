@@ -83,7 +83,10 @@ function bodyBaselineOf(items: readonly RawTextItem[]): number {
 
 /**
  * Style of one item: font name for bold/italic, size and baseline for
- * sup/sub. `styles: false` (OCR layer) forces everything plain.
+ * sup/sub. `styles: false` (OCR layer) forces everything plain. Flags
+ * estimated from the image (E9-T03, OCR words only — pdf.js never emits
+ * bold/italic) win over the name, the same OR `headings.ts`/`quotes.ts`
+ * already apply.
  */
 export function itemRunStyle(
   item: RawTextItem,
@@ -100,7 +103,9 @@ export function itemRunStyle(
     if (rise >= SUPSUB_RISE_FACTOR * item.fontSize) sup = true;
     else if (-rise >= SUPSUB_RISE_FACTOR * item.fontSize) sub = true;
   }
-  return { bold: font.bold, italic: font.italic, sup, sub };
+  const bold = item.fontFlags?.bold === true || font.bold;
+  const italic = item.fontFlags?.italic === true || font.italic;
+  return { bold, italic, sup, sub };
 }
 
 /** Style of an item, or the neutral style for an inferred separator space. */

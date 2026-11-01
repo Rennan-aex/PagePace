@@ -347,6 +347,11 @@ export interface BookAnalysis {
   references: ReferenceDecision[];
   /** `source.ocrTextLayer === true` on the original document. */
   fromOcr: boolean;
+  /**
+   * Some item carries `fontFlags.bold`/`italic` — the unique mark of style
+   * estimated from the image (E9-T03): pdf.js never emits those flags.
+   */
+  styleFromImage: boolean;
   /** Base confidence before the doubt flags (E7-T01). */
   base: number;
 }
@@ -414,6 +419,15 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
   // the entry-shaped paragraphs that follow it, until the next heading.
   const references = detectReferences(paragraphs, { headings });
   const fromOcr = document.source.ocrTextLayer === true;
+  // E9-T03: bold/italic flags on an item only come from the visual heuristic
+  // over a scan (pdf.js never emits them — pdfjs.ts), so their presence is
+  // the signal that re-enables run styles on an OCR document while the
+  // confidence base and the warning stay (ADR-096 leaves this call to E9-T03).
+  const styleFromImage = document.pages.some((page) =>
+    page.items.some(
+      (item) => item.fontFlags?.bold !== undefined || item.fontFlags?.italic !== undefined,
+    ),
+  );
   // E7-T01: every doubt flag is collected on the block and `blockConfidence`
   // (confidence.ts) combines them — the weights add up, the result is
   // clamped at the minimum and rounded.
@@ -437,6 +451,7 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
     captions,
     references,
     fromOcr,
+    styleFromImage,
     base,
   };
 }
@@ -471,6 +486,7 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     captions,
     references,
     fromOcr,
+    styleFromImage,
     base,
   } = analysis;
   const ordinals = new Map<number, number>();
@@ -539,7 +555,10 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     if (indentList && list?.uncertain === true) {
       flags.push(UNCERTAIN_LIST_FLAG);
     }
-    const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr });
+    // E9-T03: an OCR document keeps its runs plain unless the visual
+    // heuristic estimated style (`styleFromImage`) — the warning and the
+    // confidence base stay either way.
+    const runs = paragraphRuns(paragraph.lines, { styles: !fromOcr || styleFromImage });
     chunk.blocks.push({
       id: blockId(paragraph.pageFrom, ordinal, text),
       kind: marginRef

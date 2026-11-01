@@ -62,6 +62,10 @@ importers:
       '@pagepace/schema':
         specifier: workspace:*
         version: link:../schema
+    devDependencies:
+      '@napi-rs/canvas':
+        specifier: ^1.0.10
+        version: 1.0.10
 
   packages/extractor:
     dependencies:
