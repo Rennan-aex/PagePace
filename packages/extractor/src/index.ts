@@ -130,6 +130,12 @@ export {
   OCR_RENDER_SCALE,
   ocrPageToRawPage,
 } from "./ingest/ocr";
+export type {
+  OcrFlowOptions,
+  OcrFlowProgress,
+  OcrFlowRenderedPage,
+} from "./ingest/ocr-flow";
+export { ingestOcrFlow } from "./ingest/ocr-flow";
 export type { OcrRaster, OcrWordStyle, StyleWordInput } from "./ingest/ocr-style";
 export {
   estimatePageWordStyles,
@@ -157,6 +163,7 @@ export {
   discardFontData,
   ingestPages,
   ingestPdfjs,
+  isScannedPdf,
   PDFJS_DIST_VERSION,
   releasePdfjsCaches,
   stripSubsetPrefix,

@@ -4,22 +4,28 @@ import { runEvalCli } from "@pagepace/eval";
 import {
   BookError,
   buildBook,
+  createTesseractOcrEngine,
   documentStats,
   ExplainPageError,
   explainPage,
   extractionCacheKeyFor,
   extractStream,
+  ingestOcrFlow,
   ingestPdfjs,
   MB,
   MemoryLimitError,
+  OCR_RENDER_SCALE,
   readCachedBook,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
   StatsError,
+  sha256Hex,
   writeCachedBook,
 } from "@pagepace/extractor";
 import { SchemaValidationError } from "@pagepace/schema";
 import { FileExtractionCache } from "./cache-file";
+import type { OcrRenderer } from "./ocr";
+import { createOcrRenderer, prepareOcrLangs, SCANNED_OCR_HINT, tessdataSetup } from "./ocr";
 import { renderPagesPng } from "./render-pdf";
 import {
   formatExplainText,
@@ -46,7 +52,7 @@ type RawDocument = Awaited<ReturnType<typeof ingestPdfjs>>;
 
 const USAGE = `Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>]
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>] [--ocr] [--tessdata <pasta>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -56,7 +62,7 @@ export const HELP = `pagepace — extrator de PDF do PagePace
 
 Uso:
   pnpm pagepace dump-raw <arquivo.pdf> [--pages 1-5]
-  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>]
+  pnpm pagepace extract <arquivo.pdf> [--cache-dir <pasta>] [--memory-limit-mb <n>] [--ocr] [--tessdata <pasta>]
   pnpm pagepace inspect <arquivo.pdf> [--pages 1-5] [--format text|md|html] [--out <arquivo>]
   pnpm pagepace explain-page <arquivo.pdf> <n>
   pnpm pagepace eval [--diff|--ci|--update-baseline]
@@ -68,7 +74,10 @@ Comandos:
                             por página sai no stderr (o JSON continua limpo);
                             com --cache-dir, a segunda abertura do mesmo arquivo
                             sai do cache sem reprocessar (chave: sha256 do PDF +
-                            versão do extrator + versão do esquema)
+                            versão do extrator + versão do esquema);
+                            se o PDF for escaneado (sem camada de texto), o
+                            extract recusa com código 3 — use --ocr para
+                            reconhecer o texto em segundo plano, com progresso
   inspect <arquivo.pdf>     Relatório da extração: resumo do documento e os blocos
                             de cada página, com tipo, confiança e flags de dúvida
   explain-page <pdf> <n>    Explica a página n (1-based): a decisão de cada camada
@@ -96,13 +105,22 @@ Opções:
                             passarem do orçamento, a extração para com erro
                             explicando o limite e o observado (padrão: sem
                             orçamento — a memória não é limitada)
+  --ocr                     Em extract: se o PDF for escaneado (sem camada de
+                            texto), reconhece o texto com tesseract.js e produz
+                            o Book normalmente; o progresso sai no stderr
+                            (página por página); em PDF digital é ignorado
+  --tessdata <pasta>        Pasta com os modelos .traineddata(.gz) por idioma
+                            (por, eng); sem --tessdata os modelos vêm das
+                            devDependencies do monorepo (requer pnpm install);
+                            exige --ocr
   -h, --help                Mostra esta ajuda
 
 Códigos de saída:
   0  sucesso
   1  erro de leitura (arquivo ausente ou PDF inválido)
   2  uso incorreto (comando, opção ou valor desconhecidos)
-  3  PDF escaneado: sem camada de texto — mensagem da ADR-018, sem JSON
+  3  PDF escaneado: sem camada de texto — mensagem da ADR-018, sem JSON;
+     com --ocr o extract processa o OCR em vez de sair com 3
 
 Salvando em arquivo:
   o pnpm imprime um cabeçalho no console; acrescente -s para o JSON sair limpo:
@@ -171,7 +189,7 @@ async function loadDocument(file: string, pageRange?: PageRange): Promise<LoadRe
     return { document, bytes };
   } catch (error) {
     if (error instanceof ScannedPdfError) {
-      return { error: `${SCANNED_PDF_MESSAGE}\n`, code: EXIT_SCANNED };
+      return { error: `${SCANNED_PDF_MESSAGE}\n${SCANNED_OCR_HINT}\n`, code: EXIT_SCANNED };
     }
     if (error instanceof RangeError) {
       return { error: `Faixa de páginas inválida: ${messageOf(error)}\n`, code: EXIT_USAGE };
@@ -381,12 +399,29 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
   let file: string | undefined;
   let cacheDir: string | undefined;
   let memoryLimitMb: number | undefined;
+  let ocr = false;
+  let tessdata: string | undefined;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index] as string;
     if (arg === "-h" || arg === "--help") {
       io.out(HELP);
       return EXIT_OK;
+    }
+    if (arg === "--ocr") {
+      ocr = true;
+      continue;
+    }
+    if (arg === "--tessdata" || arg.startsWith("--tessdata=")) {
+      const inline = arg.startsWith("--tessdata=") ? arg.slice("--tessdata=".length) : undefined;
+      const value = inline ?? args[index + 1];
+      if (inline === undefined) index++;
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        io.err(`Valor ausente para --tessdata. Use --tessdata <pasta>.\n`);
+        return EXIT_USAGE;
+      }
+      tessdata = normalizeCliPath(value);
+      continue;
     }
     if (arg === "--cache-dir" || arg.startsWith("--cache-dir=")) {
       const inline = arg.startsWith("--cache-dir=") ? arg.slice("--cache-dir=".length) : undefined;
@@ -436,6 +471,10 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
 
   if (file === undefined) {
     io.err(`Falta o arquivo PDF.\n\n${USAGE}\n`);
+    return EXIT_USAGE;
+  }
+  if (tessdata !== undefined && !ocr) {
+    io.err(`--tessdata exige --ocr (os modelos só são usados pelo reconhecimento).\n`);
     return EXIT_USAGE;
   }
 
@@ -495,8 +534,11 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     return EXIT_OK;
   } catch (error) {
     if (error instanceof ScannedPdfError) {
-      io.err(`${SCANNED_PDF_MESSAGE}\n`);
-      return EXIT_SCANNED;
+      if (!ocr) {
+        io.err(`${SCANNED_PDF_MESSAGE}\n${SCANNED_OCR_HINT}\n`);
+        return EXIT_SCANNED;
+      }
+      return await runOcrFlow(file, bytes, io, { cache, cacheKey, tessdata });
     }
     if (error instanceof MemoryLimitError) {
       io.err(
@@ -520,6 +562,66 @@ async function extract(args: readonly string[], io: CliIo): Promise<number> {
     }
     io.err(describeIngestError(file, error));
     return EXIT_ERROR;
+  }
+}
+
+/**
+ * The `extract --ocr` branch (E9-T04): the pdf.js path threw
+ * `ScannedPdfError`, so the pages are rendered at `OCR_RENDER_SCALE`,
+ * recognised by tesseract.js and assembled by `ingestOcrFlow`. Progress goes
+ * to stderr page by page; stdout carries the final Book JSON, exactly like a
+ * digital run — the same cache contract applies, so a second opening of the
+ * same file is served from `--cache-dir` without paying the OCR again.
+ */
+async function runOcrFlow(
+  file: string,
+  bytes: Uint8Array,
+  io: CliIo,
+  options: {
+    cache: FileExtractionCache | null;
+    cacheKey: string | null;
+    tessdata?: string;
+  },
+): Promise<number> {
+  const setup =
+    options.tessdata === undefined ? prepareOcrLangs() : tessdataSetup(options.tessdata);
+  if ("error" in setup) {
+    io.err(`${setup.error}\n`);
+    return EXIT_ERROR;
+  }
+  const engine = createTesseractOcrEngine({
+    langPath: setup.langPath,
+    gzip: setup.gzip,
+    cachePath: setup.cachePath,
+  });
+  let renderer: OcrRenderer | null = null;
+  try {
+    const pdfRenderer = await createOcrRenderer(bytes, OCR_RENDER_SCALE);
+    renderer = pdfRenderer;
+    const document = await ingestOcrFlow({
+      fileName: basename(file),
+      sha256: sha256Hex(bytes),
+      pageCount: pdfRenderer.pageCount,
+      engine,
+      renderPage: (pageIndex) => pdfRenderer.renderPage(pageIndex),
+      onProgress: ({ page, total }) => io.err(`OCR: página ${page} de ${total} reconhecida\n`),
+    });
+    const book = buildBook(document);
+    if (options.cache !== null && options.cacheKey !== null) {
+      try {
+        await writeCachedBook(options.cache, options.cacheKey, book);
+      } catch (error) {
+        io.err(`Aviso: não foi possível gravar o cache (${messageOf(error)})\n`);
+      }
+    }
+    io.out(`${JSON.stringify(book, null, 2)}\n`);
+    return EXIT_OK;
+  } catch (error) {
+    io.err(`Falha no OCR de ${file}: ${messageOf(error)}\n`);
+    return EXIT_ERROR;
+  } finally {
+    await engine.close().catch(() => undefined);
+    await renderer?.close();
   }
 }
 

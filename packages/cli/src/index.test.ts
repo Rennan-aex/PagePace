@@ -1,6 +1,10 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
+import { createCanvas } from "@napi-rs/canvas";
 import {
   buildBook,
   extractionCacheKeyFor,
@@ -11,6 +15,7 @@ import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
 import { EXIT_ERROR, EXIT_OK, EXIT_SCANNED, EXIT_USAGE, HELP, run } from "./index";
+import { SCANNED_OCR_HINT } from "./ocr";
 import { normalizeCliPath, pagesRange } from "./report";
 
 /**
@@ -164,7 +169,7 @@ describe("dump-raw", () => {
 
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");
-    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n${SCANNED_OCR_HINT}\n`);
   });
 
   it("keeps the ocr-text-layer flag of an embedded OCR layer in the JSON", async () => {
@@ -229,7 +234,7 @@ describe("inspect", () => {
 
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");
-    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n${SCANNED_OCR_HINT}\n`);
   });
 });
 
@@ -358,7 +363,49 @@ describe("extract", () => {
 
     expect(code).toBe(EXIT_SCANNED);
     expect(streams.out()).toBe("");
-    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n`);
+    expect(streams.err()).toBe(`${SCANNED_PDF_MESSAGE}\n${SCANNED_OCR_HINT}\n`);
+  });
+
+  it("rejects --tessdata without --ocr (E9-T04)", async () => {
+    const file = await writePdf("tessdata.pdf", buildPdf([textStream("x")]));
+    const streams = capture();
+    const code = await run(["extract", file, "--tessdata", "C:\\models"], streams.io);
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toContain("--tessdata exige --ocr");
+  });
+
+  it("rejects --tessdata without a value (E9-T04)", async () => {
+    const file = await writePdf("tessdata-missing.pdf", buildPdf([textStream("x")]));
+    const streams = capture();
+    expect(await run(["extract", file, "--ocr", "--tessdata"], streams.io)).toBe(EXIT_USAGE);
+    expect(streams.err()).toContain("Valor ausente para --tessdata");
+  });
+
+  it("reports a --tessdata folder that does not exist as an OCR error (E9-T04)", async () => {
+    const bytes = buildPdf([""]);
+    const file = await writePdf("tessdata-missing-dir.pdf", bytes);
+    const streams = capture();
+    const code = await run(
+      ["extract", file, "--ocr", "--tessdata", path.join(dir, "no-such-tessdata")],
+      streams.io,
+    );
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(streams.out()).toBe("");
+    expect(streams.err()).toContain("--tessdata não encontrada");
+  });
+
+  it("--ocr on a digital PDF keeps the normal path (no OCR progress)", async () => {
+    const file = await writePdf("ocr-digital.pdf", buildPdf([textStream("digital text")]));
+    const streams = capture();
+    const code = await run(["extract", file, "--ocr"], streams.io);
+
+    expect(code).toBe(EXIT_OK);
+    expect(streams.err()).not.toContain("OCR:");
+    const book = parseBook(JSON.parse(streams.out()));
+    expect(book.blocks[0]?.runs[0]?.text).toBe("digital text");
   });
 });
 
@@ -446,6 +493,96 @@ describe("extract --cache-dir (E8-T02)", () => {
     const missing = capture();
     expect(await run(["extract", file, "--cache-dir"], missing.io)).toBe(EXIT_USAGE);
     expect(missing.err()).toContain("Valor ausente para --cache-dir");
+  });
+});
+
+describe("extract --ocr (E9-T04)", () => {
+  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  const modelGz = (lang: string): string =>
+    path.join(
+      repoRoot,
+      "node_modules",
+      "@tesseract.js-data",
+      lang,
+      "4.0.0_best_int",
+      `${lang}.traineddata.gz`,
+    );
+  const hasOcrModels = existsSync(modelGz("eng")) && existsSync(modelGz("por"));
+
+  /**
+   * A scanned page as a real PDF: the text is painted on a canvas, the raw
+   * pixels become one FlateDecode image XObject — no text layer anywhere, so
+   * the pdf.js path raises `ScannedPdfError` and only `--ocr` can read it.
+   */
+  function buildImagePdf(text: string): Uint8Array {
+    const width = 800;
+    const height = 300;
+    const canvas = createCanvas(width, height);
+    const context = canvas.getContext("2d");
+    context.fillStyle = "white";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "black";
+    context.font = "48px serif";
+    context.fillText(text, 60, 160);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const rgb = Buffer.alloc(width * height * 3);
+    for (let index = 0, offset = 0; index < width * height; index += 1, offset += 3) {
+      rgb[offset] = pixels[index * 4] as number;
+      rgb[offset + 1] = pixels[index * 4 + 1] as number;
+      rgb[offset + 2] = pixels[index * 4 + 2] as number;
+    }
+    const compressed = deflateSync(rgb);
+    const content = `q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q`;
+    const objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Contents 4 0 R ` +
+        "/Resources << /XObject << /Im0 5 0 R >> >> >>",
+      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+      `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode ` +
+        `/Length ${compressed.length} >>\nstream\n${compressed.toString("latin1")}\nendstream`,
+    ];
+    // Byte-accurate writer (minipdf's trick): latin1 strings round-trip 1:1.
+    let body = "%PDF-1.4\n";
+    const offsets: number[] = [0];
+    objects.forEach((object, index) => {
+      offsets.push(body.length);
+      body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const xrefOffset = body.length;
+    body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let index = 1; index <= objects.length; index += 1) {
+      body += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+    }
+    body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+    return new Uint8Array(Buffer.from(body, "latin1"));
+  }
+
+  describe.skipIf(!hasOcrModels)("with the tesseract models installed", () => {
+    it("reads a scanned PDF end to end: progress, Book and cache (E9-T04)", async () => {
+      const bytes = buildImagePdf("PagePace OCR");
+      const file = await writePdf("ocr-scan.pdf", bytes);
+      const cacheDir = path.join(dir, "ocr-cache");
+
+      const first = capture();
+      const code = await run(["extract", file, "--ocr", "--cache-dir", cacheDir], first.io);
+
+      expect(code).toBe(EXIT_OK);
+      expect(first.err()).toContain("OCR: página 1 de 1 reconhecida");
+      const book = parseBook(JSON.parse(first.out()));
+      expect(book.source.fileName).toBe("ocr-scan.pdf");
+      expect(book.extraction.warnings).toContain("ocr-text-layer");
+      const text = book.blocks.map((block) => block.runs.map((run) => run.text).join("")).join(" ");
+      expect(text).toMatch(/OCR/i);
+
+      // Second opening: the OCR result was cached, so no --ocr is needed.
+      const second = capture();
+      expect(await run(["extract", file, "--cache-dir", cacheDir], second.io)).toBe(EXIT_OK);
+      expect(second.err()).toContain("Cache:");
+      expect(second.err()).not.toContain("OCR:");
+      expect(second.out()).toBe(first.out());
+    }, 180_000);
   });
 });
 

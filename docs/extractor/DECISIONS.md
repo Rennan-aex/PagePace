@@ -100,6 +100,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-093 | tesseract.js como devDependency do spike de OCR (E9-T01) | accepted |
 | ADR-094 | Engine de OCR do PagePace: tesseract.js (WASM); ML Kit fica como acelerador Android opcional | accepted |
 | ADR-097 | Estilo visual do scan: heurística pura + sinal `fontFlags` (sem mudança de esquema) | accepted |
+| ADR-098 | Fluxo escaneado: probe `isScannedPdf`, orquestrador `ingestOcrFlow` e `extract --ocr` na CLI | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -775,3 +776,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) campo novo `source.styleFromImage` no esquema (explícito, mas bump + migração + tarefa própria) · B) presença de `fontFlags.bold/italic` como sinal único (pdf.js nunca emite esses flags — pdfjs.ts; headings.ts/quotes.ts já usam o mesmo OR).
 **Decisão:** B — heurística pura em `ingest/ocr-style.ts` (raster grayscale injetado; stroke via distância-tinta→fundo calibrado na mediana da página; italic via shear/projection-profile com margem sobre a mediana dos ângulos; fontSize = x-height/0,5), aplicada por `ocrPageToRawPage` quando `OcrPageInput.image` existe; confiança da imagem e do engine abaixo do piso → item plain (fallback). `book.ts` liga `styles: !fromOcr || styleFromImage`; warning/confiança 0,5 intactos.
 **Consequências:** nenhum doc do eval muda (pdfjs não emite os flags; diff 0,0000); `style_f1` medido por nível no relatório (aceite N5) e E2E sintético N5 = 0,9089 (piso 0,7); revisar se o esquema ganhar campo próprio de proveniência de estilo.
+
+### ADR-098 · Fluxo escaneado: probe `isScannedPdf`, orquestrador `ingestOcrFlow` e `extract --ocr` na CLI · accepted · 2026-11-02
+**Contexto:** E9-T04 fecha a ADR-018 (detectar escaneado → perguntar ao usuário → processar em segundo plano com progresso) antes de existir `packages/app`: quem plumba o fluxo hoje é a CLI, e detector/orquestrador precisam ficar exportados no extrator para o app reusar depois.
+**Alternativas:** A) OCR silencioso automático quando o `ScannedPdfError` aparece (contraria a ADR-018: o usuário deve optar; e não há probe nem progresso antes) · B) detecção só na CLI/flag manual (duplica lógica para o app e o usuário teria que saber que o PDF é escaneado) · C) probe barato `isScannedPdf` exportado do extrator + orquestrador portável `ingestOcrFlow` + `extract --ocr` opt-in com progresso por página.
+**Decisão:** C — `isScannedPdf(bytes, {assets?})` em `ingest/pdfjs.ts` (reusa `documentHasText`; `RangeError` em bytes vazios); `ingestOcrFlow` em `ingest/ocr-flow.ts` (sequência `renderPage` injetado → `OcrEngine` → `ingestOcr`, `onProgress({page,total})`, não fecha a engine — quem chamou fecha); CLI `extract --ocr [--tessdata]` prepara modelos (`@tesseract.js-data` → cache `.pagepace-cache/ocr-lang/`, ou pasta própria), renderiza escala 2 com `wasmUrl`/fontes do pdf.js (páginas JBIG2/JPX), imprime `OCR: página N de M reconhecida` no stderr e segue pelo mesmo `--cache-dir` (segunda abre sem OCR, ADR-089); sem `--ocr`, o exit 3 ganha a dica `SCANNED_OCR_HINT` e nada muda.
+**Consequências:** 15 testes novos (probe 4, orquestrador 6, CLI 5 incluindo e2e de PDF-imagem guardado pela presença dos modelos); `pnpm eval --ci` sem mudança de baseline (documentos OCR ainda fora do eval); schema intocado; o "perguntar ao usuário" fica documentado em `docs/app/OCR-FLOW.md` (diálogo + segundo plano + barra de progresso) já que o app não existe nesta fase.

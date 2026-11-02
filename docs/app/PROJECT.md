@@ -37,4 +37,4 @@ São **dois estados diferentes**, e a interface precisa distinguir os dois:
 Sincronização entre dispositivos, contas, OCR (E9 do extrator), EPUB como entrada, versão iOS.
 
 ## Documentos
-`READING-MODES.md` (especificação dos 3 modos) · `ARCHITECTURE.md` · `ROADMAP.md` · `DECISIONS.md` · `OPEN-QUESTIONS.md` · `STATE.md`
+`READING-MODES.md` (especificação dos 3 modos) · `OCR-FLOW.md` (fluxo do PDF escaneado: detectar → perguntar → processar com progresso, E9-T04) · `ARCHITECTURE.md` · `ROADMAP.md` · `DECISIONS.md` · `OPEN-QUESTIONS.md` · `STATE.md`

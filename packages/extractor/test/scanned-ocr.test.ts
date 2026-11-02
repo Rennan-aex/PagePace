@@ -6,6 +6,7 @@ import {
   countRenderModeChars,
   ingestPdfjs,
   isOcrTextLayer,
+  isScannedPdf,
   OCR_TEXT_LAYER_MAJORITY,
   SCANNED_PDF_MESSAGE,
   ScannedPdfError,
@@ -65,6 +66,28 @@ describe("detector A - no text layer at all (ADR-018)", () => {
     expect(document.pages[0]?.items).toEqual([]);
     expect(document.pages[1]?.items.map((item) => item.text)).toEqual(["page two"]);
     expect(document.source.ocrTextLayer).toBeUndefined();
+  });
+});
+
+describe("isScannedPdf - cheap pre-flight probe (E9-T04)", () => {
+  it("answers true for a PDF without any text layer", async () => {
+    const bytes = buildPdf([""]);
+    expect(await isScannedPdf(bytes)).toBe(true);
+  });
+
+  it("answers false for a digital PDF with text", async () => {
+    const bytes = buildPdf([textStream("ordinary digital text")]);
+    expect(await isScannedPdf(bytes)).toBe(false);
+  });
+
+  it("answers false when any page of the document carries text", async () => {
+    const bytes = buildPdf(["", textStream("page two"), ""]);
+    expect(await isScannedPdf(bytes)).toBe(false);
+  });
+
+  it("throws RangeError on empty input", async () => {
+    await expect(isScannedPdf(new Uint8Array(0))).rejects.toThrow(RangeError);
+    await expect(isScannedPdf(new Uint8Array(0))).rejects.toThrow("isScannedPdf: empty input");
   });
 });
 

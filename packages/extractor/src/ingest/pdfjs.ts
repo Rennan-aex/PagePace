@@ -411,6 +411,47 @@ async function documentHasText(pdf: PDFDocumentProxy): Promise<boolean> {
 }
 
 /**
+ * Cheap pre-flight probe for the scanned flow (E9-T04 / ADR-018): does the
+ * PDF have a text layer at all?
+ *
+ * `true` means "no usable text on any page" — the file is a scan (or a
+ * degenerate 0-page document) and the caller should offer OCR instead of
+ * running {@link ingestPdfjs} (which would throw `ScannedPdfError` anyway).
+ * `false` means at least one page carries text, so the normal pdf.js path
+ * is safe. The probe stops at the first page with text, exactly like the
+ * detector inside `ingestPages`, so a digital book pays for one extra
+ * `getTextContent` and a scan is recognised without building a document.
+ *
+ * Throws `RangeError` on empty input. The same bytes always give the same
+ * answer (rule 7): nothing here reads the clock or any ambient state.
+ */
+export async function isScannedPdf(
+  bytes: Uint8Array,
+  options: { assets?: PdfjsAssets } = {},
+): Promise<boolean> {
+  if (bytes.length === 0) throw new RangeError("isScannedPdf: empty input");
+
+  const task = getDocument({
+    data: bytes.slice(),
+    fontExtraProperties: true,
+    verbosity: 0,
+    ...(options.assets?.standardFontDataUrl
+      ? { standardFontDataUrl: options.assets.standardFontDataUrl }
+      : {}),
+    ...(options.assets?.cMapUrl ? { cMapUrl: options.assets.cMapUrl } : {}),
+    ...(options.assets?.wasmUrl ? { wasmUrl: options.assets.wasmUrl } : {}),
+    ...(options.assets?.cMapPacked !== undefined ? { cMapPacked: options.assets.cMapPacked } : {}),
+  });
+
+  try {
+    const pdf = await task.promise;
+    return !(await documentHasText(pdf));
+  } finally {
+    await task.destroy().catch(() => undefined);
+  }
+}
+
+/**
  * Reads a PDF from memory as a stream of pages (E8-T01, fatia 2): every page
  * is yielded as soon as it is read — the `page` layer of the `extractStream`
  * protocol (ADR-088, "o app começa a ler enquanto o resto processa") — and the
