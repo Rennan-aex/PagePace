@@ -102,6 +102,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-097 | Estilo visual do scan: heurística pura + sinal `fontFlags` (sem mudança de esquema) | accepted |
 | ADR-098 | Fluxo escaneado: probe `isScannedPdf`, orquestrador `ingestOcrFlow` e `extract --ocr` na CLI | accepted |
 | ADR-099 | Fonte OFL própria para os testes de canvas (substitui o genérico `serif`) | accepted |
+| ADR-100 | Figuras: legenda copiada para `placeholder.description` e figura dentro do chunk da página | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -789,3 +790,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A · fonte OFL versionada nos testes, registrada por `GlobalFonts.registerFromPath` (mesmos pixels em todo OS; +651 KB no repo; licença acompanhada) · B · `runs-on: ubuntu-24.04` (resolve já, mas depende de pin de imagem que o GitHub removerá; adia a conta) · C · pular/ignorar no CI (deixa regressão de OCR passar despercebida).
 **Decisão:** A — Source Serif 4 (SIL OFL 1.1, Adobe; Regular/Bold/Italic não modificados + `LICENSE-SourceSerif4.md`) em `packages/extractor/test/fonts/`, exposta pelo helper `registerTestSerif`/`TEST_SERIF` (`test-fonts.ts`). Liberada pela PO (opção A) com exigência de licença livre. Evita Liberation (GPL v2, precedente ADR-020).
 **Consequências:** os 3 testes usam `48px "Source Serif 4"` (bold/italic resolvem nos estilos registrados; medido localmente, `style_f1` acima do piso 0,7). Revisar se o corpus de testes ganhar render próprio no app; ofuscar/atualizar a fonte exige trocar os 3 OTFs e manter a licença.
+
+### ADR-100 · Figuras: legenda copiada para `placeholder.description` e figura dentro do chunk da página · accepted · 2026-11-06
+**Contexto:** E10-T01b precisa entregar `figure` com `origin.bbox` e a legenda ligada sem quebrar o que já é contrato testado: REQ-EXT-11 (a legenda não some), um único evento `blocks` por página (ADR-088) e `block_kind_f1` medido por banda.
+**Alternativas:** A) apagar o bloco `caption` e guardar só o texto no `figure` (perde REQ-EXT-11 e os gabaritos de `block_kind_f1`) · B) `runs` do `figure` com o texto da legenda (o schema manda `runs: []` em figure/table/equation) · C) manter o bloco `caption` e copiar o texto normalizado para `placeholder.description` (Opção A do plano, sem bump de esquema).
+**Decisão:** C — `figures.ts` filtra `nonText` (1%–90% da página), mescla regiões (gap ≤ 1,2×body) e liga a legenda da E5-T05 (gap ≤ 3×body abaixo e sobreposição horizontal); `buildBlockChunks` intercala a figura antes do parágrafo âncora (banda n → primeiro da banda com `top ≥ fig.bottom`, senão após o último da banda; spanning → primeiro parágrafo com `top ≥ fig.bottom`) e a página **sem** parágrafo ganha chunk próprio (`pageIndex = origin.pageFrom`). A prioridade `table > equation > list > quote` do plano vale quando a T02/T03 existirem: aqui a figura só disputa lugar com o parágrafo.
+**Consequências:** 11 testes unitários + 3 de integração (sintético e corpus); `placeholder.description` é cópia do bloco `caption` (mesmo texto normalizado); página só-com-arte vira chunk próprio em vez de cair no `BookError` de "sem texto" (o scan puro continua sendo recusado na ingestão, ADR-018); `pnpm verify` 1157 testes e `pnpm eval --ci` exit 0.

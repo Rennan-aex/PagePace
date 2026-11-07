@@ -5,6 +5,7 @@ import { BROKEN_FONT_MAPPING, brokenFontText } from "./brokenfont";
 import { type CaptionDecision, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
 import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
 import { detectEndnotes, type EndnoteDecision } from "./endnotes";
+import { detectFigures, type FigureDecision } from "./figures";
 import { detectFootnotes, type FootnoteDecision, UNCERTAIN_FOOTNOTE_FLAG } from "./footnotes";
 import { tagGreekRuns } from "./greek";
 import { detectHeadings, type HeadingDecision, type PageMeasure, pageMeasureOf } from "./headings";
@@ -345,6 +346,8 @@ export interface BookAnalysis {
   lists: ListDecision[];
   captions: CaptionDecision[];
   references: ReferenceDecision[];
+  /** Figures read off `page.nonText`, anchored in the reading order (E10-T01b). */
+  figures: FigureDecision[];
   /** `source.ocrTextLayer === true` on the original document. */
   fromOcr: boolean;
   /**
@@ -415,6 +418,14 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
   // shallow indent below the quote gate, and the figure/table label.
   const lists = detectLists(paragraphs, { measures });
   const captions = detectCaptions(paragraphs, { bodyFontSize });
+  // E10-T01b: the figures of `page.nonText`, linked to their caption and
+  // anchored in the reading order — `buildBlockChunks` interleaves them.
+  const figures = detectFigures({
+    pages: stripped.document.pages,
+    paragraphs,
+    captions,
+    bodyFontSize,
+  });
   // E5-T06: the bibliography section — the exact title of the lexicon plus
   // the entry-shaped paragraphs that follow it, until the next heading.
   const references = detectReferences(paragraphs, { headings });
@@ -450,6 +461,7 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
     lists,
     captions,
     references,
+    figures,
     fromOcr,
     styleFromImage,
     base,
@@ -463,6 +475,131 @@ export interface BlockChunk {
   blocks: Block[];
   /** Parallel to `blocks`: `true` when the block came from the endnote pass. */
   endnoteFlags: boolean[];
+}
+
+/** The `figure` block of one decision (E10-T01b): empty runs, box, caption. */
+function figureBlockOf(
+  figure: FigureDecision,
+  options: { ordinal: number; base: number; pageLabel: string | null | undefined },
+): Block {
+  const caption = figure.caption;
+  return {
+    id: blockId(figure.page, options.ordinal, caption ?? ""),
+    kind: "figure",
+    // SCHEMA.md: `runs` stay empty for figure/table/equation — the caption
+    // keeps reading as its own block and a copy of it sits in the placeholder.
+    runs: [],
+    origin: {
+      pageFrom: figure.page,
+      pageTo: figure.page,
+      bbox: [figure.bbox],
+      ...(options.pageLabel === null || options.pageLabel === undefined
+        ? {}
+        : { originalPageLabel: options.pageLabel }),
+    },
+    confidence: blockConfidence(options.base, []),
+    flags: [],
+    ...(caption === undefined ? {} : { placeholder: { description: caption } }),
+  };
+}
+
+/**
+ * The figure blocks of one page, top to bottom, each taking the page's next
+ * ordinal so every id of the page stays unique (E10-T01b).
+ */
+function figureBlocksOf(
+  figures: readonly FigureDecision[],
+  page: number,
+  ordinals: Map<number, number>,
+  base: number,
+  pageLabel: string | null | undefined,
+): Block[] {
+  return [...figures]
+    .sort((a, b) => a.bbox.y - b.bbox.y || a.bbox.x - b.bbox.x)
+    .map((figure) => {
+      const ordinal = ordinals.get(page) ?? 0;
+      ordinals.set(page, ordinal + 1);
+      return figureBlockOf(figure, { ordinal, base, pageLabel });
+    });
+}
+
+/**
+ * Puts the page's figures where they read (E10-T01b — the `insertBefore`
+ * interleaving): before the block of their anchor paragraph, top to bottom
+ * when several figures share one anchor. An anchor paragraph that produced
+ * no block (empty text) is skipped, so the search walks forward to the next
+ * one and falls back to the end of the page.
+ */
+function interleaveFigures(
+  chunk: BlockChunk,
+  figures: readonly FigureDecision[] | undefined,
+  blockIndexByParagraph: ReadonlyMap<number, number>,
+  lastParagraphIndex: number,
+  ordinals: Map<number, number>,
+  base: number,
+  pageLabel: string | null | undefined,
+): void {
+  if (figures === undefined || figures.length === 0) return;
+  const blockIndexAt = (anchor: number): number => {
+    for (let index = anchor; index <= lastParagraphIndex; index++) {
+      const block = blockIndexByParagraph.get(index);
+      if (block !== undefined) return block;
+    }
+    return chunk.blocks.length;
+  };
+  const placed = figures
+    .map((figure) => ({
+      figure,
+      at:
+        figure.insertBefore === undefined ? chunk.blocks.length : blockIndexAt(figure.insertBefore),
+    }))
+    .sort(
+      (a, b) =>
+        a.at - b.at || a.figure.bbox.y - b.figure.bbox.y || a.figure.bbox.x - b.figure.bbox.x,
+    );
+  const blocks: Block[] = [];
+  const endnoteFlags: boolean[] = [];
+  let cursor = 0;
+  for (const { figure, at } of placed) {
+    while (cursor < at && cursor < chunk.blocks.length) {
+      blocks.push(chunk.blocks[cursor] as Block);
+      endnoteFlags.push(chunk.endnoteFlags[cursor] === true);
+      cursor++;
+    }
+    blocks.push(...figureBlocksOf([figure], chunk.pageIndex, ordinals, base, pageLabel));
+    // Not an endnote: the flag exists for the E5-T03 pass over text blocks.
+    endnoteFlags.push(false);
+  }
+  while (cursor < chunk.blocks.length) {
+    blocks.push(chunk.blocks[cursor] as Block);
+    endnoteFlags.push(chunk.endnoteFlags[cursor] === true);
+    cursor++;
+  }
+  chunk.blocks = blocks;
+  chunk.endnoteFlags = endnoteFlags;
+}
+
+/**
+ * The chunks of the pages that carry figures and **no** paragraph at all (a
+ * plate page): they read as their own chunk, in page order, so a figure
+ * never disappears with the text the page does not have (REQ-EXT-11).
+ */
+function figureOnlyChunks(
+  figuresByPage: ReadonlyMap<number, readonly FigureDecision[]>,
+  paragraphs: readonly JoinedParagraph[],
+  ordinals: Map<number, number>,
+  base: number,
+  pageLabels: readonly (string | null | undefined)[],
+): BlockChunk[] {
+  const withParagraphs = new Set(paragraphs.map((paragraph) => paragraph.pageFrom));
+  const chunks: BlockChunk[] = [];
+  for (const [page, figures] of figuresByPage) {
+    if (withParagraphs.has(page)) continue;
+    const blocks = figureBlocksOf(figures, page, ordinals, base, pageLabels[page]);
+    chunks.push({ pageIndex: page, blocks, endnoteFlags: blocks.map(() => false) });
+  }
+  chunks.sort((a, b) => a.pageIndex - b.pageIndex);
+  return chunks;
 }
 
 /**
@@ -485,17 +622,57 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     lists,
     captions,
     references,
+    figures,
     fromOcr,
     styleFromImage,
     base,
   } = analysis;
   const ordinals = new Map<number, number>();
+  /** Block index each paragraph of the chunk produced (E10-T01b anchors). */
+  const blockIndexByParagraph = new Map<number, number>();
+  const figuresByPage = new Map<number, FigureDecision[]>();
+  for (const figure of figures) {
+    const list = figuresByPage.get(figure.page);
+    if (list === undefined) figuresByPage.set(figure.page, [figure]);
+    else list.push(figure);
+  }
+  const figureOnly = figureOnlyChunks(
+    figuresByPage,
+    paragraphs,
+    ordinals,
+    base,
+    stripped.pageLabels,
+  );
+  let figureOnlyCursor = 0;
   let chunk: BlockChunk | undefined;
+  let lastParagraphIndex = -1;
   for (const [index, paragraph] of paragraphs.entries()) {
     if (chunk === undefined || chunk.pageIndex !== paragraph.pageFrom) {
-      if (chunk !== undefined && chunk.blocks.length > 0) yield chunk;
+      if (chunk !== undefined) {
+        interleaveFigures(
+          chunk,
+          figuresByPage.get(chunk.pageIndex),
+          blockIndexByParagraph,
+          lastParagraphIndex,
+          ordinals,
+          base,
+          stripped.pageLabels[chunk.pageIndex],
+        );
+        if (chunk.blocks.length > 0) yield chunk;
+      }
+      // Pages without a paragraph of their own read between the pages around
+      // them, in page order (E10-T01b).
+      while (
+        figureOnlyCursor < figureOnly.length &&
+        (figureOnly[figureOnlyCursor] as BlockChunk).pageIndex < paragraph.pageFrom
+      ) {
+        yield figureOnly[figureOnlyCursor] as BlockChunk;
+        figureOnlyCursor++;
+      }
+      blockIndexByParagraph.clear();
       chunk = { pageIndex: paragraph.pageFrom, blocks: [], endnoteFlags: [] };
     }
+    lastParagraphIndex = index;
     const hyphen = paragraphHyphenText(paragraph.lines);
     const text = normalizeForReader(hyphen.text);
     if (text.trim() === "") continue;
@@ -596,8 +773,25 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     // E5-T03: the chunk says whether the block came from the endnote pass —
     // a block the reference kind won (E5-T06) is no longer a note.
     chunk.endnoteFlags.push(endnote && !reference);
+    // E10-T01b: where the paragraph's block sits, so a figure reads before it.
+    blockIndexByParagraph.set(index, chunk.blocks.length - 1);
   }
-  if (chunk !== undefined && chunk.blocks.length > 0) yield chunk;
+  if (chunk !== undefined) {
+    interleaveFigures(
+      chunk,
+      figuresByPage.get(chunk.pageIndex),
+      blockIndexByParagraph,
+      lastParagraphIndex,
+      ordinals,
+      base,
+      stripped.pageLabels[chunk.pageIndex],
+    );
+    if (chunk.blocks.length > 0) yield chunk;
+  }
+  while (figureOnlyCursor < figureOnly.length) {
+    yield figureOnly[figureOnlyCursor] as BlockChunk;
+    figureOnlyCursor++;
+  }
 }
 
 /**

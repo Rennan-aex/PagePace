@@ -57,6 +57,14 @@ export type {
   PageExplanation,
 } from "./explain";
 export { ExplainPageError, explainPage } from "./explain";
+export type { FigureContext, FigureDecision } from "./figures";
+export {
+  detectFigures,
+  FIGURE_CAPTION_GAP_FACTOR,
+  FIGURE_MAX_PAGE_SHARE,
+  FIGURE_MERGE_GAP_FACTOR,
+  FIGURE_MIN_PAGE_SHARE,
+} from "./figures";
 export type { FontStyle, FontStyleBasis } from "./fontstyle";
 export { classifyFontName, fontNameTokens } from "./fontstyle";
 export type { FootnoteContext, FootnoteDecision } from "./footnotes";

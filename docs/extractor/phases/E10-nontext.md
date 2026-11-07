@@ -3,8 +3,9 @@
 **Requisitos:** REQ-EXT-11. **Depende de:** E5/E6. **Saída:** blocos `figure|table|equation` corretos e fora do fluxo de leitura dinâmica.
 
 ## Tarefas
-### E10-T01 · Figuras
+### E10-T01 · Figuras · `done`
 - Detectar imagens/vetores relevantes (`nonText`) e criar `figure` com `origin.bbox` e `caption` ligada. **Aceite:** fixtures; legendas associadas.
+- **Resultado (2026-11-06):** **`done` — T01a + T01b.** **T01a:** `ingest/non-text.ts` (`collectNonTextRegions` da operator list do pdf.js) + `page.nonText` no `readPage` (chave omitida quando vazia), 14 testes, PR #90 (squash `9f19db0`). **T01b:** `figures.ts` (área 1%–90% da página, merge com gap ≤ 1,2×body em ambos os eixos, legenda da E5-T05 a ≤ 3×body abaixo com sobreposição horizontal → texto em `placeholder.description`, Opção A) + intercalação `insertBefore` por banda em `buildBlockChunks` e chunk próprio para a página sem parágrafo (**ADR-100**); 11 unitários (`src/figures.test.ts`) + 3 de integração (`test/figure-pdf.test.ts`, inclui a p3 do phobos); `pnpm verify` 1157 testes, `pnpm eval --ci` exit 0, schema/baseline intocados.
 ### E10-T02 · Tabelas
 - Detectar tabelas por alinhamento de colunas/linhas de grade; bloco `table` com `placeholder` e, se possível, células. **Aceite:** metade das tabelas simples do corpus N4 detectadas; nunca misturar células no texto corrido.
 ### E10-T03 · Equações
@@ -43,3 +44,11 @@
 
 ### Plano — E10-T04 (recortes)
 - Teste ligando `origin.bbox` de bloco `figure` a `renderPageRegion` (função e ADR-016 já existem); decisão de produto pendente em `OPEN-QUESTIONS #1`.
+
+### Feito na T01b (2026-11-06, branch `e10-t01b-figures`) — fechada, ADR-100
+- `src/figures.ts`: `detectFigures({pages, paragraphs, captions, bodyFontSize})` → `FigureDecision[]` puro e determinístico; constantes `FIGURE_MIN_PAGE_SHARE` 0,01 · `FIGURE_MAX_PAGE_SHARE` 0,9 · `FIGURE_MERGE_GAP_FACTOR` 1,2 · `FIGURE_CAPTION_GAP_FACTOR` 3 (todas exportadas). Merge = cluster com gap ≤ fator×body nos **dois** eixos; âncora considera só bands ≥ 1 (0 = spanning) e 0 ou ≥ 2 overlaps = spanning; legenda exige `captions[i].caption === true` (gate da E5-T05), `normalizeForReader(paragraphHyphenText(...))` para o texto bater com o bloco `caption`.
+- Wire em `book.ts`: campo `figures` no `BookAnalysis` (calculado depois de `captions`) e três funções novas — `figureBlockOf` (`runs: []`, `origin.bbox = [bbox]`, `placeholder.description` só quando há legenda), `figureBlocksOf` (ordinais da página, ids `blockId(page, ordinal, caption)`), `interleaveFigures` (reordena o chunk, `endnoteFlags.push(false)`), `figureOnlyChunks` (página sem parágrafo → chunk próprio, `pageIndex = origin.pageFrom`, ordenado por página).
+- **Invariantes preservados (ADR-088):** um único evento `blocks` por página — `pipeline.test.ts:62` exige `pageIndex === [0,1,2…]`, então a figura **entra no chunk da página** e o "chunk próprio" do plano vale só para a página sem parágrafo. `blockIndexByParagraph` é limpo a cada página e a busca do âncora é limitada por `lastParagraphIndex` (âncora sem bloco próprio, texto vazio, avança para o parágrafo seguinte).
+- **Prioridade `table > equation > list > quote` do plano:** anotação para T02/T03 (hoje a figura só disputa lugar com o parágrafo); registrada na ADR-100 para não virar silêncio.
+- Testes: `src/figures.test.ts` (11: filtros de área, merge, legenda, intercalação single-column, append no fim, coluna 2, manutenção do bloco `caption`, `parseBook`) + `test/figure-pdf.test.ts` (3: parágrafo→figure→caption→parágrafo, página só-com-arte, heatmap da p3 do phobos no corpus público — os 3 rodam, `corpus/public` existe).
+- Limites conhecidos (candidatos a BACKLOG): legenda acima da figura ou além do gap fica órfã; `nonText` não tem passe de regiões repetidas (running head/foot pode virar figura pequena); tabela desenhada como vetor ainda lê `figure` até a T02 reivindicar.
