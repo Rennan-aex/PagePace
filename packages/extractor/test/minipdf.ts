@@ -3,8 +3,9 @@
  *
  * It emits only what the tests need: one or more pages with a Type 1 font
  * (optionally non-embedded, which is the case that exercises the standard
- * fonts of pdf.js), an optional struct tree, an optional outline and the
- * optional `/Info` + `/Lang` metadata (E4-T04). Offsets
+ * fonts of pdf.js), an optional image XObject (E10-T01), an optional struct
+ * tree, an optional outline and the optional `/Info` + `/Lang` metadata
+ * (E4-T04). Offsets
  * are computed while writing, so the xref table is always correct.
  *
  * Nothing here reaches production code: the helper lives under `test/`.
@@ -37,11 +38,25 @@ export interface BuildPdfOptions {
   /**
    * `/ToUnicode` CMap per font resource (E5-T08): single-byte code → the
    * Unicode text pdf.js must extract for it. Without the map the standard
-   * fonts answer WinAnsi and Greek never reaches the `RawDocument`; with it,
+   * fonts answer WinAnsi and Greek never reaches the `RawDocument`; with it
    * a content stream written in private bytes delivers any script.
    */
   toUnicode?: Record<string, Record<number, string>>;
   mediaBox?: [number, number, number, number];
+  /**
+   * Image XObjects by resource name (`Im1`, `Im2`, ...) for the content
+   * streams to paint with `/Im1 Do` (E10-T01). RGB, 8 bits per component,
+   * uncompressed — the smallest shape pdf.js decodes as `paintImageXObject`.
+   */
+  images?: Record<string, ImageSpec>;
+}
+
+/** One `/Subtype /Image` XObject written by {@link buildPdf}. */
+export interface ImageSpec {
+  width: number;
+  height: number;
+  /** RGB triplets, exactly `width * height * 3` bytes. Defaults to black. */
+  data?: Uint8Array;
 }
 
 export interface TextStreamOptions {
@@ -206,6 +221,7 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     lang,
     toUnicode,
     mediaBox = [0, 0, 600, 800],
+    images,
   } = options;
   const pageCount = contentStreams.length;
 
@@ -245,6 +261,31 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
   const fontResources = [...fontNumbers]
     .map(([name, number]) => `/${name} ${number} 0 R`)
     .join(" ");
+
+  const imageEntries = Object.entries(images ?? {});
+  const imageNumbers = new Map<string, number>();
+  for (const [resource, spec] of imageEntries) {
+    const expected = spec.width * spec.height * 3;
+    const data = spec.data ?? new Uint8Array(expected);
+    if (data.length !== expected) {
+      throw new Error(`buildPdf: image ${resource} needs ${expected} bytes, got ${data.length}`);
+    }
+    const binary = Buffer.from(data).toString("latin1");
+    imageNumbers.set(
+      resource,
+      push(
+        `<< /Type /XObject /Subtype /Image /Width ${spec.width} /Height ${spec.height}` +
+          ` /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${data.length} >>` +
+          `\nstream\n${binary}\nendstream`,
+      ),
+    );
+  }
+  const xObjectResources =
+    imageEntries.length === 0
+      ? ""
+      : ` /XObject << ${imageEntries
+          .map(([name, _]) => `/${name} ${imageNumbers.get(name) as number} 0 R`)
+          .join(" ")} >>`;
 
   const langEntry = lang === undefined ? "" : ` /Lang (${escapeLiteral(lang)})`;
 
@@ -310,7 +351,7 @@ export function buildPdf(contentStreams: string[], options: BuildPdfOptions = {}
     const structParents = tagged ? ` /StructParents ${index}` : "";
     objects[(pageNumbers[index] as number) - 1] =
       `<< /Type /Page /Parent ${pagesNumber} 0 R /MediaBox [${mediaBox.join(" ")}]` +
-      ` /Contents ${contentNumbers[index]} 0 R /Resources << /Font << ${fontResources} >> >>` +
+      ` /Contents ${contentNumbers[index]} 0 R /Resources << /Font << ${fontResources} >>${xObjectResources} >>` +
       `${structParents} >>`;
   }
 

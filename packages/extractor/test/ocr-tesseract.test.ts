@@ -11,6 +11,7 @@ import {
   TESSERACT_JS_VERSION,
 } from "@pagepace/extractor";
 import { describe, expect, it } from "vitest";
+import { registerTestSerif, TEST_SERIF } from "./test-fonts";
 
 /**
  * E9-T02 integration: the real tesseract.js engine recognises a synthetic
@@ -27,6 +28,8 @@ import { describe, expect, it } from "vitest";
 (globalThis as Record<string, unknown>).DOMMatrix = DOMMatrix;
 (globalThis as Record<string, unknown>).ImageData = ImageData;
 (globalThis as Record<string, unknown>).Path2D = Path2D;
+// ADR-099: draw with the bundled OFL face, never the system `serif`.
+registerTestSerif();
 
 const repoRoot = path.join(import.meta.dirname, "..", "..", "..");
 
@@ -62,7 +65,7 @@ async function renderSentencePng(text: string): Promise<Buffer> {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "black";
-  ctx.font = "64px serif";
+  ctx.font = `64px "${TEST_SERIF}"`;
   ctx.fillText(text, 40, 120);
   ctx.fillText("Segunda linha do recorte.", 40, 220);
   // The Node worker reads Buffers (the S7 recipe); browsers get a Blob/URL.

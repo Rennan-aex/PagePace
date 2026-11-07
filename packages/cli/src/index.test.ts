@@ -14,6 +14,7 @@ import {
 import { parseBook } from "@pagepace/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPdf, textStream } from "../../extractor/test/minipdf";
+import { registerTestSerif, TEST_SERIF } from "../../extractor/test/test-fonts";
 import { EXIT_ERROR, EXIT_OK, EXIT_SCANNED, EXIT_USAGE, HELP, run } from "./index";
 import { SCANNED_OCR_HINT } from "./ocr";
 import { normalizeCliPath, pagesRange } from "./report";
@@ -517,12 +518,14 @@ describe("extract --ocr (E9-T04)", () => {
   function buildImagePdf(text: string): Uint8Array {
     const width = 800;
     const height = 300;
+    // ADR-099: draw with the bundled OFL face, never the system `serif`.
+    registerTestSerif();
     const canvas = createCanvas(width, height);
     const context = canvas.getContext("2d");
     context.fillStyle = "white";
     context.fillRect(0, 0, width, height);
     context.fillStyle = "black";
-    context.font = "48px serif";
+    context.font = `48px "${TEST_SERIF}"`;
     context.fillText(text, 60, 160);
     const pixels = context.getImageData(0, 0, width, height).data;
     const rgb = Buffer.alloc(width * height * 3);

@@ -3,23 +3,24 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E9 CONCLUÍDA (2026-11-02)** — T01–T04 todas `done` (ADR-093–098). E8/E7/E6/E5/E4/E3 fechadas.
-- **Próxima tarefa:** **E10 · Não textual** (`phases/E10-nontext.md`: tabelas, equações, figuras) ou **SEG** (`phases/SEG-segmenter.md`, pode rodar a qualquer momento depois do E1 e é exigida antes do M2 do app) — ordem a confirmar com o PO/ROADMAP.
-- **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`.
-- **Status:** `pnpm verify` verde (1129 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline do bench no ar (16 docs, calibrada no CI).
-- **Última atualização:** 2026-11-02 (E9-T04 fechada: fluxo escaneado completo, ADR-098).
+- **Fase atual:** **E10 EM ANDAMENTO (2026-11-06)** — T01a (`nonText` no RawPage) pronta; T01b (figuras), T02 (tabelas), T03 (equações), T04 (recortes) pendentes. E9/E8/E7/E6/E5/E4/E3 fechadas.
+- **Próxima tarefa:** **(1) Conferir `gh pr checks` do PR #90 e mesclar quando verdes** (correção do CI já commitada na branch); **(2) E10-T01b — figuras** (`phases/E10-nontext.md`, seção "Notas de sessão 2026-11-06" tem o plano inteiro). Depois: E10-T02, T03, T04 (ou SEG, ordem a confirmar com o PO/ROADMAP).
+- **Ação pendente do PO:** (a) autorizar apagar a branch `ci-baseline-check` (sobrou no remoto, idêntica à main); (b) não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`.
+- **Status:** `pnpm verify` local verde (1143 testes + `check:no-pdf` + `check:docs`); `pnpm eval` sem regressão; baseline intocada. **CI corrigido na branch (opção A do PO, ADR-099:** fonte OFL Source Serif 4 em `packages/extractor/test/fonts/`); **PR #90 aguardando CI verde para mesclar.**
+- **Última atualização:** 2026-11-06 (E10-T01a + correção do CI com fonte própria).
 
-## Tarefa fechada nesta sessão — E9-T04 (pré-processamento e fluxo de uso)
-- **Detector (aceite):** `isScannedPdf(bytes, {assets?})` em `ingest/pdfjs.ts` — probe barato que reusa `documentHasText` (mesmo veredito do `ScannedPdfError`), `RangeError` em bytes vazios, `task.destroy()` em `finally`; 4 testes em `test/scanned-ocr.test.ts`.
-- **Orquestrador:** `ingest/ocr-flow.ts` (núcleo portável, regra 6/7) — sequência `renderPage` injetado → `OcrEngine` → `ingestOcr`, `onProgress({page,total})` por página, engine **não** fechada (quem chamou fecha, ADR-095); 6 testes com engine/render fake.
-- **CLI (plumbing de produção):** `extract --ocr [--tessdata]` em `runOcrFlow` (`packages/cli/src/index.ts:576`) — no `ScannedPdfError` prepara modelos (`prepareOcrLangs` → cache `.pagepace-cache/ocr-lang/`, ou `tessdataSetup` com pasta própria), `createOcrRenderer` (`packages/cli/src/ocr.ts`) renderiza escala 2 com assets pdf.js (wasm/cmaps), imprime `OCR: página N de M reconhecida` no stderr, grava no mesmo `--cache-dir`; sem `--ocr` o exit 3 ganha a dica `SCANNED_OCR_HINT`. 5 testes novos + 3 atualizados + e2e com PDF-imagem sintético (guardado pela presença dos modelos).
-- **Documentação (aceite):** **`docs/app/OCR-FLOW.md`** (detectar → perguntar → segundo plano com progresso; tabela de responsabilidades app×orquestrador×engine; cache; limites) linkada no `docs/app/PROJECT.md`. **Decisão: ADR-098.**
+## Tarefa em andamento — E10-T01a (regiões não textuais do RawPage)
+- **Módulo:** `ingest/non-text.ts` — `collectNonTextRegions(ops, view)` lê a operator list do pdf.js (CTM com save/restore/forms, imagens = unit square, `constructPath` com `pathMinMax`) e devolve `RawNonTextRegion[]` em coordenadas de página topo-esquerda (mesmo espelho do `glyphBox`), dedupe + ordenação, caixa degenerada descartada.
+- **Wire:** `readPage` popula `page.nonText` **só quando não vazio** — página sem arte mantém JSON idêntico ao pré-E10; `columns.ts` só usa `nonText` em `regionSpanning` (não consumido) → colunas/baseline intocadas.
+- **Testes:** `src/ingest/non-text.test.ts` (11, TDD) + `test/non-text-pdf.test.ts` (3, inclui heatmap da p3 do phobos); `minipdf.ts` ganhou `images` (`ImageSpec`).
+- **Próximo:** T01b (`figures.ts` + intercalação em `buildBlockChunks`) — plano completo em `phases/E10-nontext.md` § "Notas de sessão".
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão 2026-11-02 — E9-T04 (fluxo escaneado) CONCLUÍDA** na branch `e9-t04-scanned-flow`. Feito tudo: (1) `isScannedPdf` + 4 testes; (2) `ingestOcrFlow` + 6 testes; (3) CLI `extract --ocr/--tessdata` (`runOcrFlow` + `packages/cli/src/ocr.ts`) com progresso no stderr, 5 testes novos + e2e de PDF-imagem; (4) **ADR-098** (+ `pnpm decisions:index`) e **`docs/app/OCR-FLOW.md`** linkado no PROJECT.md; fase fechada em `phases/E9-ocr.md`. `pnpm verify` verde (1129 testes) e `pnpm eval --ci` exit 0 (baseline intocada), schema intocado. **Próximo:** commit final (inclui fix de formatação de `ocr-flow.test.ts`), push, PR, merge, `report-to-po`. **Depois (nova sessão):** E10 (`phases/E10-nontext.md`) ou SEG — confirmar ordem. **Armadilhas:** `@` no PowerShell exige aspas; testes de OCR guardados por `existsSync` dos `.traineddata.gz`; `node scripts/check-docs-budget.mjs` antes de commitar docs. **Não mexer:** baseline do eval/bench; `packages/app` não existe (só doc).
+- **Sessão 2026-11-06 — E10-T01a (nonText do RawPage) CONCLUÍDA + CI CORRIGIDO NA BRANCH; PR #90 ABERTO, aguardando CI verde.** Feito (T01a): `ingest/non-text.ts` + 11 testes TDD; wire no `readPage` (chave omitida quando vazia); `minipdf.images` + 3 testes de integração; plano/calibração de T01b–T04 em `phases/E10-nontext.md` § "Notas de sessão". **CI (PO escolheu opção A, ADR-099):** 4 testes de OCR desenhavam `serif` e víam 0 pixels na imagem nova do runner (prova: teste temporário `54c6ad1`, removido `8b126cf`); agora usam a fonte **Source Serif 4** (SIL OFL 1.1, Adobe; Regular/Bold/Italic + licença em `packages/extractor/test/fonts/`, helper `registerTestSerif`/`TEST_SERIF` em `test/test-fonts.ts` — não Liberation/GPL, ADR-020) nos 3 arquivos: `ocr-tesseract.test.ts`, `ocr-style-n5.test.ts`, `index.test.ts`. ADR-099 registrada, BACKLOG 2026-11-06 marcado concluído. `pnpm verify` local verde (1143 testes), `pnpm eval` sem regressão, schema/baseline intocados. **Próximo:** commit+push desta correção → `gh pr checks` verde → `gh pr merge 90 --squash --delete-branch` → `git branch -D e10-nontext` → E10-T01b. **Armadilhas:** ordem das matrizes é `compose(ctm, novaMatriz)`; args de repeat são números planos; sonda em `%TEMP%\opencode\probe-e10.mts`; branch `ci-baseline-check` (idêntica à main) sobrou no remoto, apagar só quando o PO autorizar. **Não mexer:** baseline do eval/bench; `packages/app` não existe (só doc).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
+- [ ] Autorizar apagar a branch `ci-baseline-check` no remoto (sobrou do diagnóstico; regra proíbe apagar sem permissão).
 
 ## Progresso por marco
 | Marco | Status |
@@ -42,8 +43,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-06 · **E10-T01a (regiões não textuais) — CONCLUÍDO** · `ingest/non-text.ts` (`collectNonTextRegions` da operator list do pdf.js) + wire no `readPage` (`page.nonText` só quando não vazio), 14 testes novos (1143 totais), `minipdf.images`, plano de T01b–T04 na fase, verify/eval verdes, schema/baseline intocados. **Mesma sessão:** CI corrigido com fonte OFL própria (opção A do PO, ADR-099, ver Handoff).
 - 2026-11-02 · **E9-T04 (fluxo escaneado) — CONCLUÍDO** · `isScannedPdf` (probe) + `ingestOcrFlow` (orquestrador portável com progresso) + CLI `extract --ocr/--tessdata` (render escala 2, modelos locais, cache), 15 testes novos (1129 totais), ADR-098, `docs/app/OCR-FLOW.md`, E9 fase fechada, verify/eval verdes.
-- 2026-11-01 · **E9-T03 (estilo visual) — CONCLUÍDO** · `ingest/ocr-style.ts` (stroke/shear/x-height puros) + `fontFlags` no adaptador OCR + OR em `runs.ts` + `styleFromImage` em `book.ts` (ADR-097, esquema intocado), style_f1 por nível no eval, E2E N5 = 0,9089, 15 testes novos (1114 totais), verify/eval verdes.
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096).
 
 Histórico completo: docs/extractor/archive/

@@ -5,6 +5,7 @@ import { gunzipSync } from "node:zlib";
 import { createCanvas, DOMMatrix, ImageData, loadImage, Path2D } from "@napi-rs/canvas";
 import { buildBook, createTesseractOcrEngine, ingestOcr } from "@pagepace/extractor";
 import { describe, expect, it } from "vitest";
+import { registerTestSerif, TEST_SERIF } from "../../extractor/test/test-fonts";
 import { blockStyleF1 } from "./eval";
 import type { Golden } from "./golden";
 
@@ -26,6 +27,8 @@ import type { Golden } from "./golden";
 (globalThis as Record<string, unknown>).DOMMatrix = DOMMatrix;
 (globalThis as Record<string, unknown>).ImageData = ImageData;
 (globalThis as Record<string, unknown>).Path2D = Path2D;
+// ADR-099: draw with the bundled OFL face, never the system `serif`.
+registerTestSerif();
 
 const repoRoot = path.join(import.meta.dirname, "..", "..", "..");
 
@@ -64,11 +67,11 @@ async function renderStyledPagePng(): Promise<Buffer> {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.fillStyle = "black";
-  ctx.font = "48px serif";
+  ctx.font = `48px "${TEST_SERIF}"`;
   ctx.fillText("Uma linha simples de leitura", 60, 110);
-  ctx.font = "bold 48px serif";
+  ctx.font = `bold 48px "${TEST_SERIF}"`;
   ctx.fillText("destacada em negrito", 60, 220);
-  ctx.font = "italic 48px serif";
+  ctx.font = `italic 48px "${TEST_SERIF}"`;
   ctx.fillText("e um termo em italico", 60, 330);
   // The Node worker reads Buffers (the S7 recipe); browsers get a Blob/URL.
   return Buffer.from(await canvas.encode("png"));
@@ -145,7 +148,8 @@ describeStyle("visual style on a scanned page (E9-T03 acceptance, level N5)", ()
       expect(book.extraction.warnings).toContain("ocr-text-layer");
 
       const styles = blockStyleF1(golden, doc);
-      // Measured 0.9089 on this fixture (engine best_int, serif canvas page).
+      // Measured 0.9089 on this fixture (engine best_int, serif canvas page);
+      // still above the 0,7 floor with the bundled Source Serif 4 (ADR-099).
       expect(styles.f1).toBeGreaterThanOrEqual(0.7);
     } finally {
       await engine.close();

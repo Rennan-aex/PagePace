@@ -4,6 +4,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist/legacy/build/pdf
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { composeAccentItems, stripOrnamentItems } from "../accents";
 import { MemoryGovernor } from "./memory";
+import { collectNonTextRegions } from "./non-text";
 import { sha256Hex } from "./sha256";
 import type { PageTagInput } from "./tag-hints";
 import { buildTagHints } from "./tag-hints";
@@ -364,12 +365,19 @@ async function readPage(
     // `fontExtraProperties` retained (S1 measured 308 MB on n4).
     discardFontData(page, Object.keys(styles));
 
+    // E10-T01: the same operator list the font/OCR reads already carries
+    // every image and painted path — the regions land in `page.nonText`
+    // only when there is at least one, so a page without art keeps its
+    // exact previous JSON.
+    const nonText = operatorList ? collectNonTextRegions(operatorList, view) : [];
+
     const outputPage: RawPage = {
       index: pageNumber - 1,
       width: viewport.width,
       height: viewport.height,
       rotation: viewport.rotation as 0 | 90 | 180 | 270,
       items,
+      ...(nonText.length > 0 ? { nonText } : {}),
     };
 
     const tagInput: PageTagInput = {
