@@ -6,7 +6,7 @@
 - **Fase atual:** **E10 EM ANDAMENTO (2026-11-06)** — T01 (`nonText` no RawPage + figuras) e T02 (tabelas) prontas; T03 (equações), T04 (recortes) pendentes. E9/E8/E7/E6/E5/E4/E3 fechadas.
 - **Próxima tarefa:** **E10-T03 — equações** (`phases/E10-nontext.md`, § "Plano — E10-T03"). Depois: T04 (recortes, depende de OPEN-QUESTIONS #1).
 - **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`. (Branch `ci-baseline-check` apagada em 2026-11-06 com autorização do PO.)
-- **Status:** **E10-T02 PR aberto (número a preencher no merge)** — branch `e10-t02-detect-tables`. `pnpm verify` local verde (1174 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; **ADR-101** registrada.
+- **Status:** **PR #96 MESCLADO** (squash `39c697e`, CI `verify` verde) — E10-T02 fechada. `pnpm verify` local verde (1174 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; **ADR-101** registrada.
 - **Última atualização:** 2026-11-06 (E10-T02 tabelas concluída).
 
 ## Tarefa atual — E10-T03 (equações) · copiada da fase em 2026-11-06
@@ -17,7 +17,7 @@
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
 - **Sessão concluída: E10-T02 (tabelas).** Feito: `src/tables.ts` (`detectTables`, gates finais em ADR-101/BACKLOG), wire em `book.ts` (`splitParagraphsAtTables` → UM bloco `table` com TSV), 10 unitários + 7 integração (`table-pdf.test.ts`), fase/STATE/DECISIONS/BACKLOG atualizados, `pnpm verify` verde (1174), `pnpm eval --ci` exit 0.
-- **Próximo passo:** commit + push + PR da branch `e10-t02-detect-tables`, `gh pr checks` verde → `gh pr merge --squash --delete-branch`, depois report-to-po. Em seguida: E10-T03 (equações).
+- **Próximo passo:** **E10-T03 (equações)** — `phases/E10-nontext.md` § "Plano — E10-T03"; branch nova a partir de `main`.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
@@ -43,7 +43,7 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-06 · **E10-T02 (tabelas) — CONCLUÍDO** · `tables.ts` (`detectTables`, gates da ADR-101) + `splitParagraphsAtTables` em `book.ts` (UM bloco `table` com TSV), 17 testes novos (1174 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados). PR aberto na branch `e10-t02-detect-tables`.
+- 2026-11-06 · **E10-T02 (tabelas) — CONCLUÍDO** · `tables.ts` (`detectTables`, gates da ADR-101) + `splitParagraphsAtTables` em `book.ts` (UM bloco `table` com TSV), 17 testes novos (1174 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados). PR #96 (squash `39c697e`).
 - 2026-11-06 · **E10-T01b (figuras) — CONCLUÍDO** · `figures.ts` (`detectFigures`) + intercalação por banda em `buildBlockChunks` + `figureOnlyChunks`, 14 testes novos (1157 totais), ADR-100 (bloco `caption` mantido, texto em `placeholder.description`), fase atualizada, verify/eval verdes (schema/baseline intocados). PR #94 (squash `5e86bf3`).
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098).
 
