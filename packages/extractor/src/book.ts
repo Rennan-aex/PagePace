@@ -25,6 +25,7 @@ import { type StrippedDocument, stripRepeatedRegions } from "./repeated";
 import { headingRuns, paragraphRuns } from "./runs";
 import { SIDEBAR_FLAG } from "./sidebars";
 import { type DocumentStats, documentStats } from "./stats";
+import { detectTables, splitParagraphsAtTables, type TableDecision, tableTsv } from "./tables";
 import { buildToc } from "./toc";
 import { normalizeForReader } from "./unicode";
 
@@ -348,6 +349,12 @@ export interface BookAnalysis {
   references: ReferenceDecision[];
   /** Figures read off `page.nonText`, anchored in the reading order (E10-T01b). */
   figures: FigureDecision[];
+  /**
+   * One entry per paragraph of `paragraphs`: the table that paragraph reads
+   * as, when the lines of the paragraph were claimed by `detectTables`
+   * (E10-T02) — the block loop turns it into a single `table` block.
+   */
+  tables: (TableDecision | undefined)[];
   /** `source.ocrTextLayer === true` on the original document. */
   fromOcr: boolean;
   /**
@@ -375,7 +382,13 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
   // E7-T04: every line knows its page, so each block can carry the union of
   // its lines as `origin.bbox`, one box per page (ADR-074).
   const linePages = linePageMap(pages);
-  const paragraphs = joinCrossPageParagraphs(pages, bodyFontSize);
+  const joined = joinCrossPageParagraphs(pages, bodyFontSize);
+  // E10-T02: the tables are claimed off the raw lines first and the
+  // paragraphs cut at the claim — a table reads as one `table` block instead
+  // of prose lines glued to it (ADR-100 priority: table > equation > list >
+  // quote), and every pass below keeps its index over the split flow.
+  const tableDecisions = detectTables(pages, { bodyFontSize });
+  const { paragraphs, tables } = splitParagraphsAtTables(joined, tableDecisions, linePages);
   // E5-T07: margin numbers first — the position gate needs the body measured
   // with the candidates excluded, and every other pass then measures the page
   // without the confirmed numbers (a printed number in the left margin would
@@ -462,6 +475,7 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
     captions,
     references,
     figures,
+    tables,
     fromOcr,
     styleFromImage,
     base,
@@ -623,6 +637,7 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     captions,
     references,
     figures,
+    tables,
     fromOcr,
     styleFromImage,
     base,
@@ -673,6 +688,42 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
       chunk = { pageIndex: paragraph.pageFrom, blocks: [], endnoteFlags: [] };
     }
     lastParagraphIndex = index;
+    // E10-T02: a claimed table reads as one `table` block — empty runs, the
+    // cells in `placeholder.description` (TSV, Opção A of ADR-100) and no
+    // other kind: the table outranks what the paragraph passes decided
+    // (priority `table > equation > list > quote`).
+    const table = tables[index];
+    if (table !== undefined) {
+      const tableOrdinal = ordinals.get(paragraph.pageFrom) ?? 0;
+      ordinals.set(paragraph.pageFrom, tableOrdinal + 1);
+      const tableLabel = stripped.pageLabels[paragraph.pageFrom];
+      const tsv = tableTsv(table);
+      const tableFlags: string[] = [];
+      if (brokenFontText(tsv)) {
+        tableFlags.push(BROKEN_FONT_MAPPING);
+      }
+      chunk.blocks.push({
+        id: blockId(paragraph.pageFrom, tableOrdinal, tsv),
+        kind: "table",
+        runs: [],
+        origin: {
+          pageFrom: paragraph.pageFrom,
+          pageTo: paragraph.pageTo,
+          bbox: paragraphBBoxes(paragraph, linePages),
+          ...(tableLabel === null || tableLabel === undefined
+            ? {}
+            : { originalPageLabel: tableLabel }),
+        },
+        confidence: blockConfidence(base, tableFlags),
+        flags: tableFlags,
+        placeholder: { description: tsv },
+      });
+      // Not an endnote: the flag exists for the E5-T03 pass over text blocks.
+      chunk.endnoteFlags.push(false);
+      // E10-T01b: a figure anchored on the table reads before it.
+      blockIndexByParagraph.set(index, chunk.blocks.length - 1);
+      continue;
+    }
     const hyphen = paragraphHyphenText(paragraph.lines);
     const text = normalizeForReader(hyphen.text);
     if (text.trim() === "") continue;

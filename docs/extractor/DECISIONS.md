@@ -103,6 +103,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-098 | Fluxo escaneado: probe `isScannedPdf`, orquestrador `ingestOcrFlow` e `extract --ocr` na CLI | accepted |
 | ADR-099 | Fonte OFL própria para os testes de canvas (substitui o genérico `serif`) | accepted |
 | ADR-100 | Figuras: legenda copiada para `placeholder.description` e figura dentro do chunk da página | accepted |
+| ADR-101 | Tabelas: gates de detecção (âncora sign-only, família alnum, `≪≫`) | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -796,3 +797,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) apagar o bloco `caption` e guardar só o texto no `figure` (perde REQ-EXT-11 e os gabaritos de `block_kind_f1`) · B) `runs` do `figure` com o texto da legenda (o schema manda `runs: []` em figure/table/equation) · C) manter o bloco `caption` e copiar o texto normalizado para `placeholder.description` (Opção A do plano, sem bump de esquema).
 **Decisão:** C — `figures.ts` filtra `nonText` (1%–90% da página), mescla regiões (gap ≤ 1,2×body) e liga a legenda da E5-T05 (gap ≤ 3×body abaixo e sobreposição horizontal); `buildBlockChunks` intercala a figura antes do parágrafo âncora (banda n → primeiro da banda com `top ≥ fig.bottom`, senão após o último da banda; spanning → primeiro parágrafo com `top ≥ fig.bottom`) e a página **sem** parágrafo ganha chunk próprio (`pageIndex = origin.pageFrom`). A prioridade `table > equation > list > quote` do plano vale quando a T02/T03 existirem: aqui a figura só disputa lugar com o parágrafo.
 **Consequências:** 11 testes unitários + 3 de integração (sintético e corpus); `placeholder.description` é cópia do bloco `caption` (mesmo texto normalizado); página só-com-arte vira chunk próprio em vez de cair no `BookError` de "sem texto" (o scan puro continua sendo recusado na ingestão, ADR-018); `pnpm verify` 1157 testes e `pnpm eval --ci` exit 0.
+
+### ADR-101 · Tabelas: gates de detecção (âncora sign-only, família alnum, `≪≫`) · accepted · 2026-11-06
+**Contexto:** E10-T02 precisa separar linhas de tabela de prosa/TOC/equações sem ouro por página; o plano fixou agrupar por gaps alinhados + anti dot-leader + UM bloco `table` com TSV, mas não os limites finais do gap.
+**Alternativas:** A) âncora either-side (um lado alnum) — pega headers em bracket (p230) mas traz FPs p44/p288 (40→44 tabelas no `n4-pt`, 2 falsas); B) âncora both-sides só — perde bordas de célula negativa; C) âncora both-sides OU sinal standalone em um lado (`CELL_ANCHOR`+`CELL_SIGN`) — 40 tabelas todas reais, p44/p288 mortos. Família: vote em todos os itens (threshold alto perde p70/p64/p65) vs só itens com alnum a 0,35 (`TABLE_ALNUM_FAMILY_SHARE`) — escolhida a segunda. `MATH_RELATION` com `<`/`>` simples matava o FP y356.6 mas perdia a célula p267 `> 0.64` → só `[=≈≃≡≤≥≪≫]`.
+**Decisão:** C + família alnum 0,35 + `≪≫`; linha com exatamente 1 gap quebra a cadeia; `DOT_LEADER` literal `[.·•‥…]`.
+**Consequências:** 40 tabelas no `n4-pt` (38 baseline + p116/p331), 3 em fisica, 2 em en-astro, 0 no phobos; limites (p116 parcial, 2-colunas, grids de equação, header bracket-only p230) em BACKLOG; revisar com a E10-T03 (equações) e se novos N4 entrarem no corpus.

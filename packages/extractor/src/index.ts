@@ -324,6 +324,23 @@ export {
   LINE_HEIGHT_MIN_FACTOR,
   StatsError,
 } from "./stats";
+export type { TableDecision } from "./tables";
+export {
+  detectTables,
+  splitParagraphsAtTables,
+  TABLE_ABSORB_FONT_MAX,
+  TABLE_ABSORB_FONT_MIN,
+  TABLE_ABSORB_GAP_FACTOR,
+  TABLE_ABSORB_WIDTH_SHARE,
+  TABLE_DOT_LEADER_FACTOR,
+  TABLE_GAP_FACTOR,
+  TABLE_LINK_OVERLAP,
+  TABLE_MIN_FONT_FACTOR,
+  TABLE_MIN_GAPS,
+  TABLE_MIN_LINES,
+  TABLE_ROW_GAP_FACTOR,
+  tableTsv,
+} from "./tables";
 export type { FlatOutlineItem, TocResult } from "./toc";
 export {
   buildToc,
