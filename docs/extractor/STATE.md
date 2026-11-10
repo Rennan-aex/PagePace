@@ -6,7 +6,7 @@
 - **Fase atual:** **E10 EM ANDAMENTO (2026-11-10)** — T01 (figuras), T02 (tabelas) e T03 (equações) prontas; só T04 (recortes) pendente. E9/E8/E7/E6/E5/E4/E3 fechadas.
 - **Próxima tarefa:** **E10-T04 — recortes de imagem** (`phases/E10-nontext.md`, § "Plano — E10-T04"): teste ligando `origin.bbox` de `figure` a `renderPageRegion`; a decisão de produto já existe (**ADR-016** — OPEN-QUESTIONS #1 respondida em 2026-10-04).
 - **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`. (Branch `ci-baseline-check` apagada em 2026-11-06 com autorização do PO.)
-- **Status:** **PR #98 ABERTO** (branch `e10-t03-detect-equations`, aguardando CI/merge) — E10-T03 pronta. `pnpm verify` local verde (1196 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; **ADR-102** registrada.
+- **Status:** **PR #98 MESCLADO** (squash `d99cb2c`, CI `verify` verde) — E10-T03 fechada. `pnpm verify` local verde (1196 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; **ADR-102** registrada.
 - **Última atualização:** 2026-11-10 (E10-T03 equações concluída).
 
 ## Tarefa atual — E10-T04 (recortes) · copiada da fase em 2026-11-10
@@ -16,7 +16,7 @@
 - **Medição:** o teste é de integração (bbox → PNG não-branco); nenhum doc de eval muda.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão concluída: E10-T03 (equações).** Feito: `src/equations.ts` (`detectEquations`, gates da ADR-102) + `src/claims.ts` (`splitParagraphsAtClaims` genérico, T02 passou a usá-lo) + bloco `equation` (`runs: []`, texto em `placeholder.description`), 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, `pnpm verify` verde, `pnpm eval --ci` exit 0 (schema/baseline intocados). **PR #98 aberto.**
+- **Sessão concluída: E10-T03 (equações).** Feito: `src/equations.ts` (`detectEquations`, gates da ADR-102) + `src/claims.ts` (`splitParagraphsAtClaims` genérico, T02 passou a usá-lo) + bloco `equation` (`runs: []`, texto em `placeholder.description`), 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, `pnpm verify` verde, `pnpm eval --ci` exit 0 (schema/baseline intocados). **PR #98 mesclado (squash `d99cb2c`).**
 - **Próximo passo:** **E10-T04 (recortes)** — `phases/E10-nontext.md` § "Plano — E10-T04"; branch nova a partir de `main` depois do merge. É a última tarefa da E10.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
@@ -43,7 +43,7 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-10 · **E10-T03 (equações) — CONCLUÍDO** · `equations.ts` (`detectEquations`, gates da ADR-102: run máximo de linhas reivindicáveis + fragmento de fórmula, `PROSE_TAIL`, `symbols > 0`) + `claims.ts` (`splitParagraphsAtClaims`, T02 reusou) + bloco `equation` em `book.ts`, 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados; medido: phobos 20, n2-astro 30, n4-en-astro 62, n4-pt 2080). PR #98.
+- 2026-11-10 · **E10-T03 (equações) — CONCLUÍDO** · `equations.ts` (`detectEquations`, gates da ADR-102: run máximo de linhas reivindicáveis + fragmento de fórmula, `PROSE_TAIL`, `symbols > 0`) + `claims.ts` (`splitParagraphsAtClaims`, T02 reusou) + bloco `equation` em `book.ts`, 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados; medido: phobos 20, n2-astro 30, n4-en-astro 62, n4-pt 2080). PR #98 (squash `d99cb2c`).
 - 2026-11-06 · **E10-T02 (tabelas) — CONCLUÍDO** · `tables.ts` (`detectTables`, gates da ADR-101) + `splitParagraphsAtTables` em `book.ts` (UM bloco `table` com TSV), 17 testes novos (1174 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados). PR #96 (squash `39c697e`).
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098).
 
