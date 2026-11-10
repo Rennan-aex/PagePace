@@ -1,4 +1,5 @@
 import type { RawTextItem } from "@pagepace/schema";
+import { claimsByLine, splitParagraphsAtClaims } from "./claims";
 import type { TextLine } from "./lines";
 import type { JoinedParagraph } from "./pagejoin";
 import { spaceBetween } from "./spaces";
@@ -424,51 +425,6 @@ export function splitParagraphsAtTables(
   decisions: readonly TableDecision[],
   linePages: ReadonlyMap<TextLine, number>,
 ): { paragraphs: JoinedParagraph[]; tables: (TableDecision | undefined)[] } {
-  const claimed = new Map<TextLine, TableDecision>();
-  for (const decision of decisions) {
-    for (const line of decision.lines) claimed.set(line, decision);
-  }
-  const outParagraphs: JoinedParagraph[] = [];
-  const outTables: (TableDecision | undefined)[] = [];
-  for (const paragraph of paragraphs) {
-    const lines = paragraph.lines;
-    if (lines.length === 0) {
-      outParagraphs.push(paragraph);
-      outTables.push(undefined);
-      continue;
-    }
-    const runs: { start: number; end: number; claim: TableDecision | undefined }[] = [];
-    let start = 0;
-    let claim = claimed.get(lines[0] as TextLine);
-    for (let index = 1; index < lines.length; index++) {
-      const next = claimed.get(lines[index] as TextLine);
-      if (next === claim) continue;
-      runs.push({ start, end: index, claim });
-      start = index;
-      claim = next;
-    }
-    runs.push({ start, end: lines.length, claim });
-
-    for (const run of runs) {
-      const previous = outTables[outTables.length - 1];
-      if (run.claim !== undefined && previous === run.claim) {
-        const merged = outParagraphs[outParagraphs.length - 1] as JoinedParagraph;
-        merged.lines.push(...lines.slice(run.start, run.end));
-        merged.pageTo = linePages.get(lines[run.end - 1] as TextLine) ?? merged.pageTo;
-        continue;
-      }
-      if (run.claim === undefined && runs.length === 1) {
-        outParagraphs.push(paragraph);
-        outTables.push(undefined);
-        continue;
-      }
-      outParagraphs.push({
-        lines: lines.slice(run.start, run.end),
-        pageFrom: linePages.get(lines[run.start] as TextLine) ?? paragraph.pageFrom,
-        pageTo: linePages.get(lines[run.end - 1] as TextLine) ?? paragraph.pageTo,
-      });
-      outTables.push(run.claim);
-    }
-  }
-  return { paragraphs: outParagraphs, tables: outTables };
+  const split = splitParagraphsAtClaims(paragraphs, claimsByLine(decisions), linePages);
+  return { paragraphs: split.paragraphs, tables: split.claims };
 }

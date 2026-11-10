@@ -3,8 +3,10 @@ import { blockSchema, bookSchema, parseWith, SCHEMA_VERSION } from "@pagepace/sc
 import { linePageMap, paragraphBBoxes } from "./bbox";
 import { BROKEN_FONT_MAPPING, brokenFontText } from "./brokenfont";
 import { type CaptionDecision, detectCaptions, UNCERTAIN_CAPTION_FLAG } from "./captions";
+import { claimsByLine, splitParagraphsAtClaims } from "./claims";
 import { BOOK_BLOCK_CONFIDENCE, blockConfidence, OCR_TEXT_LAYER_CONFIDENCE } from "./confidence";
 import { detectEndnotes, type EndnoteDecision } from "./endnotes";
+import { detectEquations, type EquationDecision, equationText } from "./equations";
 import { detectFigures, type FigureDecision } from "./figures";
 import { detectFootnotes, type FootnoteDecision, UNCERTAIN_FOOTNOTE_FLAG } from "./footnotes";
 import { tagGreekRuns } from "./greek";
@@ -355,6 +357,12 @@ export interface BookAnalysis {
    * (E10-T02) — the block loop turns it into a single `table` block.
    */
   tables: (TableDecision | undefined)[];
+  /**
+   * One entry per paragraph of `paragraphs`: the equation that paragraph
+   * reads as, when `detectEquations` claimed every line of it (E10-T03) —
+   * the block loop turns it into a single `equation` block.
+   */
+  equations: (EquationDecision | undefined)[];
   /** `source.ocrTextLayer === true` on the original document. */
   fromOcr: boolean;
   /**
@@ -388,7 +396,23 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
   // of prose lines glued to it (ADR-100 priority: table > equation > list >
   // quote), and every pass below keeps its index over the split flow.
   const tableDecisions = detectTables(pages, { bodyFontSize });
-  const { paragraphs, tables } = splitParagraphsAtTables(joined, tableDecisions, linePages);
+  const tableSplit = splitParagraphsAtTables(joined, tableDecisions, linePages);
+  // E10-T03: the equations are claimed off the paragraphs the tables left
+  // and cut the same way — a paragraph of math reads as one `equation` block
+  // instead of prose carrying symbol junk (ADR-100 priority keeps a table a
+  // table), and consecutive equation paragraphs chain into a single decision.
+  const equationDecisions = detectEquations(tableSplit.paragraphs, {
+    bodyFontSize,
+    tables: tableSplit.tables,
+  });
+  const equationSplit = splitParagraphsAtClaims(
+    tableSplit.paragraphs,
+    claimsByLine(equationDecisions),
+    linePages,
+  );
+  const paragraphs = equationSplit.paragraphs;
+  const tables = equationSplit.sources.map((source) => tableSplit.tables[source]);
+  const equations = equationSplit.claims;
   // E5-T07: margin numbers first — the position gate needs the body measured
   // with the candidates excluded, and every other pass then measures the page
   // without the confirmed numbers (a printed number in the left margin would
@@ -476,6 +500,7 @@ export function analyzeDocument(document: RawDocument): BookAnalysis {
     references,
     figures,
     tables,
+    equations,
     fromOcr,
     styleFromImage,
     base,
@@ -638,6 +663,7 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
     references,
     figures,
     tables,
+    equations,
     fromOcr,
     styleFromImage,
     base,
@@ -721,6 +747,43 @@ export function* buildBlockChunks(analysis: BookAnalysis): Generator<BlockChunk>
       // Not an endnote: the flag exists for the E5-T03 pass over text blocks.
       chunk.endnoteFlags.push(false);
       // E10-T01b: a figure anchored on the table reads before it.
+      blockIndexByParagraph.set(index, chunk.blocks.length - 1);
+      continue;
+    }
+    // E10-T03: a claimed equation reads as one `equation` block — empty runs,
+    // the normalized lines in `placeholder.description` and no other kind:
+    // the equation outranks what the paragraph passes decided (priority
+    // `table > equation > list > quote`, ADR-100) and its text never leaks
+    // into the paragraph the reader gets.
+    const equation = equations[index];
+    if (equation !== undefined) {
+      const equationOrdinal = ordinals.get(paragraph.pageFrom) ?? 0;
+      ordinals.set(paragraph.pageFrom, equationOrdinal + 1);
+      const equationLabel = stripped.pageLabels[paragraph.pageFrom];
+      const equationBody = equationText(equation);
+      const equationFlags: string[] = [];
+      if (brokenFontText(equationBody)) {
+        equationFlags.push(BROKEN_FONT_MAPPING);
+      }
+      chunk.blocks.push({
+        id: blockId(paragraph.pageFrom, equationOrdinal, equationBody),
+        kind: "equation",
+        runs: [],
+        origin: {
+          pageFrom: paragraph.pageFrom,
+          pageTo: paragraph.pageTo,
+          bbox: paragraphBBoxes(paragraph, linePages),
+          ...(equationLabel === null || equationLabel === undefined
+            ? {}
+            : { originalPageLabel: equationLabel }),
+        },
+        confidence: blockConfidence(base, equationFlags),
+        flags: equationFlags,
+        placeholder: { description: equationBody },
+      });
+      // Not an endnote: the flag exists for the E5-T03 pass over text blocks.
+      chunk.endnoteFlags.push(false);
+      // E10-T01b: a figure anchored on the equation reads before it.
       blockIndexByParagraph.set(index, chunk.blocks.length - 1);
       continue;
     }

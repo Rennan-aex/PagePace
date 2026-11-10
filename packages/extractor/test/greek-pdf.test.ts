@@ -126,9 +126,14 @@ describe("E5-T08 acceptance against the public corpus (skipped without corpus/pu
       expect(rawGreek).toBeGreaterThan(0);
 
       const book = buildBook(document);
+      // E10-T03: an equation carries its text in `placeholder.description`
+      // (empty `runs`), so the count walks both — figure/table/equation
+      // blocks never duplicate text between the two.
       const bookText = book.blocks
-        .flatMap((block) => block.runs)
-        .map((run) => run.text)
+        .flatMap((block) => [
+          ...block.runs.map((run) => run.text),
+          block.placeholder?.description ?? "",
+        ])
         .join("");
       expect(countGreek(bookText)).toBe(rawGreek);
       expect(bookText).not.toContain("�");

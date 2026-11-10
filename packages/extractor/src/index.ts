@@ -34,6 +34,7 @@ export {
   readCachedBook,
   writeCachedBook,
 } from "./cache";
+export { claimsByLine, type SplitAtClaimsResult, splitParagraphsAtClaims } from "./claims";
 export type { ColumnDetectionOptions, ColumnRange, PageColumns } from "./columns";
 export {
   COLUMNS_BIN_WIDTH,
@@ -49,6 +50,17 @@ export {
 } from "./columns";
 export type { EndnoteContext, EndnoteDecision } from "./endnotes";
 export { detectEndnotes, ENDNOTE_SECTION_TITLES, normalizeSectionTitle } from "./endnotes";
+export type { EquationDecision } from "./equations";
+export {
+  detectEquations,
+  EQUATION_DOT_LEADER_FACTOR,
+  EQUATION_FRAGMENT_PROSE_WORDS,
+  EQUATION_LINK_GAP_FACTOR,
+  EQUATION_MATH_FONT_SHARE,
+  EQUATION_SHORT_WORDS,
+  EQUATION_SYMBOL_DENSITY,
+  equationText,
+} from "./equations";
 export type {
   ExplainedHyphenSite,
   ExplainedLayer,
