@@ -5,20 +5,20 @@
 ## Situação
 - **Fase atual:** **E10 FECHADA (2026-11-11)** — T01 (figuras), T02 (tabelas), T03 (equações) e T04 (recortes) prontas. E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
 - **Próxima tarefa:** trilha **SEG** — `phases/SEG-segmenter.md` (frases e palavras pt/en; pode começar a qualquer momento depois do E1 e é obrigatória antes do M2 do app). Abrir o arquivo da fase na próxima sessão.
-- **Ação pendente do PO:** nenhuma sobre a entrega — em 2026-11-11 o PO autorizou apagar a `corpus-public-v1` depois do merge com CI verde (o agente faz sozinho com o `gh`, ADR-054).
-- **Status:** **manutenção em andamento (branch `chore-corpus-vendor-pdfs`, ADR-103):** os 2 PDFs do SciELO agora são versionados em `corpus/vendored/`, o `corpus:fetch` copia sem rede e o `check:no-pdf` virou TS com exceção testada. Falta: `pnpm verify` + `pnpm eval` → PR → merge → CI verde da `main` → apagar a entrega → report-to-po.
-- **Última atualização:** 2026-11-11 (manutenção corpus-public-v1 em andamento).
+- **Ação pendente do PO:** nenhuma — a entrega `corpus-public-v1` foi apagada em 2026-11-11, depois do CI verde da `main` (ADR-103).
+- **Status:** **PR #102 MESCLADO** (squash `91a49c7`, CI `verify` verde na `main`) — manutenção "eliminar a entrega `corpus-public-v1`" concluída (ADR-103): os 2 PDFs do SciELO são versionados em `corpus/vendored/` (byte a byte, SHA-256 inalterados), o `corpus:fetch` copia sem rede, o `pnpm check:no-pdf` virou TS com exceção testada, e a entrega + tag foram apagadas. `pnpm verify` verde (1206 testes); `pnpm eval --ci` exit 0; baseline/goldens intocados.
+- **Última atualização:** 2026-11-11 (manutenção corpus-public-v1 concluída; entrega apagada).
 
 ## Tarefa atual — SEG (próxima; abrir `phases/SEG-segmenter.md` na próxima sessão)
 - **Da fase:** frases e palavras pt/en; suíte de casos pt/en passando (ver `phases/SEG-segmenter.md` para tarefas e aceites).
 - **Por que agora:** E0–E10 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão em andamento: manutenção "eliminar a entrega `corpus-public-v1"` (branch `chore-corpus-vendor-pdfs`, ADR-103).** Feito: 2 PDFs copiados byte a byte p/ `corpus/vendored/` + `README.md` de licenças; campo `vendored` no parser e no `loadCorpus`; `corpus:fetch` copia sem rede (prova local: `2 vendored, 0 downloaded, 14 reused`, exit 0); `check:no-pdf` trocado por `packages/eval/src/check-no-pdf.ts` + `check-no-pdf.test.ts` (2 passam / 3º PDF reprova / digest errado reprova); `corpus.test.ts` e `fetch.test.ts` atualizados (+5 testes); docs: `corpus/README.md`, `CORPUS.md`, `E1-foundation.md`, comentários do `ci.yml`, `corpus/vendored/README.md`, ADR-103 + nota na ADR-034; `scripts/check-no-pdf.sh` removido.
-- **Próximo comando:** `pnpm verify` (e `pnpm eval --ci`) → commit + push → PR (`gh pr create --base main`) → merge quando os checks passarem → CI verde da `main` → `gh release delete corpus-public-v1 --yes --cleanup-tag` → fechar STATE/LOG e falar com o PO (`report-to-po`).
+- **Sessão concluída: manutenção `corpus-public-v1` (ADR-103) — PR #102 mesclado (squash `91a49c7`); entrega e tag apagadas depois do CI verde da `main`.** Feito: `corpus/vendored/` com os 2 PDFs byte a byte + `README.md` de licenças (CC BY 4.0 re-verificadas em 2026-11-11); `vendored:` no manifest (sem `source_url`/`fallback_urls`); `corpus:fetch` copia sem rede; `check:no-pdf` = `packages/eval/src/check-no-pdf.ts` + teste (2 passam, 3º PDF reprova, digest errado reprova); `scripts/check-no-pdf.sh` removido; docs (`corpus/README.md`, `CORPUS.md`, `E1-foundation.md`, `ci.yml`, `AGENTS.md`, skill `add-corpus-pdf`) + ADR-103 e nota na ADR-034. CI na `main`: `copied ... (596315/694609 bytes)`, `2 vendored`, `check:no-pdf` OK.
+- **Próximo passo:** trilha **SEG** — `phases/SEG-segmenter.md`, branch nova a partir da `main` atualizada (`91a49c7`).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
-- [ ] Apagar a entrega `corpus-public-v1` **só depois** do PR mesclado e do CI verde da `main` (`gh release delete corpus-public-v1 --yes --cleanup-tag`); o `manifest.yaml` já não aponta para ela.
+- Nenhum aberto.
 
 ## Progresso por marco
 | Marco | Status |
@@ -42,8 +42,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-11 · **manutenção `corpus-public-v1` — CONCLUÍDO** · 2 PDFs do SciELO versionados byte a byte em `corpus/vendored/` (ADR-103, licenças CC BY 4.0 re-verificadas) + `vendored:` no manifest (cópia sem rede no `corpus:fetch`) + `check:no-pdf` em TypeScript com exceção testada por caminho e SHA-256 (`scripts/check-no-pdf.sh` removido) + docs/ADR-103 e nota na ADR-034. `pnpm verify` 1206 testes, `pnpm eval --ci` exit 0, baseline/goldens intocados. **PR #102 (squash `91a49c7`); CI da `main` verde (2 vendored, 0 requisições para o SciELO); entrega e tag `corpus-public-v1` apagadas. Próxima: SEG.**
 - 2026-11-11 · **E10-T04 (recortes) — CONCLUÍDO** · `test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 pixels não-brancos; controle: região em branco da mesma página → 0 — o recorte segue a área do bloco, nunca a página inteira; regra ADR-016, gate de modo normal×dinâmico é do app/A-015). Sem código novo (API ADR-075 e decisão ADR-016 já existiam; OPEN-QUESTIONS #1 respondida 2026-10-04). `pnpm verify` 1198 testes, `pnpm eval --ci` exit 0, schema/baseline intocados. **PR #100 (squash `8c549d1`). E10 fechada; próxima: SEG.**
-- 2026-11-10 · **E10-T03 (equações) — CONCLUÍDO** · `equations.ts` (`detectEquations`, gates da ADR-102: run máximo de linhas reivindicáveis + fragmento de fórmula, `PROSE_TAIL`, `symbols > 0`) + `claims.ts` (`splitParagraphsAtClaims`, T02 reusou) + bloco `equation` em `book.ts`, 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados; medido: phobos 20, n2-astro 30, n4-en-astro 62, n4-pt 2080). PR #98 (squash `d99cb2c`).
-- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098).
+- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98).
 
 Histórico completo: docs/extractor/archive/
