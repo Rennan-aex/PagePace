@@ -6,7 +6,7 @@
 - **Fase atual:** **E10 FECHADA (2026-11-11)** — T01 (figuras), T02 (tabelas), T03 (equações) e T04 (recortes) prontas. E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
 - **Próxima tarefa:** trilha **SEG** — `phases/SEG-segmenter.md` (frases e palavras pt/en; pode começar a qualquer momento depois do E1 e é obrigatória antes do M2 do app). Abrir o arquivo da fase na próxima sessão.
 - **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`. (Branch `ci-baseline-check` apagada em 2026-11-06 com autorização do PO.)
-- **Status:** **PR #100 aberto** — E10-T04 (recortes) pronta: teste `test/figure-clip.test.ts` (bbox do `figure` → `renderPageRegion` → não-branco + controle em branco, regra ADR-016); `renderPageRegion` (ADR-075) e decisão de produto (ADR-016) já existiam, sem código novo. `pnpm verify` local verde (1198 testes); `pnpm eval --ci` exit 0; baseline/schema intocados.
+- **Status:** **PR #100 MESCLADO** (squash `8c549d1`, CI `verify` verde) — E10-T04 (recortes) fechada e **E10 encerrada**. `pnpm verify` local verde (1198 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; sem ADR nova (decisão de produto já era a ADR-016).
 - **Última atualização:** 2026-11-11 (E10-T04 recortes concluída; E10 fechada).
 
 ## Tarefa atual — SEG (próxima; abrir `phases/SEG-segmenter.md` na próxima sessão)
@@ -14,8 +14,8 @@
 - **Por que agora:** E0–E10 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão: E10-T04 (recortes) — teste pronto, PR #100 em aberto.** Feito: `packages/extractor/test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 não-brancos; controle região em branco → 0; canvas `@napi-rs/canvas` já era devDep). Sem código novo — API (ADR-075) e decisão (ADR-016) já existiam; OPEN-QUESTIONS #1 respondida em 2026-10-04. Fase marcada `done`, E10 fechada na tabela, STATE atualizado. `pnpm verify` e `pnpm eval --ci` verdes (1198 testes).
-- **Próximo passo:** merge do PR (checks verdes) e depois docs-PR "mark E10-T04 merged in STATE"; sessão seguinte = SEG (`phases/SEG-segmenter.md`).
+- **Sessão concluída: E10-T04 (recortes) — PR #100 mesclado (squash `8c549d1`).** Feito: `packages/extractor/test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 não-brancos; controle região em branco → 0; canvas `@napi-rs/canvas` já era devDep). Sem código novo — API (ADR-075) e decisão (ADR-016) já existiam; OPEN-QUESTIONS #1 respondida em 2026-10-04. Fase marcada `done`, E10 fechada, verify/eval verdes (1198 testes, exit 0).
+- **Próximo passo:** **trilha SEG** — `phases/SEG-segmenter.md`, branch nova a partir da `main` atualizada (`8c549d1`).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
@@ -42,7 +42,7 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-11 · **E10-T04 (recortes) — CONCLUÍDO** · `test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 pixels não-brancos; controle: região em branco da mesma página → 0 — o recorte segue a área do bloco, nunca a página inteira; regra ADR-016, gate de modo normal×dinâmico é do app/A-015). Sem código novo (API ADR-075 e decisão ADR-016 já existiam; OPEN-QUESTIONS #1 respondida 2026-10-04). `pnpm verify` 1198 testes, `pnpm eval --ci` exit 0, schema/baseline intocados. **PR #100. E10 fechada; próxima: SEG.**
+- 2026-11-11 · **E10-T04 (recortes) — CONCLUÍDO** · `test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 pixels não-brancos; controle: região em branco da mesma página → 0 — o recorte segue a área do bloco, nunca a página inteira; regra ADR-016, gate de modo normal×dinâmico é do app/A-015). Sem código novo (API ADR-075 e decisão ADR-016 já existiam; OPEN-QUESTIONS #1 respondida 2026-10-04). `pnpm verify` 1198 testes, `pnpm eval --ci` exit 0, schema/baseline intocados. **PR #100 (squash `8c549d1`). E10 fechada; próxima: SEG.**
 - 2026-11-10 · **E10-T03 (equações) — CONCLUÍDO** · `equations.ts` (`detectEquations`, gates da ADR-102: run máximo de linhas reivindicáveis + fragmento de fórmula, `PROSE_TAIL`, `symbols > 0`) + `claims.ts` (`splitParagraphsAtClaims`, T02 reusou) + bloco `equation` em `book.ts`, 22 testes novos (1196 totais), fase/STATE/DECISIONS/BACKLOG atualizados, verify/eval verdes (`eval --ci` exit 0; schema/baseline intocados; medido: phobos 20, n2-astro 30, n4-en-astro 62, n4-pt 2080). PR #98 (squash `d99cb2c`).
 - Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098).
 
