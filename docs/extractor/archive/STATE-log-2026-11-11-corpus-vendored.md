@@ -1,0 +1,3 @@
+# STATE log — 2026-11-11 (manutenção corpus-public-v1)
+
+- 2026-11-11 · **manutenção `corpus-public-v1` — CONCLUÍDO** · 2 PDFs do SciELO versionados byte a byte em `corpus/vendored/` (ADR-103, licenças CC BY 4.0 re-verificadas) + `vendored:` no manifest (cópia sem rede no `corpus:fetch`) + `check:no-pdf` em TypeScript com exceção testada por caminho e SHA-256 (`scripts/check-no-pdf.sh` removido) + docs/ADR-103 e nota na ADR-034. `pnpm verify` 1206 testes, `pnpm eval --ci` exit 0, baseline/goldens intocados. **PR #102 (squash `91a49c7`); CI da `main` verde (2 vendored, 0 requisições para o SciELO); entrega e tag `corpus-public-v1` apagadas. Próxima: SEG.**

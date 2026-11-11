@@ -107,6 +107,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-102 | Equações: runs reivindicáveis com fragmento de fórmula e bloco `equation` sem runs | accepted |
 | ADR-103 | PDFs do SciELO versionados em `corpus/vendored/` (entrega `corpus-public-v1` removida) | accepted |
 | ADR-104 | Segmentador: offsets de frase aparados e palavra = trecho sem espaço | accepted |
+| ADR-105 | Segmentador: abreviações por idioma e iniciais não terminam frase | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -825,3 +826,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) spans de frase incluindo o espaço entre frases · B) spans aparados (o espaço fica de fora) · C) tokens de palavra separando também a pontuação para fora — e, para a fronteira: i) todo terminador é fronteira · ii) fronteira só quando o terminador (e fechamentos `" ' ” ’ » ) ] }`) é seguido de espaço ou do fim.
 **Decisão:** **B + ii** — `splitSentences(text, { lang })` devolve `{ start, end }` aparados, nulidade em texto vazio/só espaço, e só quebra quando há espaço/fim depois dos terminadores `. ! ? …` (runs como `...` e `?!` contam uma vez); `splitWords` devolve `{ text, start, end }` onde o token é o trecho sem espaço, com pontuação e aspas anexadas. `SegmentLang = "pt" | "en"`; idioma desconhecido lança `RangeError`. Abreviações, decimais, iniciais e compostos ficam para SEG-T02/T03 — a API não muda.
 **Consequências:** 43 casos de frase + 32 de palavra (70 tabelados, ≥ 60 do aceite) mais invariantes de offset (monotônico, sem sobreposição, só espaço fora) e determinismo; dados por idioma de SEG-T02 entram atrás da mesma assinatura; `lang` já é lido (validação), sem parâmetro morto.
+
+### ADR-105 · Segmentador: abreviações por idioma e iniciais não terminam frase · accepted · 2026-11-11
+**Contexto:** SEG-T02 precisa que `Sr.`, `e.g.`, `p.` e `J. S. Mill` não gerem fronteira de frase sem quebrar `3.14`/`1.000,50` (já cobertos por "terminador só quebra com espaço depois"):
+**Alternativas:** A) lista única pt+en — simples, mas uma abreviação de um idioma vaza para o outro · B) um arquivo de dados por idioma · C) heurística sem lista (só letra minúscula depois do ponto) — perde `Mr. Smith` e `3.14`.
+**Decisão:** **B** — `src/abbreviations/{pt,en}.ts` exportam listas lowercase sem o ponto final (multi-ponto mantém o interno: `e.g`), comparadas sem diferenciar maiúsculas. Ponto isolado + abreviação conhecida → nunca quebra (mesmo antes de maiúscula); ponto isolado + letra maiúscula sozinha (inicial) → não quebra se a próxima palavra começa com maiúscula. `! ? …` e runs de pontos seguem a regra anterior. A API não muda.
+**Consequências:** `Item A. Depois` (letra solteira seguida de maiúscula) e `..., etc. Depois` (abreviação no fim de frase) ficam juntos por escolha; revisar se o corpus de SEG-T05 mostrar perda. Estender a lista é editar o arquivo do idioma; o teste confere formato (minúsculas, sem ponto final, sem duplicata).

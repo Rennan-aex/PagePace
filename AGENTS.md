@@ -63,6 +63,7 @@ Atalho: skill `end-session`.
 7. **Determinismo:** mesma entrada, mesma saída. Sem `Date.now()`/aleatoriedade na lógica de extração.
 8. **Conventional Commits** nas mensagens de commit e no título do PR (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 9. **Sem decisões silenciosas.** Se escolheu entre alternativas, escreveu em `DECISIONS.md`.
+10. **Sem atribuição de IA.** Commits e PRs terminam na própria mensagem: nada de `Generated with...` nem `Co-Authored-By` de IA.
 
 ## Definição de pronto (uma tarefa)
 Critérios de aceite da tarefa cumpridos, testes automatizados escritos (ou justificativa), `pnpm verify` verde, avaliação sem regressão, docs de estado atualizados, PR aberto.

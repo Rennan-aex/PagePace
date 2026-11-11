@@ -3,19 +3,19 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **SEG em andamento (2026-11-11)** — T01 (API + testes tabelados) pronta; T02–T05 abertas. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
-- **Próxima tarefa:** **SEG-T02 (frases)** — abreviações pt/en por idioma, decimais, iniciais, aspas/diálogos, fim de frase seguido de fechamento (texto completo copiado abaixo).
+- **Fase atual:** **SEG em andamento (2026-11-11)** — T01 (API + testes) e T02 (frases) prontas; T03–T05 abertas. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
+- **Próxima tarefa:** **SEG-T03 (palavras)** — hífens compostos, apóstrofos, números com separadores, travessão, URLs/emails como um token (texto completo copiado abaixo).
 - **Ação pendente do PO:** nenhuma.
-- **Status:** **SEG-T01 concluída em 2026-11-11** — `packages/segmenter/src/{types,sentences,words,index}.ts` com `splitSentences(text, { lang })` → spans e `splitWords(text)` → tokens, 75 testes no pacote (43 de frase + 32 de palavra, 70 tabelados, escritos antes da implementação), ADR-104. `pnpm verify` verde; `pnpm eval --ci` exit 0 (sem mudança de baseline). **PR #106 (squash `b961305`), CI `verify` verde na `main`.**
-- **Última atualização:** 2026-11-11 (SEG-T01).
+- **Status:** **SEG-T02 concluída em 2026-11-11** — `packages/segmenter/src/abbreviations/{pt,en}.ts` (listas lowercase sem ponto, 30 + 32 entradas) e `sentences.ts` sem mudar a API: ponto isolado depois de abreviação conhecida nunca quebra, inicial maiúscula sozinha não quebra antes de palavra maiúscula, `! ? …`/runs e decimais como antes. 73 testes no arquivo (68 casos tabelados, 28 novos; + cobertura por categoria e formato das listas), ADR-105. `pnpm verify` verde; `pnpm eval --ci` exit 0 (baseline intocado).
+- **Última atualização:** 2026-11-11 (SEG-T02).
 
-## Tarefa atual — SEG-T02 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
-- **SEG-T02 · Frases:** fim por `. ! ?` e reticências; **abreviações** pt (Sr., Sra., Dr., Dra., Prof., etc., p., pp., cap., v., ex.) e en (Mr., Mrs., Dr., e.g., i.e., vs., Fig.); números/decimais (`3.14`, `1.000,50`); iniciais (`J. S. Mill`); aspas e diálogos (`— Disse ele.`); fim de frase seguido de aspas/parênteses. **Aceite:** testes de cada categoria; lista de abreviações em arquivo de dados por idioma (fácil de estender).
-- **Por que agora:** E0–E10 e SEG-T01 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
+## Tarefa atual — SEG-T03 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
+- **SEG-T03 · Palavras:** hifens compostos como uma palavra (`guarda-chuva`), apóstrofos (`don't`, `d'água`), números com separadores, travessão `—` como separador, URLs/emails como um token. **Aceite:** testes.
+- **Por que agora:** E0–E10, SEG-T01 e SEG-T02 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão concluída: SEG-T01 (API do segmentador) — código + testes + ADR-104 prontos.** Feito: `SegmentLang`/`SentenceSpan`/`WordToken`/`SplitSentencesOptions` exportados; `splitSentences` (spans aparados, fronteira após `. ! ? …` + fechamentos `" ' ” ’ » ) ] }` só com espaço/fim, `RangeError` em idioma fora de `pt|en`) e `splitWords` (trecho sem espaço, pontuação/aspas anexadas) em arquivos separados; `packages/segmenter/src/index.test.ts` atualizado (forma da API).
-- **Próximo passo:** **SEG-T02** em branch nova `seg-t02-sentences` a partir da `main` (`b961305`) — criar `packages/segmenter/src/abbreviations/{pt,en}.ts` com a lista de abreviações e estender `sentences.ts`; não mexer na assinatura da API.
+- **Sessão concluída: SEG-T02 (frases) — código + testes + ADR-105 prontos.** Feito: listas `abbreviations/pt.ts` e `en.ts`; `sentences.ts` ganhou `abbreviationBefore`/`isInitialBefore` e só aplica a regra quando o terminador é um ponto isolado (runs de `...` e `! ?` seguem a regra anterior); decimais já cobertos por "sem espaço depois do ponto" e agora testados.
+- **Próximo passo:** **SEG-T03** em branch nova `seg-t03-words` a partir da `main` — estender `words.ts` (hífen composto, apóstrofo, número com separador, travessão como separador, URL/email), mantendo `splitWords(text)`; não mexer na assinatura da API.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Nenhum aberto.
@@ -34,7 +34,7 @@
 | E8 | **done** (T01–T04 — fase fechada 2026-10-29; ADR-088/089/090/091/092; medições Android 3/3) |
 | E9 | **done** (T01–T04 done 2026-10-30/11-02, ADR-093–098 — fase fechada 2026-11-02; E9 = OCR da ADR-018) |
 | E10 | **done** (T01a/T01b/T02/T03/T04 — fase fechada 2026-11-11; ADR-100/101/102; recorte = ADR-016 + ADR-075) |
-| SEG | **em andamento** (T01 done 2026-11-11; T02–T05 abertas) |
+| SEG | **em andamento** (T01/T02 done 2026-11-11; T03–T05 abertas) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
 - `pnpm eval`: 31 documentos (16 públicos + 15 privados); 12 com gabarito (sintéticos `syn-*`); nenhum PDF real com gabarito ainda.
@@ -42,8 +42,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-11 · **SEG-T02 (frases) — CONCLUÍDO** · `abbreviations/{pt,en}.ts` (30+32 entradas lowercase sem ponto) + `sentences.ts` (sem mudar a API): ponto isolado após abreviação conhecida nunca quebra; inicial maiúscula sozinha (`J. S. Mill`) não quebra antes de palavra maiúscula; `3.14`/`1.000,50`, `! ? …` e runs seguem a regra anterior; 68 casos tabelados (28 novos, cada categoria pt/en) + checagem de cobertura e de formato das listas (73 testes no arquivo), ADR-105; `pnpm verify` verde, `eval --ci` exit 0. Próxima: SEG-T03.
 - 2026-11-11 · **SEG-T01 (API do segmentador) — CONCLUÍDO** · `packages/segmenter/src/{types,sentences,words}.ts` + ADR-104: `splitSentences(text, { lang })` → spans aparados (`{start,end}`) e `splitWords(text)` → `{text,start,end}`, determinísticos e sem dependência de Node; 43 casos de frase + 32 de palavra (70 tabelados pt/en, escritos antes da implementação), invariantes de offset e determinismo; 75 testes no pacote, `pnpm verify` verde; eval sem mudança de baseline. Próxima: SEG-T02.
-- 2026-11-11 · **manutenção `corpus-public-v1` — CONCLUÍDO** · 2 PDFs do SciELO versionados byte a byte em `corpus/vendored/` (ADR-103, licenças CC BY 4.0 re-verificadas) + `vendored:` no manifest (cópia sem rede no `corpus:fetch`) + `check:no-pdf` em TypeScript com exceção testada por caminho e SHA-256 (`scripts/check-no-pdf.sh` removido) + docs/ADR-103 e nota na ADR-034. `pnpm verify` 1206 testes, `pnpm eval --ci` exit 0, baseline/goldens intocados. **PR #102 (squash `91a49c7`); CI da `main` verde (2 vendored, 0 requisições para o SciELO); entrega e tag `corpus-public-v1` apagadas. Próxima: SEG.**
-- Sessões anteriores: `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98).
+- Sessões anteriores: `archive/STATE-log-2026-11-11-corpus-vendored.md` (manutenção corpus vendored), `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98).
 
 Histórico completo: docs/extractor/archive/
