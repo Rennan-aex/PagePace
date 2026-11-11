@@ -6,7 +6,7 @@
 - **Fase atual:** **SEG em andamento (2026-11-11)** — T01 (API + testes tabelados) pronta; T02–T05 abertas. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
 - **Próxima tarefa:** **SEG-T02 (frases)** — abreviações pt/en por idioma, decimais, iniciais, aspas/diálogos, fim de frase seguido de fechamento (texto completo copiado abaixo).
 - **Ação pendente do PO:** nenhuma.
-- **Status:** **SEG-T01 concluída em 2026-11-11** — `packages/segmenter/src/{types,sentences,words,index}.ts` com `splitSentences(text, { lang })` → spans e `splitWords(text)` → tokens, 75 testes no pacote (43 de frase + 32 de palavra, 70 tabelados, escritos antes da implementação), ADR-104. `pnpm verify` verde; `pnpm eval --ci` exit 0 (sem mudança de baseline).
+- **Status:** **SEG-T01 concluída em 2026-11-11** — `packages/segmenter/src/{types,sentences,words,index}.ts` com `splitSentences(text, { lang })` → spans e `splitWords(text)` → tokens, 75 testes no pacote (43 de frase + 32 de palavra, 70 tabelados, escritos antes da implementação), ADR-104. `pnpm verify` verde; `pnpm eval --ci` exit 0 (sem mudança de baseline). **PR #106 (squash `b961305`), CI `verify` verde na `main`.**
 - **Última atualização:** 2026-11-11 (SEG-T01).
 
 ## Tarefa atual — SEG-T02 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
@@ -15,7 +15,7 @@
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
 - **Sessão concluída: SEG-T01 (API do segmentador) — código + testes + ADR-104 prontos.** Feito: `SegmentLang`/`SentenceSpan`/`WordToken`/`SplitSentencesOptions` exportados; `splitSentences` (spans aparados, fronteira após `. ! ? …` + fechamentos `" ' ” ’ » ) ] }` só com espaço/fim, `RangeError` em idioma fora de `pt|en`) e `splitWords` (trecho sem espaço, pontuação/aspas anexadas) em arquivos separados; `packages/segmenter/src/index.test.ts` atualizado (forma da API).
-- **Próximo passo:** **SEG-T02** na mesma branch (`seg-t01-api-tests`, renomear para `seg-t02-sentences` ao começar) — criar `packages/segmenter/src/abbreviations/{pt,en}.ts` com a lista de abreviações e estender `sentences.ts`; não mexer na assinatura da API.
+- **Próximo passo:** **SEG-T02** em branch nova `seg-t02-sentences` a partir da `main` (`b961305`) — criar `packages/segmenter/src/abbreviations/{pt,en}.ts` com a lista de abreviações e estender `sentences.ts`; não mexer na assinatura da API.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Nenhum aberto.
