@@ -106,6 +106,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-101 | Tabelas: gates de detecção (âncora sign-only, família alnum, `≪≫`) | accepted |
 | ADR-102 | Equações: runs reivindicáveis com fragmento de fórmula e bloco `equation` sem runs | accepted |
 | ADR-103 | PDFs do SciELO versionados em `corpus/vendored/` (entrega `corpus-public-v1` removida) | accepted |
+| ADR-104 | Segmentador: offsets de frase aparados e palavra = trecho sem espaço | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -818,3 +819,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) manter a entrega (prós: zero mudança; contras: depende de rede e token do GitHub, de um id de asset fixo e de nada no repositório) · B) versionar os 2 PDFs em `corpus/vendored/` com exceção testada no `check:no-pdf` (prós: bytes auditáveis e diffáveis, `corpus:fetch` sem rede, clone reproduzível; contras: +1,3 MB no git e exceção numa regra inviolável) · C) trocar os 2 artigos (contras: perde a cobertura N3 pt/en e o histórico de métricas).
 **Decisão:** **B** — os 2 PDFs entram byte a byte (SHA-256 inalterados, licença CC BY 4.0 re-verificada nas páginas do SciELO em 2026-11-11), `corpus/manifest.yaml` ganha `vendored:`, o `pnpm corpus:fetch` **copia** de `corpus/vendored/` para `corpus/public/` conferindo o digest **sem nenhuma requisição**, e o `pnpm check:no-pdf` só aceita os caminhos de `corpus/vendored/` com o digest do manifest (`packages/eval/src/check-no-pdf.ts` + teste provando que 2 passam e um 3º PDF reprova); a entrega é apagada somente depois do merge com CI verde (mesma tarefa).
 **Consequências:** `scripts/check-no-pdf.sh` virou código TypeScript testável; `GITHUB_TOKEN` e `githubRequestHeaders()` seguem no `fetch.ts`/`ci.yml` porque uma fonte GitHub futura (ex.: manifest privado) ainda pode usá-los — nenhuma entrada pública depende mais disso; métricas, goldens e baseline intocados (mesmos bytes); revisar se a SciELO deixar de bloquear os IPs do CI.
+
+### ADR-104 · Segmentador: offsets de frase aparados e palavra = trecho sem espaço · accepted · 2026-11-11
+**Contexto:** SEG-T01 fixa a API usada pelo app, pelo TTS e pelo extrator (`splitSentences`, `splitWords`), mas não diz o que os offsets incluem nem onde a fronteira de frase pode cair; sem isso os testes tabelados não têm contrato estável.
+**Alternativas:** A) spans de frase incluindo o espaço entre frases · B) spans aparados (o espaço fica de fora) · C) tokens de palavra separando também a pontuação para fora — e, para a fronteira: i) todo terminador é fronteira · ii) fronteira só quando o terminador (e fechamentos `" ' ” ’ » ) ] }`) é seguido de espaço ou do fim.
+**Decisão:** **B + ii** — `splitSentences(text, { lang })` devolve `{ start, end }` aparados, nulidade em texto vazio/só espaço, e só quebra quando há espaço/fim depois dos terminadores `. ! ? …` (runs como `...` e `?!` contam uma vez); `splitWords` devolve `{ text, start, end }` onde o token é o trecho sem espaço, com pontuação e aspas anexadas. `SegmentLang = "pt" | "en"`; idioma desconhecido lança `RangeError`. Abreviações, decimais, iniciais e compostos ficam para SEG-T02/T03 — a API não muda.
+**Consequências:** 43 casos de frase + 32 de palavra (70 tabelados, ≥ 60 do aceite) mais invariantes de offset (monotônico, sem sobreposição, só espaço fora) e determinismo; dados por idioma de SEG-T02 entram atrás da mesma assinatura; `lang` já é lido (validação), sem parâmetro morto.

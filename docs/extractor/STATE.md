@@ -3,19 +3,19 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **E10 FECHADA (2026-11-11)** — T01 (figuras), T02 (tabelas), T03 (equações) e T04 (recortes) prontas. E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
-- **Próxima tarefa:** trilha **SEG** — `phases/SEG-segmenter.md` (frases e palavras pt/en; pode começar a qualquer momento depois do E1 e é obrigatória antes do M2 do app). Abrir o arquivo da fase na próxima sessão.
-- **Ação pendente do PO:** nenhuma — a entrega `corpus-public-v1` foi apagada em 2026-11-11, depois do CI verde da `main` (ADR-103).
-- **Status:** **PR #102 MESCLADO** (squash `91a49c7`, CI `verify` verde na `main`) — manutenção "eliminar a entrega `corpus-public-v1`" concluída (ADR-103): os 2 PDFs do SciELO são versionados em `corpus/vendored/` (byte a byte, SHA-256 inalterados), o `corpus:fetch` copia sem rede, o `pnpm check:no-pdf` virou TS com exceção testada, e a entrega + tag foram apagadas. `pnpm verify` verde (1206 testes); `pnpm eval --ci` exit 0; baseline/goldens intocados.
-- **Última atualização:** 2026-11-11 (manutenção corpus-public-v1 concluída; entrega apagada).
+- **Fase atual:** **SEG em andamento (2026-11-11)** — T01 (API + testes tabelados) pronta; T02–T05 abertas. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
+- **Próxima tarefa:** **SEG-T02 (frases)** — abreviações pt/en por idioma, decimais, iniciais, aspas/diálogos, fim de frase seguido de fechamento (texto completo copiado abaixo).
+- **Ação pendente do PO:** nenhuma.
+- **Status:** **SEG-T01 concluída em 2026-11-11** — `packages/segmenter/src/{types,sentences,words,index}.ts` com `splitSentences(text, { lang })` → spans e `splitWords(text)` → tokens, 75 testes no pacote (43 de frase + 32 de palavra, 70 tabelados, escritos antes da implementação), ADR-104. `pnpm verify` verde; `pnpm eval --ci` exit 0 (sem mudança de baseline).
+- **Última atualização:** 2026-11-11 (SEG-T01).
 
-## Tarefa atual — SEG (próxima; abrir `phases/SEG-segmenter.md` na próxima sessão)
-- **Da fase:** frases e palavras pt/en; suíte de casos pt/en passando (ver `phases/SEG-segmenter.md` para tarefas e aceites).
-- **Por que agora:** E0–E10 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
+## Tarefa atual — SEG-T02 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
+- **SEG-T02 · Frases:** fim por `. ! ?` e reticências; **abreviações** pt (Sr., Sra., Dr., Dra., Prof., etc., p., pp., cap., v., ex.) e en (Mr., Mrs., Dr., e.g., i.e., vs., Fig.); números/decimais (`3.14`, `1.000,50`); iniciais (`J. S. Mill`); aspas e diálogos (`— Disse ele.`); fim de frase seguido de aspas/parênteses. **Aceite:** testes de cada categoria; lista de abreviações em arquivo de dados por idioma (fácil de estender).
+- **Por que agora:** E0–E10 e SEG-T01 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão concluída: manutenção `corpus-public-v1` (ADR-103) — PR #102 mesclado (squash `91a49c7`); entrega e tag apagadas depois do CI verde da `main`.** Feito: `corpus/vendored/` com os 2 PDFs byte a byte + `README.md` de licenças (CC BY 4.0 re-verificadas em 2026-11-11); `vendored:` no manifest (sem `source_url`/`fallback_urls`); `corpus:fetch` copia sem rede; `check:no-pdf` = `packages/eval/src/check-no-pdf.ts` + teste (2 passam, 3º PDF reprova, digest errado reprova); `scripts/check-no-pdf.sh` removido; docs (`corpus/README.md`, `CORPUS.md`, `E1-foundation.md`, `ci.yml`, `AGENTS.md`, skill `add-corpus-pdf`) + ADR-103 e nota na ADR-034. CI na `main`: `copied ... (596315/694609 bytes)`, `2 vendored`, `check:no-pdf` OK.
-- **Próximo passo:** trilha **SEG** — `phases/SEG-segmenter.md`, branch nova a partir da `main` atualizada (`91a49c7`).
+- **Sessão concluída: SEG-T01 (API do segmentador) — código + testes + ADR-104 prontos.** Feito: `SegmentLang`/`SentenceSpan`/`WordToken`/`SplitSentencesOptions` exportados; `splitSentences` (spans aparados, fronteira após `. ! ? …` + fechamentos `" ' ” ’ » ) ] }` só com espaço/fim, `RangeError` em idioma fora de `pt|en`) e `splitWords` (trecho sem espaço, pontuação/aspas anexadas) em arquivos separados; `packages/segmenter/src/index.test.ts` atualizado (forma da API).
+- **Próximo passo:** **SEG-T02** na mesma branch (`seg-t01-api-tests`, renomear para `seg-t02-sentences` ao começar) — criar `packages/segmenter/src/abbreviations/{pt,en}.ts` com a lista de abreviações e estender `sentences.ts`; não mexer na assinatura da API.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Nenhum aberto.
@@ -34,7 +34,7 @@
 | E8 | **done** (T01–T04 — fase fechada 2026-10-29; ADR-088/089/090/091/092; medições Android 3/3) |
 | E9 | **done** (T01–T04 done 2026-10-30/11-02, ADR-093–098 — fase fechada 2026-11-02; E9 = OCR da ADR-018) |
 | E10 | **done** (T01a/T01b/T02/T03/T04 — fase fechada 2026-11-11; ADR-100/101/102; recorte = ADR-016 + ADR-075) |
-| SEG | todo (segmentador pt/en, `phases/SEG-segmenter.md`) |
+| SEG | **em andamento** (T01 done 2026-11-11; T02–T05 abertas) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
 - `pnpm eval`: 31 documentos (16 públicos + 15 privados); 12 com gabarito (sintéticos `syn-*`); nenhum PDF real com gabarito ainda.
@@ -42,8 +42,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-11 · **SEG-T01 (API do segmentador) — CONCLUÍDO** · `packages/segmenter/src/{types,sentences,words}.ts` + ADR-104: `splitSentences(text, { lang })` → spans aparados (`{start,end}`) e `splitWords(text)` → `{text,start,end}`, determinísticos e sem dependência de Node; 43 casos de frase + 32 de palavra (70 tabelados pt/en, escritos antes da implementação), invariantes de offset e determinismo; 75 testes no pacote, `pnpm verify` verde; eval sem mudança de baseline. Próxima: SEG-T02.
 - 2026-11-11 · **manutenção `corpus-public-v1` — CONCLUÍDO** · 2 PDFs do SciELO versionados byte a byte em `corpus/vendored/` (ADR-103, licenças CC BY 4.0 re-verificadas) + `vendored:` no manifest (cópia sem rede no `corpus:fetch`) + `check:no-pdf` em TypeScript com exceção testada por caminho e SHA-256 (`scripts/check-no-pdf.sh` removido) + docs/ADR-103 e nota na ADR-034. `pnpm verify` 1206 testes, `pnpm eval --ci` exit 0, baseline/goldens intocados. **PR #102 (squash `91a49c7`); CI da `main` verde (2 vendored, 0 requisições para o SciELO); entrega e tag `corpus-public-v1` apagadas. Próxima: SEG.**
-- 2026-11-11 · **E10-T04 (recortes) — CONCLUÍDO** · `test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 pixels não-brancos; controle: região em branco da mesma página → 0 — o recorte segue a área do bloco, nunca a página inteira; regra ADR-016, gate de modo normal×dinâmico é do app/A-015). Sem código novo (API ADR-075 e decisão ADR-016 já existiam; OPEN-QUESTIONS #1 respondida 2026-10-04). `pnpm verify` 1198 testes, `pnpm eval --ci` exit 0, schema/baseline intocados. **PR #100 (squash `8c549d1`). E10 fechada; próxima: SEG.**
-- Sessões anteriores: `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98).
+- Sessões anteriores: `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98).
 
 Histórico completo: docs/extractor/archive/

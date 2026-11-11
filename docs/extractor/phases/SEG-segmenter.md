@@ -4,8 +4,9 @@
 **Critério de saída:** suíte de casos pt/en passando; documentação de como estender abreviações.
 
 ## Tarefas
-### SEG-T01 · API e testes tabelados
+### SEG-T01 · API e testes tabelados · `done`
 - `splitSentences(text, { lang })` → offsets; `splitWords(text)` → tokens `{ text, start, end }` com pontuação anexada (`"tempo,"`), mantendo aspas/parênteses junto da palavra de forma consistente. **Aceite:** tipos exportados; testes tabelados (≥ 60 casos pt+en) escritos antes da implementação.
+- **Resultado (2026-11-11):** **`done` — `packages/segmenter/src/{types,sentences,words,index}.ts` + ADR-104.** Tipos exportados (`SegmentLang`, `SplitSentencesOptions`, `SentenceSpan`, `WordToken`); `splitSentences` devolve spans aparados e só quebra após `. ! ? …` (runs `...`/`?!`) seguidos de espaço/fim, absorvendo fechamentos `" ' ” ’ » ) ] }`; `splitWords` = trecho sem espaço, com pontuação/aspas anexadas; idioma fora de `pt|en` → `RangeError`. **Testes escritos antes da implementação:** 43 casos de frase + 32 de palavra (70 tabelados, pt+en), invariantes de offset (monotônicos, sem sobreposição, só espaço fora dos spans/tokens), determinismo e forma da API.
 ### SEG-T02 · Frases
 - Fim por `. ! ?` e reticências; **abreviações** pt (Sr., Sra., Dr., Dra., Prof., etc., p., pp., cap., v., ex.) e en (Mr., Mrs., Dr., e.g., i.e., vs., Fig.); números/decimais (`3.14`, `1.000,50`); iniciais (`J. S. Mill`); aspas e diálogos (`— Disse ele.`); fim de frase seguido de aspas/parênteses.
 - **Aceite:** testes de cada categoria; lista de abreviações em arquivo de dados por idioma (fácil de estender).
