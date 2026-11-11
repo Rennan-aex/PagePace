@@ -132,7 +132,7 @@ describe("resolveCorpusPrivateDir", () => {
 });
 
 describe("parseManifest", () => {
-  it("reads the real public manifest (4 downloaded + 12 synthetic entries)", () => {
+  it("reads the real public manifest (2 downloaded + 2 vendored + 12 synthetic)", () => {
     const text = readFileSync(path.join(REPO_ROOT, "corpus", "manifest.yaml"), "utf8");
     const entries = parseManifest(text, "corpus/manifest.yaml");
 
@@ -163,25 +163,29 @@ describe("parseManifest", () => {
     expect(phobos?.visibility).toBe("public");
     expect(phobos?.generated).toBe(false);
     expect(entries[2]?.features).toContain("tagged");
-    // ADR-034: the two SciELO PDFs come from the release mirror first and
-    // keep both SciELO URLs (CDN variant, canonical) as fallbacks.
-    expect(entries[1]?.sourceUrl).toBe(
-      "https://api.github.com/repos/Rennan-aex/PagePace/releases/assets/614311768",
+    // chore-corpus-vendor-pdfs: the two SciELO PDFs are tracked byte for byte
+    // in corpus/vendored/ (the release mirror is gone), so they carry no
+    // source_url/fallback_urls and must keep the digests measured in ADR-034.
+    expect(entries[1]?.sourceUrl).toBeNull();
+    expect(entries[1]?.vendored).toBe("corpus/vendored/n3-pt-scielo-wittgenstein.pdf");
+    expect(entries[1]?.fallbackUrls).toEqual([]);
+    expect(entries[1]?.sha256).toBe(
+      "f4013e92b72ad360ae6afba27dea7df8a7abb28ef4f75fd0a850281522dcbafb",
     );
-    expect(entries[1]?.fallbackUrls).toEqual([
-      "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt&ilang=en",
-      "https://www.scielo.br/j/fun/a/v7bJr6JzbzbZgXj89dvS7BJ/?format=pdf&lang=pt",
-    ]);
-    expect(entries[3]?.sourceUrl).toBe(
-      "https://api.github.com/repos/Rennan-aex/PagePace/releases/assets/614311837",
+    expect(entries[3]?.sourceUrl).toBeNull();
+    expect(entries[3]?.vendored).toBe("corpus/vendored/n3-en-scielo-climatejustice.pdf");
+    expect(entries[3]?.fallbackUrls).toEqual([]);
+    expect(entries[3]?.sha256).toBe(
+      "a3402300bc90f00685e8286001e5b69b9fffd4c832205370b87a1ccaf36d8a3a",
     );
-    expect(entries[3]?.fallbackUrls).toHaveLength(2);
+    expect(phobos?.vendored).toBeNull();
     expect(entries[0]?.fallbackUrls).toEqual([]);
     // ADR-037: the synthetic documents are generated, never downloaded.
     const synthetic = entries.slice(4);
     expect(synthetic).toHaveLength(12);
     expect(synthetic.every((entry) => entry.generated)).toBe(true);
     expect(synthetic.every((entry) => entry.sourceUrl === null)).toBe(true);
+    expect(synthetic.every((entry) => entry.vendored === null)).toBe(true);
     expect(synthetic.every((entry) => entry.golden === `${entry.id}.golden.json`)).toBe(true);
     expect(synthetic[2]?.features).toEqual(["synthetic", "headers"]);
     expect(synthetic[2]?.golden).toBe("syn-n1-pt-cabecalhos.golden.json");

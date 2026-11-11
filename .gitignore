@@ -13,10 +13,12 @@ coverage/
 .vscode/*
 !.vscode/extensions.json
 
-# PDFs NEVER go to git (public ones are fetched by script, private ones live outside the repo)
+# PDFs NEVER go to git, with one exception: the two vendored SciELO fixtures
+# whose source blocks the CI (copied byte for byte, verified by check:no-pdf).
 *.pdf
 corpus/public/*
 !corpus/public/.gitkeep
+!corpus/vendored/*.pdf
 
 # eval outputs (generated)
 packages/eval/out/

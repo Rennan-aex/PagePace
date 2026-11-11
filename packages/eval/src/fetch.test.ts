@@ -76,10 +76,12 @@ const BODY = Buffer.from("%PDF-1.4 pagepace fetch fixture");
 
 interface PublicDoc {
   id: string;
-  url: string;
+  url?: string;
   sha256: string;
   fallbacks?: readonly string[];
   pageUrl?: string;
+  /** Repository-relative path of a tracked copy (chore-corpus-vendor-pdfs). */
+  vendored?: string;
 }
 
 async function makeRepo(docs: readonly PublicDoc[]): Promise<{ root: string; publicDir: string }> {
@@ -93,8 +95,9 @@ async function makeRepo(docs: readonly PublicDoc[]): Promise<{ root: string; pub
       "    level: N2",
       "    lang: en",
       '    title: "Fixture"',
-      `    source_url: "${doc.url}"`,
+      doc.url ? `    source_url: "${doc.url}"` : "    source_url: null",
     );
+    if (doc.vendored) lines.push(`    vendored: "${doc.vendored}"`);
     if (doc.pageUrl) lines.push(`    page_url: "${doc.pageUrl}"`);
     if (doc.fallbacks?.length) {
       const list = doc.fallbacks.map((url) => `"${url}"`).join(", ");
@@ -186,6 +189,70 @@ describe("runFetch", () => {
     expect(second.reused).toEqual(["n1-en-fixture"]);
     expect(server.requests).toHaveLength(0);
     expect(io.text()).toContain("no request");
+  });
+
+  it("copies a vendored file into corpus/public without a single request", async () => {
+    const server = await startServer(serve(200, BODY));
+    const repo = await makeRepo([
+      {
+        id: "n1-en-vendored",
+        url: `${server.origin}/n1-en-vendored.pdf`,
+        vendored: "corpus/vendored/n1-en-vendored.pdf",
+        sha256: sha(BODY),
+      },
+    ]);
+    const source = path.join(repo.root, "corpus", "vendored", "n1-en-vendored.pdf");
+    await mkdir(path.dirname(source), { recursive: true });
+    await writeFile(source, BODY);
+    const io = capture();
+
+    const first = await runFetch({ repoRoot: repo.root, env: {}, out: io.out, err: io.err });
+
+    expect(first.code).toBe(0);
+    expect(first.vendored).toEqual(["n1-en-vendored"]);
+    expect(first.downloaded).toEqual([]);
+    expect(server.requests).toHaveLength(0);
+    expect(await readFile(path.join(repo.publicDir, "n1-en-vendored.pdf"))).toEqual(BODY);
+    expect(io.text()).toContain("copied n1-en-vendored from corpus/vendored/n1-en-vendored.pdf");
+
+    server.reset();
+    const second = await runFetch({ repoRoot: repo.root, env: {}, out: io.out, err: io.err });
+
+    expect(second.code).toBe(0);
+    expect(second.vendored).toEqual([]);
+    expect(second.reused).toEqual(["n1-en-vendored"]);
+    expect(server.requests).toHaveLength(0);
+  });
+
+  it("fails when the vendored file does not match the manifest digest", async () => {
+    const repo = await makeRepo([
+      { id: "n1-en-vendored", vendored: "corpus/vendored/n1-en-vendored.pdf", sha256: sha(BODY) },
+    ]);
+    const source = path.join(repo.root, "corpus", "vendored", "n1-en-vendored.pdf");
+    await mkdir(path.dirname(source), { recursive: true });
+    await writeFile(source, "tampered bytes");
+    const io = capture();
+
+    const result = await runFetch({ repoRoot: repo.root, env: {}, out: io.out, err: io.err });
+
+    expect(result.code).toBe(1);
+    expect(io.errors()).toContain("digest mismatch for n1-en-vendored");
+    expect(io.errors()).toContain(sha(BODY));
+    expect(io.errors()).toContain(sha("tampered bytes"));
+    expect(await readdir(repo.publicDir)).toEqual([]);
+  });
+
+  it("fails when the vendored file is missing", async () => {
+    const repo = await makeRepo([
+      { id: "n1-en-vendored", vendored: "corpus/vendored/n1-en-vendored.pdf", sha256: sha(BODY) },
+    ]);
+    const io = capture();
+
+    const result = await runFetch({ repoRoot: repo.root, env: {}, out: io.out, err: io.err });
+
+    expect(result.code).toBe(1);
+    expect(io.errors()).toContain("vendored file missing for n1-en-vendored");
+    expect(io.errors()).toContain("corpus/vendored/n1-en-vendored.pdf");
   });
 
   it("re-downloads a present file whose digest does not match the manifest", async () => {

@@ -8,6 +8,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  type CorpusEntry,
   CorpusError,
   type LoadedCorpus,
   loadCorpus,
@@ -34,10 +35,13 @@ export const ACCEPT_HEADER =
 export const ACCEPT_LANGUAGE_HEADER = "en-US,en;q=0.9,pt;q=0.8";
 
 /**
- * ADR-034: sources blocked to the runner (SciELO answers 403 to data-centre
- * IPs) are mirrored in a release of this repository, and CI hands the
- * automatic `GITHUB_TOKEN` to this script. The token is attached **only** to
- * GitHub hosts, so it can never reach arxiv.org, scielo.br or any other site.
+ * ADR-034 (amended by the vendored corpus): the two SciELO PDFs used to be
+ * mirrored in a release of this repository and are now tracked in
+ * `corpus/vendored/`, so no public entry needs a GitHub URL any more. The
+ * helper stays because a source hosted on GitHub (today or in the private
+ * manifest) still gets the automatic `GITHUB_TOKEN` handed over by CI, and the
+ * token is attached **only** to GitHub hosts, so it can never reach
+ * arxiv.org, scielo.br or any other site.
  *
  * Measured on 2026-10-06: `github.com/.../releases/download/...` answers 404
  * even with a valid token, while `api.github.com/.../releases/assets/<id>`
@@ -78,14 +82,18 @@ CORPUS_PRIVATE_DIR (environment variable, then the .env file at the repo root).
 
 Behaviour:
   - a file that already matches its digest is reused without any request;
+  - an entry with "vendored: <path>" is copied from a tracked file of
+    corpus/vendored/ into corpus/public/ with its digest verified, and never
+    touches the network;
   - an entry with "generated: true" is built from its specification in
     packages/eval/src/specs.ts into corpus/public/synthetic/ (never fetched),
     and its digest must match the manifest (ADR-037);
   - network errors, HTTP 5xx, HTTP 429 and HTTP 403 are retried 3 times (1 s, 2 s);
   - when the manifest lists fallback_urls they are tried in order, after the
     retries of the previous URL are exhausted;
-  - when GITHUB_TOKEN is set (CI) a GitHub release URL is downloaded with it;
-    the token is only ever sent to github.com hosts, never to other sites;
+  - when GITHUB_TOKEN is set (CI) a URL hosted on GitHub (in this manifest or
+    in the private one) is downloaded with it; the token is only ever sent to
+    github.com hosts, never to other sites;
   - any other HTTP error, and a digest that no URL reproduces, end with exit 1;
   - without a private corpus source the script warns once and still exits 0.
 
@@ -117,6 +125,8 @@ export interface FetchResult {
   downloaded: string[];
   /** `generated: true` entries built from their specification (ADR-037). */
   generated: string[];
+  /** Entries copied from a tracked file in `corpus/vendored/` (no request). */
+  vendored: string[];
   reused: string[];
   warnings: string[];
 }
@@ -325,6 +335,34 @@ function warnOrphans(
   }
 }
 
+type CopyOutcome = { ok: true; bytes: number } | { ok: false; message: string };
+
+/**
+ * Copies a tracked file of `corpus/vendored/` into `corpus/public/` and
+ * verifies the manifest digest first: a vendored PDF whose bytes drifted from
+ * `sha256` is an error, never a silent re-hash. No request leaves the machine.
+ */
+async function copyVendored(entry: CorpusEntry, repoRoot: string): Promise<CopyOutcome> {
+  const source = path.resolve(repoRoot, entry.vendored ?? "");
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(source);
+  } catch {
+    return { ok: false, message: `vendored file missing for ${entry.id}: ${entry.vendored}` };
+  }
+  const digest = sha256Hex(bytes);
+  if (digest !== entry.sha256) {
+    return {
+      ok: false,
+      message: `digest mismatch for ${entry.id}\n  expected: ${entry.sha256}\n  actual:   ${digest}`,
+    };
+  }
+  const tempPath = `${entry.path}.tmp`;
+  await writeFile(tempPath, bytes);
+  await rename(tempPath, entry.path);
+  return { ok: true, bytes: bytes.byteLength };
+}
+
 /**
  * Runs the fetch and returns the exit code plus what happened.
  *
@@ -352,7 +390,15 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
   } catch (error) {
     const message = error instanceof CorpusError ? error.message : messageOf(error);
     err(`corpus: ${message}\n`);
-    return { code: EXIT_ERROR, corpus: null, downloaded: [], generated: [], reused: [], warnings };
+    return {
+      code: EXIT_ERROR,
+      corpus: null,
+      downloaded: [],
+      generated: [],
+      vendored: [],
+      reused: [],
+      warnings,
+    };
   }
 
   if (!corpus.privateDir) {
@@ -361,6 +407,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
 
   const downloaded: string[] = [];
   const generated: string[] = [];
+  const vendored: string[] = [];
   const reused: string[] = [];
   await mkdir(corpus.publicDir, { recursive: true });
 
@@ -372,17 +419,30 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         out(`corpus: ${entry.id} already present and verified (no request)\n`);
         continue;
       }
-      warn(
-        `${entry.id}: present file does not match the manifest digest, ` +
-          `${entry.generated ? "regenerating" : "downloading again"}`,
-      );
+      const reason = entry.generated
+        ? "regenerating"
+        : entry.vendored
+          ? "copying from corpus/vendored again"
+          : "downloading again";
+      warn(`${entry.id}: present file does not match the manifest digest, ${reason}`);
+    }
+
+    if (entry.vendored) {
+      const outcome = await copyVendored(entry, repoRoot);
+      if (!outcome.ok) {
+        err(`corpus: ${outcome.message}\n`);
+        return { code: EXIT_ERROR, corpus, downloaded, generated, vendored, reused, warnings };
+      }
+      vendored.push(entry.id);
+      out(`corpus: copied ${entry.id} from ${entry.vendored} (${outcome.bytes} bytes)\n`);
+      continue;
     }
 
     if (entry.generated) {
       const outcome = await generate(entry, entry.path);
       if (!outcome.ok) {
         err(`corpus: ${outcome.message}\n`);
-        return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
+        return { code: EXIT_ERROR, corpus, downloaded, generated, vendored, reused, warnings };
       }
       generated.push(entry.id);
       out(`corpus: generated ${entry.id} (${outcome.bytes} bytes, synthetic)\n`);
@@ -391,7 +451,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
 
     if (!entry.sourceUrl) {
       err(`corpus: ${entry.id} has no source_url in corpus/manifest.yaml\n`);
-      return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
+      return { code: EXIT_ERROR, corpus, downloaded, generated, vendored, reused, warnings };
     }
 
     const outcome = await download({
@@ -407,7 +467,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     });
     if (!outcome.ok) {
       err(`corpus: ${outcome.message}\n`);
-      return { code: EXIT_ERROR, corpus, downloaded, generated, reused, warnings };
+      return { code: EXIT_ERROR, corpus, downloaded, generated, vendored, reused, warnings };
     }
 
     downloaded.push(entry.id);
@@ -438,10 +498,11 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
 
   out(
     `corpus: ${corpus.publicEntries.length} public ` +
-      `(${downloaded.length} downloaded, ${generated.length} generated, ${reused.length} reused), ` +
+      `(${downloaded.length} downloaded, ${vendored.length} vendored, ` +
+      `${generated.length} generated, ${reused.length} reused), ` +
       `${corpus.privateEntries.length} private entries merged\n`,
   );
-  return { code: EXIT_OK, corpus, downloaded, generated, reused, warnings };
+  return { code: EXIT_OK, corpus, downloaded, generated, vendored, reused, warnings };
 }
 
 /** CLI entry: `--help` and usage errors live here, downloads in `runFetch`. */

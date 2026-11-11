@@ -54,7 +54,7 @@ Atalho: skill `end-session`.
 - Se o `gh` falhar por qualquer motivo (rede, auth, etc.), nao insistir: registrar em STATE.md e entregar ao PO o titulo/descricao do PR pela skill report-to-po, como era feito antes.
 
 ## Regras invioláveis
-1. **Nenhum PDF no git, nunca.** Públicos: `corpus/public/` (ignorado, baixado por script). Privados: fora do repositório, via `CORPUS_PRIVATE_DIR`. Nenhum texto de livro com copyright em gabaritos, fixtures, issues ou PRs.
+1. **Nenhum PDF no git, nunca.** Públicos: `corpus/public/` (ignorado, baixado por script). Privados: fora do repositório, via `CORPUS_PRIVATE_DIR`. **Única exceção:** `corpus/vendored/` (os 2 PDFs do SciELO, byte a byte, ADR-103; o `pnpm check:no-pdf` só aceita esses caminhos com o SHA-256 do manifest e reprova qualquer outro `.pdf`). Nenhum texto de livro com copyright em gabaritos, fixtures, issues ou PRs.
 2. **Regra de ouro das métricas:** nenhuma mudança de heurística é aceita se piorar qualquer métrica do baseline. Piora justificada exige registro em `DECISIONS.md` e atualização explícita do baseline.
 3. **O app nunca lê PDF.** Só o extrator toca no PDF. O contrato entre eles é `@pagepace/schema`.
 4. **Mudança no esquema** exige: bump de versão, nota em `SCHEMA.md` (changelog), entrada em `DECISIONS.md`, migração se for breaking. Skill: `evolve-schema`.

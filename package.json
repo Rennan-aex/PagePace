@@ -15,7 +15,7 @@
     "format:check": "biome format .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:no-pdf": "bash scripts/check-no-pdf.sh",
+    "check:no-pdf": "tsx packages/eval/src/check-no-pdf.ts",
     "check:docs": "node scripts/check-docs-budget.mjs",
     "decisions:index": "node scripts/build-decisions-index.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:no-pdf && pnpm check:docs",

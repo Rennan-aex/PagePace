@@ -5,8 +5,9 @@ on:
   push:
     branches: [main]
 
-# The token only needs to read the repository: checkout plus the release
-# mirror of the blocked corpus PDFs (ADR-034).
+# The token only needs to read the repository (checkout). It is also handed to
+# `pnpm corpus:fetch`: the SciELO PDFs are vendored and need no network
+# (ADR-103), so today it is only used if a manifest URL ever lives on GitHub.
 permissions:
   contents: read
 
@@ -40,8 +41,10 @@ jobs:
       - name: Fetch public corpus
         run: pnpm corpus:fetch
         env:
-          # ADR-034: downloads the release mirror of the PDFs SciELO blocks;
-          # the script sends this token to GitHub hosts only.
+          # Optional (ADR-103): the two SciELO PDFs are copied from
+          # corpus/vendored/ with no request. The token stays for a URL on
+          # GitHub (public or private manifest) and is only ever sent to
+          # github.com hosts by the script.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Corpus cache (save)
         uses: actions/cache/save@v4

@@ -104,6 +104,13 @@ export interface ManifestEntry {
    * `corpus/public/synthetic/` and is never committed.
    */
   generated: boolean;
+  /**
+   * Repository-relative path of a tracked copy of the PDF (chore-corpus-vendor-pdfs):
+   * `pnpm corpus:fetch` copies those bytes into `corpus/public/<id>.pdf` and
+   * verifies the manifest digest instead of touching the network. Public
+   * manifest only; lives under `corpus/vendored/` and is committed on purpose.
+   */
+  vendored: string | null;
   /** File name relative to `$CORPUS_PRIVATE_DIR` (ADR-014); private manifests only. */
   file: string | null;
 }
@@ -149,6 +156,7 @@ const KNOWN_FIELDS = new Set([
   "features",
   "fallback_urls",
   "generated",
+  "vendored",
   ...STRING_FIELDS,
 ]);
 const HTTP_URL_PATTERN = /^https?:\/\/\S+$/;
@@ -277,6 +285,7 @@ function toEntry(rawFields: readonly RawField[], source: string, entryLine: numb
       source,
       fields.get("generated")?.line ?? entryLine,
     ),
+    vendored: asString(readField(fields, "vendored"), "vendored", source, entryLine),
     file: asString(readField(fields, "file"), "file", source, entryLine),
   };
 }
@@ -400,10 +409,17 @@ export function loadCorpus(options: LoadCorpusOptions = {}): LoadedCorpus {
   const publicEntries = readManifest(
     path.join(repoRoot, "corpus", "manifest.yaml"),
     publicSource,
-  ).map((entry) => ({
-    ...entry,
-    path: path.join(publicDir, ...(entry.generated ? [SYNTHETIC_DIR] : []), `${entry.id}.pdf`),
-  }));
+  ).map((entry) => {
+    if (entry.vendored && !isInside(repoRoot, entry.vendored)) {
+      throw new CorpusError(
+        `${publicSource}:${entry.line}: vendored file "${entry.vendored}" must stay inside the repository`,
+      );
+    }
+    return {
+      ...entry,
+      path: path.join(publicDir, ...(entry.generated ? [SYNTHETIC_DIR] : []), `${entry.id}.pdf`),
+    };
+  });
 
   const { dir: privateDir, source: privateDirSource } = resolveCorpusPrivateDirDetailed(options);
   const privateEntries: CorpusEntry[] = [];
@@ -413,6 +429,11 @@ export function loadCorpus(options: LoadCorpusOptions = {}): LoadedCorpus {
       if (entry.generated) {
         throw new CorpusError(
           `${privateSource}:${entry.line}: generated entries belong to corpus/manifest.yaml`,
+        );
+      }
+      if (entry.vendored) {
+        throw new CorpusError(
+          `${privateSource}:${entry.line}: vendored entries belong to corpus/manifest.yaml`,
         );
       }
       if (!entry.file) {

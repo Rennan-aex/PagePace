@@ -5,20 +5,20 @@
 ## Situação
 - **Fase atual:** **E10 FECHADA (2026-11-11)** — T01 (figuras), T02 (tabelas), T03 (equações) e T04 (recortes) prontas. E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
 - **Próxima tarefa:** trilha **SEG** — `phases/SEG-segmenter.md` (frases e palavras pt/en; pode começar a qualquer momento depois do E1 e é obrigatória antes do M2 do app). Abrir o arquivo da fase na próxima sessão.
-- **Ação pendente do PO:** não apagar a entrega (Release) `corpus-public-v1`; git desde 2026-10-14 (**ADR-054**) o agente faz sozinho com o `gh`. (Branch `ci-baseline-check` apagada em 2026-11-06 com autorização do PO.)
-- **Status:** **PR #100 MESCLADO** (squash `8c549d1`, CI `verify` verde) — E10-T04 (recortes) fechada e **E10 encerrada**. `pnpm verify` local verde (1198 testes + `check:no-pdf` + `check:docs`); `pnpm eval --ci` exit 0; baseline/schema intocados; sem ADR nova (decisão de produto já era a ADR-016).
-- **Última atualização:** 2026-11-11 (E10-T04 recortes concluída; E10 fechada).
+- **Ação pendente do PO:** nenhuma sobre a entrega — em 2026-11-11 o PO autorizou apagar a `corpus-public-v1` depois do merge com CI verde (o agente faz sozinho com o `gh`, ADR-054).
+- **Status:** **manutenção em andamento (branch `chore-corpus-vendor-pdfs`, ADR-103):** os 2 PDFs do SciELO agora são versionados em `corpus/vendored/`, o `corpus:fetch` copia sem rede e o `check:no-pdf` virou TS com exceção testada. Falta: `pnpm verify` + `pnpm eval` → PR → merge → CI verde da `main` → apagar a entrega → report-to-po.
+- **Última atualização:** 2026-11-11 (manutenção corpus-public-v1 em andamento).
 
 ## Tarefa atual — SEG (próxima; abrir `phases/SEG-segmenter.md` na próxima sessão)
 - **Da fase:** frases e palavras pt/en; suíte de casos pt/en passando (ver `phases/SEG-segmenter.md` para tarefas e aceites).
 - **Por que agora:** E0–E10 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão concluída: E10-T04 (recortes) — PR #100 mesclado (squash `8c549d1`).** Feito: `packages/extractor/test/figure-clip.test.ts` (2 integração: bbox do `figure` → `renderPageRegion` → >0 não-brancos; controle região em branco → 0; canvas `@napi-rs/canvas` já era devDep). Sem código novo — API (ADR-075) e decisão (ADR-016) já existiam; OPEN-QUESTIONS #1 respondida em 2026-10-04. Fase marcada `done`, E10 fechada, verify/eval verdes (1198 testes, exit 0).
-- **Próximo passo:** **trilha SEG** — `phases/SEG-segmenter.md`, branch nova a partir da `main` atualizada (`8c549d1`).
+- **Sessão em andamento: manutenção "eliminar a entrega `corpus-public-v1"` (branch `chore-corpus-vendor-pdfs`, ADR-103).** Feito: 2 PDFs copiados byte a byte p/ `corpus/vendored/` + `README.md` de licenças; campo `vendored` no parser e no `loadCorpus`; `corpus:fetch` copia sem rede (prova local: `2 vendored, 0 downloaded, 14 reused`, exit 0); `check:no-pdf` trocado por `packages/eval/src/check-no-pdf.ts` + `check-no-pdf.test.ts` (2 passam / 3º PDF reprova / digest errado reprova); `corpus.test.ts` e `fetch.test.ts` atualizados (+5 testes); docs: `corpus/README.md`, `CORPUS.md`, `E1-foundation.md`, comentários do `ci.yml`, `corpus/vendored/README.md`, ADR-103 + nota na ADR-034; `scripts/check-no-pdf.sh` removido.
+- **Próximo comando:** `pnpm verify` (e `pnpm eval --ci`) → commit + push → PR (`gh pr create --base main`) → merge quando os checks passarem → CI verde da `main` → `gh release delete corpus-public-v1 --yes --cleanup-tag` → fechar STATE/LOG e falar com o PO (`report-to-po`).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
-- [ ] Não apagar a entrega (Release) `corpus-public-v1`: o `corpus/manifest.yaml` aponta para ela (apagar = CI vermelho com 404).
+- [ ] Apagar a entrega `corpus-public-v1` **só depois** do PR mesclado e do CI verde da `main` (`gh release delete corpus-public-v1 --yes --cleanup-tag`); o `manifest.yaml` já não aponta para ela.
 
 ## Progresso por marco
 | Marco | Status |

@@ -16,6 +16,7 @@ description: Use para adicionar um PDF ao corpus de testes do PagePace, público
 4. Rode `pnpm corpus:fetch` numa cópia limpa (ou apague o arquivo e rode) para provar que é reproduzível.
 5. (Opcional) Crie golden parcial: skill `write-golden-test`.
 6. `pnpm check:no-pdf` deve passar. Commit só do manifest/golden.
+   - **A fonte bloqueia o CI (403 no GitHub Actions, como o SciELO)?** Coloque o PDF em `corpus/vendored/` e troque `source_url` por `vendored: "corpus/vendored/<arquivo>.pdf"` no manifest (ADR-103): o fetch copia sem rede e o `check:no-pdf` cobre esse caminho com o SHA-256 do manifest. Escreva um `corpus/vendored/README.md` com título, autor, DOI, página, licença e hash (modelo: `corpus/vendored/README.md`).
 
 ## Passos (privado)
 1. Coloque o PDF em `$CORPUS_PRIVATE_DIR`, registre no manifest privado com `visibility: private`.
