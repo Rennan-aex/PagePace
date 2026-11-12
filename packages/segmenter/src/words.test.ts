@@ -78,6 +78,56 @@ export const WORD_CASES: WordCase[] = [
   },
   { text: "Mail john.doe@example.com now.", words: ["Mail", "john.doe@example.com", "now."] },
   { text: "<https://example.com/a-b>", words: ["<https://example.com/a-b>"] },
+  // SEG-T04: Greek script text
+  { text: "Καλημέρα κόσμε", words: ["Καλημέρα", "κόσμε"] },
+  { text: "λόγος, ἀρχή.", words: ["λόγος,", "ἀρχή."] },
+  // SEG-T04: Latin excerpts
+  { text: "carpe diem", words: ["carpe", "diem"] },
+  { text: "Sic transit gloria mundi.", words: ["Sic", "transit", "gloria", "mundi."] },
+  // SEG-T04: punctuation-only text
+  { text: "...", words: ["..."] },
+  { text: "!?…", words: ["!?…"] },
+  // SEG-T04: long text without punctuation
+  {
+    text: "Este texto longo não tem nenhuma pontuação e continua por mais de quarenta caracteres seguidos",
+    words: [
+      "Este",
+      "texto",
+      "longo",
+      "não",
+      "tem",
+      "nenhuma",
+      "pontuação",
+      "e",
+      "continua",
+      "por",
+      "mais",
+      "de",
+      "quarenta",
+      "caracteres",
+      "seguidos",
+    ],
+  },
+  {
+    text: "This long passage contains no punctuation at all and keeps going well beyond forty characters",
+    words: [
+      "This",
+      "long",
+      "passage",
+      "contains",
+      "no",
+      "punctuation",
+      "at",
+      "all",
+      "and",
+      "keeps",
+      "going",
+      "well",
+      "beyond",
+      "forty",
+      "characters",
+    ],
+  },
 ];
 
 function expectValidTokens(text: string, tokens: WordToken[], expected: string[]): void {
@@ -110,6 +160,20 @@ describe("splitWords", () => {
       numberSeparators: /\d[.,]\d/u,
       emDashSeparator: /\S—\S/u,
       urlsEmails: /(?:https?:\/\/|[\w.+-]+@[\w-]+\.\w)/u,
+    };
+    for (const [name, pattern] of Object.entries(categories)) {
+      const count = WORD_CASES.filter((testCase) => pattern.test(testCase.text)).length;
+      expect(count, `category ${name}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("covers every SEG-T04 category", () => {
+    const categories: Record<string, RegExp> = {
+      greekScript: /\p{Script=Greek}/u,
+      latinExcerpt: /\b(?:carpe diem|sic transit)\b/iu,
+      punctuationOnly: /^[^\p{L}\p{N}\s]+$/u,
+      emptyOrWhitespace: /^\s*$/u,
+      longWithoutPunctuation: /^[^.!?…]{40,}$/u,
     };
     for (const [name, pattern] of Object.entries(categories)) {
       const count = WORD_CASES.filter((testCase) => pattern.test(testCase.text)).length;

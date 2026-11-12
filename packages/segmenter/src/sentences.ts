@@ -15,8 +15,16 @@ const ABBREVIATIONS: Readonly<Record<SegmentLang, ReadonlySet<string>>> = {
 };
 
 const WHITESPACE = /\s/u;
-const LETTER_OR_DOT = /[A-Za-z.]/u;
-const UPPERCASE = /[A-Z]/u;
+const LETTER_OR_DOT = /[\p{L}.]/u;
+const UPPERCASE = /\p{Lu}/u;
+
+/**
+ * SEG-T04: default cap for every sentence span, in characters. Spans longer than
+ * this (e.g. a whole paragraph with no punctuation) are cut at the last whitespace
+ * inside the limit, or hard-cut when there is no whitespace. Pass
+ * `maxSpanLength: Infinity` to disable the cap.
+ */
+export const DEFAULT_MAX_SPAN_LENGTH = 1000;
 
 function isWhitespace(char: string): boolean {
   return WHITESPACE.test(char);
@@ -25,6 +33,16 @@ function isWhitespace(char: string): boolean {
 function assertLang(lang: string): asserts lang is SegmentLang {
   if (lang !== "pt" && lang !== "en") {
     throw new RangeError(`Unsupported language: ${String(lang)}`);
+  }
+}
+
+function assertMaxSpanLength(maxSpanLength: number | undefined): void {
+  if (maxSpanLength === undefined) return;
+  if (maxSpanLength === Infinity) return;
+  if (!Number.isInteger(maxSpanLength) || maxSpanLength < 1) {
+    throw new RangeError(
+      `maxSpanLength must be a positive integer or Infinity, got ${String(maxSpanLength)}`,
+    );
   }
 }
 
@@ -66,13 +84,45 @@ function keepsSentenceGoing(
 }
 
 /**
+ * Splits `[start, end)` into spans of at most `limit` characters. Each piece ends
+ * at the last whitespace inside the limit (the whitespace becomes the gap), or is
+ * hard-cut at the limit when the text has no whitespace there. `start` is never
+ * whitespace, so every piece is non-empty and trimmed.
+ */
+function capSpan(text: string, start: number, end: number, limit: number): SentenceSpan[] {
+  if (limit === Infinity || end - start <= limit) return [{ start, end }];
+
+  const spans: SentenceSpan[] = [];
+  let cursor = start;
+  while (cursor < end) {
+    const windowEnd = Math.min(cursor + limit, end);
+    let pieceEnd = windowEnd;
+    for (let index = windowEnd; index > cursor; index -= 1) {
+      if (isWhitespace(text.charAt(index))) {
+        pieceEnd = index;
+        break;
+      }
+    }
+    while (pieceEnd > cursor && isWhitespace(text.charAt(pieceEnd - 1))) pieceEnd -= 1;
+    spans.push({ start: cursor, end: pieceEnd });
+    cursor = pieceEnd;
+    while (cursor < end && isWhitespace(text.charAt(cursor))) cursor += 1;
+  }
+  return spans;
+}
+
+/**
  * Splits `text` into sentence offsets. A boundary needs a terminator (`.`, `!`, `?`, `…`,
  * possibly repeated) optionally followed by closing quotes/brackets and then whitespace or
  * the end of the text. A single period after a known abbreviation or an initial does not
- * break. Spans are trimmed: the whitespace between sentences is not included.
+ * break. Spans are trimmed: the whitespace between sentences is not included. Every span
+ * is capped at `options.maxSpanLength` characters (SEG-T04), defaulting to
+ * {@link DEFAULT_MAX_SPAN_LENGTH}; pass `Infinity` to disable the cap.
  */
 export function splitSentences(text: string, options: SplitSentencesOptions): SentenceSpan[] {
   assertLang(options.lang);
+  assertMaxSpanLength(options.maxSpanLength);
+  const limit = options.maxSpanLength ?? DEFAULT_MAX_SPAN_LENGTH;
 
   const spans: SentenceSpan[] = [];
   let index = 0;
@@ -113,7 +163,8 @@ export function splitSentences(text: string, options: SplitSentencesOptions): Se
       index = after;
     }
 
-    spans.push({ start, end });
+    while (end > start && isWhitespace(text.charAt(end - 1))) end -= 1;
+    spans.push(...capSpan(text, start, end, limit));
   }
 
   return spans;

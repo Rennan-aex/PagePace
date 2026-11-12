@@ -3,19 +3,18 @@
 > Arquivo de passagem de bastão. **Leia primeiro, atualize em checkpoints.** Orçamento: ≤ 8 KB / ≤ 90 linhas (`pnpm check:docs`). Excedente vai para `docs/extractor/archive/`.
 
 ## Situação
-- **Fase atual:** **SEG em andamento (2026-11-11)** — T01 (API + testes), T02 (frases) e T03 (palavras) prontas; T04–T05 abertas. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
-- **Próxima tarefa:** **SEG-T04 (idioma misto e robustez)** — texto completo copiado abaixo.
+- **Fase atual:** **SEG em andamento (2026-11-11)** — T01–T04 (API, frases, palavras, robustez) prontas; T05 (avaliação) aberta. E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas.
+- **Próxima tarefa:** **SEG-T05 (avaliação)** — texto completo copiado abaixo.
 - **Ação pendente do PO:** nenhuma.
-- **Status:** **SEG-T03 concluída em 2026-11-11 (PR #109)** — `packages/segmenter/src/words.ts` quebra em `—` (U+2014, travessão como token próprio mesmo colado); hífen composto, apóstrofo (reto e `’`), separadores numéricos e URLs/e-mails nunca quebram; pontuação final anexada (ADR-104). 56 casos tabelados (26 novos) + cobertura por categoria (≥ 2) e mínimo de 50 (59 testes no arquivo), ADR-106. `pnpm verify` verde; `pnpm eval --ci` exit 0 (baseline intocado).
-- **Última atualização:** 2026-11-11 (SEG-T03).
+- **Status:** **SEG-T04 concluída em 2026-11-11 (PR #110)** — `sentences.ts` usa `UPPERCASE=/\p{Lu}/u` e `LETTER_OR_DOT=/[\p{L}.]/u` (inicial grego `Κ.`, abreviação `pág.`, inicial `Á.` não quebram mais); span sem terminador perde o espaço final; nova opção `maxSpanLength` (default `DEFAULT_MAX_SPAN_LENGTH=1000`, `Infinity` desliga, inteiro ≥1 ou `RangeError`) corta texto longo sem pontuação na última quebra de espaço do limite ou a seco. 20+8 casos novos → 88 tabelados + categorias SEG-T04 pt/en + `properties.test.ts` (604 textos), ADR-107. `pnpm verify` verde; `pnpm eval --ci` exit 0 (baseline intocado).
+- **Última atualização:** 2026-11-11 (SEG-T04).
 
-## Tarefa atual — SEG-T04 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
-- **SEG-T04 · Idioma misto e robustez:** Frases com trechos em grego/latim; texto vazio; só pontuação; textos muito longos sem pontuação (limite máximo de trecho configurável). **Aceite:** testes de propriedade simples (tokens cobrem o texto sem sobreposição, offsets monotônicos).
-- **Por que agora:** E0–E10, SEG-T01, SEG-T02 e SEG-T03 concluídas; SEG é a última trilha do extrator antes do M2 do app (ROADMAP).
+## Tarefa atual — SEG-T05 (copiada de `phases/SEG-segmenter.md` em 2026-11-11)
+- **SEG-T05 · Avaliação:** Pequeno corpus anotado de frases (domínio público) em pt/en e métrica `sentence_f1`; entra no baseline. **Aceite:** meta ≥ 0,97 em prosa comum.
+- **Por que agora:** E0–E10 e SEG-T01–T04 concluídas; SEG-T05 fecha a fase SEG antes do M2 do app (ROADMAP).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão concluída: SEG-T03 (palavras) — código + testes + ADR-106 prontos.** Feito: `words.ts` quebra em `—` e emite cada travessão como token (API inalterada); casos novos de hífen, apóstrofo, número, travessão colado e URL/email; meta de cobertura por categoria.
-- **Próximo passo:** **SEG-T04** em branch nova `seg-t04-robustness` a partir da `main` (PR #109 do T03 já mesclado) — testes de propriedade (cobertura sem sobreposição, offsets monotônicos) + casos grego/latim, vazio, só pontuação e trecho longo sem pontuação (limite configurável).
+- **Sessão encerrada: SEG-T04 concluída, PR #110 aberto (`seg-t04-robustness`).** Feito: testes TDD (14 vermelhos) → `UPPERCASE=/\p{Lu}/u`, `LETTER_OR_DOT=/[\p{L}.]/u`, trim do fim do span, `maxSpanLength` (default 1000) + `properties.test.ts` (604 textos); ADR-107, fase marcada `done`, `pnpm verify` verde, `eval --ci` exit 0. Próximo: verificar `gh pr checks` do PR #110, mesclar (squash) quando verde, limpar branch local, e seguir para **SEG-T05** (corpus anotado + `sentence_f1` ≥ 0,97; ler fase e `run-eval`).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Nenhum aberto.
@@ -34,7 +33,7 @@
 | E8 | **done** (T01–T04 — fase fechada 2026-10-29; ADR-088/089/090/091/092; medições Android 3/3) |
 | E9 | **done** (T01–T04 done 2026-10-30/11-02, ADR-093–098 — fase fechada 2026-11-02; E9 = OCR da ADR-018) |
 | E10 | **done** (T01a/T01b/T02/T03/T04 — fase fechada 2026-11-11; ADR-100/101/102; recorte = ADR-016 + ADR-075) |
-| SEG | **em andamento** (T01/T02/T03 done 2026-11-11; T04/T05 abertas) |
+| SEG | **em andamento** (T01–T04 done 2026-11-11; T05 aberta) |
 
 ## Métricas atuais (baseline: `packages/eval/baseline.json`, format v1, tolerance 0,002)
 - `pnpm eval`: 31 documentos (16 públicos + 15 privados); 12 com gabarito (sintéticos `syn-*`); nenhum PDF real com gabarito ainda.
@@ -42,8 +41,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-11 · **SEG-T04 (robustez) — CONCLUÍDO (PR #110)** · `sentences.ts`: `UPPERCASE=/\p{Lu}/u` + `LETTER_OR_DOT=/[\p{L}.]/u` (inicial grego `Κ.`, `pág.`, `Á.` não quebram), trim do fim do span sem terminador, `maxSpanLength` (default 1000, `Infinity` desliga, `RangeError` se inválido) com corte na última quebra de espaço ou a seco; 20+8 casos novos → 88 tabelados + categorias SEG-T04 pt/en + `properties.test.ts` (604 textos, invariantes + determinismo), ADR-107; `pnpm verify` verde, `eval --ci` exit 0. Próxima: SEG-T05.
 - 2026-11-11 · **SEG-T03 (palavras) — CONCLUÍDO** · `words.ts` quebra em `—` (U+2014) e emite cada travessão como token próprio mesmo colado (`ele—disse`); hífen composto, apóstrofo (reto e `’`), separadores numéricos e URLs/e-mails nunca quebram, pontuação final anexada (ADR-104); 26 casos novos → 56 tabelados + 3 meta (59 testes), cobertura ≥ 2 por categoria e mínimo de 50, ADR-106; `pnpm verify` verde, `eval --ci` exit 0. Próxima: SEG-T04.
-- 2026-11-11 · **SEG-T02 (frases) — CONCLUÍDO** · `abbreviations/{pt,en}.ts` (30+32 entradas lowercase sem ponto) + `sentences.ts` (sem mudar a API): ponto isolado após abreviação conhecida nunca quebra; inicial maiúscula sozinha (`J. S. Mill`) não quebra antes de palavra maiúscula; `3.14`/`1.000,50`, `! ? …` e runs seguem a regra anterior; 68 casos tabelados (28 novos, cada categoria pt/en) + checagem de cobertura e de formato das listas (73 testes no arquivo), ADR-105; `pnpm verify` verde, `eval --ci` exit 0. Próxima: SEG-T03.
-- Sessões anteriores: `archive/STATE-log-2026-11-11-corpus-vendored.md` (manutenção corpus vendored), `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98; SEG-T01 API = ADR-104).
+- Sessões anteriores: `archive/STATE-log-2026-11-11-segt02.md` (SEG-T02 frases), `archive/STATE-log-2026-11-11-corpus-vendored.md` (manutenção corpus vendored), `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md` (E7-T02/T03; E7-T04 ver ADR-074/075; fila 3A sofia/n2/n4 = PR #67; E8-T01 fatia 1 = ADR-088; E9-T02 = ADR-095/096; E9-T04 = ADR-098; E10-T03 equações = ADR-102, PR #98; SEG-T01 API = ADR-104).
 
 Histórico completo: docs/extractor/archive/

@@ -109,6 +109,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-104 | Segmentador: offsets de frase aparados e palavra = trecho sem espaço | accepted |
 | ADR-105 | Segmentador: abreviações por idioma e iniciais não terminam frase | accepted |
 | ADR-106 | Segmentador: travessão `—` separa palavras; hífen, apóstrofo, número e URL não | accepted |
+| ADR-107 | Segmentador: classes Unicode, span aparado no fim e `maxSpanLength` | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -839,3 +840,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) travessão cola na palavra anterior (prós: menos tokens; contras: `ele—` não é palavra e o token deixa de ser "trecho com pontuação anexada" de forma uniforme) · B) travessão vira token próprio mesmo sem espaço (prós: mesmo resultado de `a — b`, texto coberto só por espaço fora dos tokens) · C) separar só com espaço (prós: zero mudança; contras: não cumpre o aceite da tarefa).
 **Decisão:** **B** — `splitWords` quebra em `—` (U+2014) e emite cada travessão como token próprio. Hífen composto (`guarda-chuva`), apóstrofo (`don't`, `d'água`, `’`), separadores numéricos (`1.000,50`, `1,000.50`) e URLs/e-mails nunca quebram; a pontuação final segue anexada (ADR-104), então `exemplo.com.` é um token. `–` (en dash) e `--` ficam de fora por não serem travessão.
 **Consequências:** 56 casos tabelados (26 novos) + checagem de cobertura (≥ 2 por categoria) e mínimo de 50 casos; API inalterada, nenhum consumidor do extrator usa `splitWords` ainda (eval intacto); revisar se SEG-T05 mostrar que o en dash também precisa separar.
+
+### ADR-107 · Segmentador: classes Unicode, span aparado no fim e `maxSpanLength` · accepted · 2026-11-11
+**Contexto:** SEG-T04 pede frases com grego/latim (`Κ.` inicial grego quebrava, `pág.` não casava abreviação), span sem terminador com espaço final não aparado e limite de trecho para textos longos sem pontuação.
+**Alternativas:** A) manter `[A-Za-z]` e truncar em 1000 fixo (contras: continua errando `á/Κ` e não dá para desligar) · B) classes Unicode + trim final + `maxSpanLength` opcional (contras: `LETTER_OR_DOT` mais largo pode alongar candidato de abreviação, ex.: `ívol.`) · C) só o limite sem corrigir Unicode (contras: não cumpre o aceite).
+**Decisão:** **B** — `UPPERCASE = /\p{Lu}/u`, `LETTER_OR_DOT = /[\p{L}.]/u`, trim do fim do span antes de emitir, e `SplitOptions.maxSpanLength` (default `DEFAULT_MAX_SPAN_LENGTH = 1000`, `Infinity` desliga, inteiro ≥ 1 ou `RangeError`); corte: última quebra de espaço dentro do limite, senão corte seco no limite.
+**Consequências:** 20 casos novos de frase (grego/latim pt+en, `pág.`, `Á.`, só pontuação, espaço final, longos sem pontuação, 4 com `maxSpanLength`) + 8 de palavra + checagem de categorias SEG-T04 em ambos os idiomas + `properties.test.ts` (604 textos: cobertura sem sobreposição, offsets monotônicos, só espaço fora, cap ≤ limite, determinismo); `pnpm verify` verde, `pnpm eval --ci` exit 0 (segmentador ainda sem consumidor no extrator).

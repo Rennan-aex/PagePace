@@ -1,5 +1,5 @@
 // @pagepace/segmenter - pure, deterministic sentence and word segmentation (SEG phase).
-export { splitSentences } from "./sentences";
+export { DEFAULT_MAX_SPAN_LENGTH, splitSentences } from "./sentences";
 export type {
   SegmentLang,
   SentenceSpan,

@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { EN_ABBREVIATIONS } from "./abbreviations/en";
 import { PT_ABBREVIATIONS } from "./abbreviations/pt";
-import { type SegmentLang, type SentenceSpan, splitSentences } from "./index";
+import {
+  DEFAULT_MAX_SPAN_LENGTH,
+  type SegmentLang,
+  type SentenceSpan,
+  splitSentences,
+} from "./index";
 
 interface SentenceCase {
   lang: SegmentLang;
   text: string;
   sentences: string[];
+  /** SEG-T04: optional cap (in characters) applied to every sentence span. */
+  maxSpanLength?: number;
 }
 
 // SEG-T01: table-driven cases, written before the implementation.
@@ -238,6 +245,93 @@ export const SENTENCE_CASES: SentenceCase[] = [
     text: "He waited (for hours?). She never came.",
     sentences: ["He waited (for hours?).", "She never came."],
   },
+  // SEG-T04: mixed script — a Greek initial must not end the sentence (pt).
+  {
+    lang: "pt",
+    text: "Κ. Σολωμός escreveu o poema.",
+    sentences: ["Κ. Σολωμός escreveu o poema."],
+  },
+  {
+    lang: "pt",
+    text: "O termo grego ἀρχή significa início.",
+    sentences: ["O termo grego ἀρχή significa início."],
+  },
+  // SEG-T04: mixed script — a Greek initial must not end the sentence (en).
+  { lang: "en", text: "Κ. Solon wrote the laws.", sentences: ["Κ. Solon wrote the laws."] },
+  {
+    lang: "en",
+    text: "Ἐν ἀρχῇ ἦν ὁ λόγος. Καὶ τὸ φῶς.",
+    sentences: ["Ἐν ἀρχῇ ἦν ὁ λόγος.", "Καὶ τὸ φῶς."],
+  },
+  // SEG-T04: Latin excerpts stay inside the sentence.
+  {
+    lang: "pt",
+    text: "O lema carpe diem ainda vale.",
+    sentences: ["O lema carpe diem ainda vale."],
+  },
+  {
+    lang: "pt",
+    text: "Sic transit gloria mundi, disse o novato.",
+    sentences: ["Sic transit gloria mundi, disse o novato."],
+  },
+  {
+    lang: "en",
+    text: "The motto carpe diem still holds.",
+    sentences: ["The motto carpe diem still holds."],
+  },
+  {
+    lang: "en",
+    text: "Pliny et al. (1999) reported it.",
+    sentences: ["Pliny et al. (1999) reported it."],
+  },
+  // SEG-T04: accented abbreviation and accented initial (pt).
+  {
+    lang: "pt",
+    text: "Veja a pág. 12 do volume 3.",
+    sentences: ["Veja a pág. 12 do volume 3."],
+  },
+  { lang: "pt", text: "Á. Silva assinou o texto.", sentences: ["Á. Silva assinou o texto."] },
+  // SEG-T04: punctuation-only text is one span (pt and en).
+  { lang: "pt", text: "...", sentences: ["..."] },
+  { lang: "en", text: "!?…", sentences: ["!?…"] },
+  // SEG-T04: trailing whitespace on a span without terminator is trimmed.
+  { lang: "en", text: "abc ", sentences: ["abc"] },
+  { lang: "pt", text: "Fim sem pontuação   ", sentences: ["Fim sem pontuação"] },
+  // SEG-T04: long text without punctuation stays whole (under the default cap).
+  {
+    lang: "pt",
+    text: "Este texto longo não tem nenhuma pontuação e continua por mais de quarenta caracteres seguidos",
+    sentences: [
+      "Este texto longo não tem nenhuma pontuação e continua por mais de quarenta caracteres seguidos",
+    ],
+  },
+  {
+    lang: "en",
+    text: "This long passage contains no punctuation at all and keeps going well beyond forty characters",
+    sentences: [
+      "This long passage contains no punctuation at all and keeps going well beyond forty characters",
+    ],
+  },
+  // SEG-T04: maxSpanLength caps every span.
+  {
+    lang: "pt",
+    text: "um dois tres quatro",
+    sentences: ["um dois", "tres", "quatro"],
+    maxSpanLength: 10,
+  },
+  {
+    lang: "pt",
+    text: "palavra palavra palavra palavra palavra",
+    sentences: ["palavra palavra", "palavra palavra", "palavra"],
+    maxSpanLength: 16,
+  },
+  { lang: "en", text: "abcdefghij", sentences: ["abcd", "efgh", "ij"], maxSpanLength: 4 },
+  {
+    lang: "en",
+    text: "alpha beta gamma",
+    sentences: ["alpha beta", "gamma"],
+    maxSpanLength: 10,
+  },
 ];
 
 function expectValidSpans(text: string, spans: SentenceSpan[], expected: string[]): void {
@@ -278,6 +372,21 @@ describe("splitSentences", () => {
     }
   });
 
+  it("covers every SEG-T04 category in both languages", () => {
+    const categories: Record<string, (testCase: SentenceCase) => boolean> = {
+      greekScript: (testCase) => /\p{Script=Greek}/u.test(testCase.text),
+      latinExcerpt: (testCase) => /\b(?:carpe diem|sic transit|et al)\b/iu.test(testCase.text),
+      punctuationOnly: (testCase) => /^[^\p{L}\p{N}\s]+$/u.test(testCase.text),
+      emptyOrWhitespace: (testCase) => /^\s*$/u.test(testCase.text),
+      longWithoutPunctuation: (testCase) => /^[^.!?…]{40,}$/u.test(testCase.text),
+      cappedSpan: (testCase) => testCase.maxSpanLength !== undefined,
+    };
+    for (const [name, matches] of Object.entries(categories)) {
+      const langs = new Set(SENTENCE_CASES.filter(matches).map((testCase) => testCase.lang));
+      expect({ name, langs: [...langs].sort() }).toEqual({ name, langs: ["en", "pt"] });
+    }
+  });
+
   it("keeps the abbreviation data files easy to extend", () => {
     for (const list of [PT_ABBREVIATIONS, EN_ABBREVIATIONS]) {
       expect(list.length).toBeGreaterThan(10);
@@ -292,13 +401,40 @@ describe("splitSentences", () => {
 
   for (const testCase of SENTENCE_CASES) {
     it(`${testCase.lang}: ${JSON.stringify(testCase.text)}`, () => {
-      expectValidSpans(
-        testCase.text,
-        splitSentences(testCase.text, { lang: testCase.lang }),
-        testCase.sentences,
-      );
+      const spans = splitSentences(testCase.text, {
+        lang: testCase.lang,
+        maxSpanLength: testCase.maxSpanLength,
+      });
+      expectValidSpans(testCase.text, spans, testCase.sentences);
+      if (testCase.maxSpanLength !== undefined) {
+        for (const span of spans) {
+          expect(span.end - span.start).toBeLessThanOrEqual(testCase.maxSpanLength);
+        }
+      }
     });
   }
+
+  it("caps every span at the default maxSpanLength of 1000 characters", () => {
+    expect(DEFAULT_MAX_SPAN_LENGTH).toBe(1000);
+    const text = "a".repeat(1200);
+    expect(splitSentences(text, { lang: "en" })).toEqual([
+      { start: 0, end: 1000 },
+      { start: 1000, end: 1200 },
+    ]);
+  });
+
+  it("accepts Infinity to disable the span cap", () => {
+    const text = "a".repeat(1500);
+    expect(splitSentences(text, { lang: "en", maxSpanLength: Infinity })).toEqual([
+      { start: 0, end: 1500 },
+    ]);
+  });
+
+  it("rejects an invalid maxSpanLength with RangeError", () => {
+    expect(() => splitSentences("Olá.", { lang: "pt", maxSpanLength: 0 })).toThrow(RangeError);
+    expect(() => splitSentences("Olá.", { lang: "pt", maxSpanLength: -3 })).toThrow(RangeError);
+    expect(() => splitSentences("Olá.", { lang: "pt", maxSpanLength: 2.5 })).toThrow(RangeError);
+  });
 
   it("is deterministic for the same input", () => {
     const text = "Uma frase. Outra frase! E a última?";
