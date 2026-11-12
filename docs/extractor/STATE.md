@@ -6,14 +6,14 @@
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
 - **Próxima tarefa:** nenhuma no extrator; o **M2 do app** (`docs/app/STATE.md`) espera o PO liberar o M0 (planejar fases e tarefas).
 - **Ação pendente do PO:** liberar o M0 do app.
-- **Status:** **SEG-T05 concluída em 2026-11-12** — corpus anotado `corpus/sentences/` (4 docs, 71 frases, domínio público) + `sentence_f1` no `pnpm eval` e no baseline (**1,0000 nos 4**; meta 0,97); o corpus expôs 2 erros do segmentador, corrigidos (atribuição minúscula após fechamento; `snr./snra.` na lista pt), ADR-108/109. `pnpm verify` verde; `pnpm eval --ci` exit 0.
+- **Status:** **SEG-T05 concluída e mesclada em 2026-11-12 (PR #111)** — corpus anotado `corpus/sentences/` (4 docs, 71 frases, domínio público) + `sentence_f1` no `pnpm eval` e no baseline (**1,0000 nos 4**; meta 0,97); o corpus expôs 2 erros do segmentador, corrigidos (atribuição minúscula após fechamento; `snr./snra.` na lista pt), ADR-108/109. `pnpm verify` verde; `pnpm eval --ci` exit 0.
 - **Última atualização:** 2026-11-12 (SEG-T05).
 
 ## Tarefa atual
 Nenhuma aberta no extrator (fase SEG encerrada em 2026-11-12). Próximo marco: **M2 do app**, que depende do M0 planejado (`docs/app/STATE.md`).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão encerrada: SEG-T05 concluída; PR aberto (`seg-t05-eval`).** Feito: `corpus/sentences/*.json` (Machado, Eça, Austen, Darwin), `packages/eval/src/sentences.ts` (loader estrito + runner + meta 0,97), `sentence_f1` em `metrics.ts`/baseline/`pnpm eval` (seção "Sentence segmentation"), 2 correções no segmentador (ADR-109), ADR-108/109, fase SEG fechada, `pnpm verify` verde, `pnpm eval --ci` exit 0. Próximo: conferir `gh pr checks`, mesclar (squash), apagar `seg-t05-eval` local e, se o PO liberar, começar o M0/M2 do app.
+- **Sessão encerrada: SEG-T05 concluída e mesclada (PR #111, squash); branch `seg-t05-eval` removida.** Feito: `corpus/sentences/*.json` (Machado, Eça, Austen, Darwin), `packages/eval/src/sentences.ts` (loader estrito + runner + meta 0,97), `sentence_f1` em `metrics.ts`/baseline/`pnpm eval` (seção "Sentence segmentation"), 2 correções no segmentador (ADR-109), ADR-108/109, fase SEG fechada, `pnpm verify` verde, `pnpm eval --ci` exit 0. Próximo: se o PO liberar, começar o M0/M2 do app (`docs/app/STATE.md`); nenhuma tarefa aberta no extrator.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
@@ -40,7 +40,7 @@ Nenhuma aberta no extrator (fase SEG encerrada em 2026-11-12). Próximo marco: *
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-12 · **SEG-T05 (avaliação) — CONCLUÍDO** · corpus anotado pt/en em `corpus/sentences/` (4 docs, 71 frases, domínio público) + `sentence_f1` no baseline (1,0000 nos 4; meta 0,97); 2 correções no segmentador achadas pelo corpus (ADR-109); ADR-108; `pnpm verify` verde, `eval --ci` exit 0. Próxima: M0/M2 do app (PO).
+- 2026-11-12 · **SEG-T05 (avaliação) — CONCLUÍDO (PR #111)** · corpus anotado pt/en em `corpus/sentences/` (4 docs, 71 frases, domínio público) + `sentence_f1` no baseline (1,0000 nos 4; meta 0,97); 2 correções no segmentador achadas pelo corpus (ADR-109); ADR-108; `pnpm verify` verde, `eval --ci` exit 0. Próxima: M0/M2 do app (PO).
 - 2026-11-11 · **SEG-T04 (robustez) — CONCLUÍDO (PR #110)** · `sentences.ts`: `UPPERCASE=/\p{Lu}/u` + `LETTER_OR_DOT=/[\p{L}.]/u` (inicial grego `Κ.`, `pág.`, `Á.` não quebram), trim do fim do span sem terminador, `maxSpanLength` (default 1000, `Infinity` desliga, `RangeError` se inválido) com corte na última quebra de espaço ou a seco; 20+8 casos novos → 88 tabelados + categorias SEG-T04 pt/en + `properties.test.ts` (604 textos, invariantes + determinismo), ADR-107; `pnpm verify` verde, `eval --ci` exit 0. Próxima: SEG-T05.
 - Sessões anteriores: `archive/STATE-log-2026-11-11-segt03.md` (SEG-T03 palavras), `archive/STATE-log-2026-11-11-segt02.md` (SEG-T02 frases), `archive/STATE-log-2026-11-11-corpus-vendored.md` (manutenção corpus vendored), `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
 
