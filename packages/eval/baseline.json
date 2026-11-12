@@ -2,6 +2,18 @@
   "version": 1,
   "tolerance": 0.002,
   "documents": {
+    "seg-en-origin-species": {
+      "sentence_f1": 1
+    },
+    "seg-en-pride-prejudice": {
+      "sentence_f1": 1
+    },
+    "seg-pt-cidade-serras": {
+      "sentence_f1": 1
+    },
+    "seg-pt-domcasmurro": {
+      "sentence_f1": 1
+    },
     "syn-n1-en-paragraphs": {
       "block_kind_f1": 1,
       "confidence_calibration": 1,

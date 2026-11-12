@@ -60,6 +60,15 @@ import {
   styleF1,
   textCer,
 } from "./metrics";
+import {
+  evaluateSentenceCorpus,
+  loadSentenceCorpus,
+  meanSentenceF1,
+  SENTENCE_CORPUS_DIR,
+  SENTENCE_F1_TARGET,
+  SentenceCorpusError,
+  type SentenceDocumentResult,
+} from "./sentences";
 import { documentText } from "./text";
 
 export const EXIT_OK = 0;
@@ -104,7 +113,13 @@ corpus/golden/ and, for private documents, in $CORPUS_PRIVATE_DIR/golden/):
                     block confidence and the error flag (E7-T01), 1 = every
                     wrong block is less confident than every right one (or
                     nothing is wrong), negative = the confident ones are wrong
+  sentence_f1       F1 of the sentence breaks the segmenter finds against the
+                    annotated corpus in corpus/sentences/ (SEG-T05), 1 = every
+                    break exactly where the annotation has it; the acceptance
+                    target for common prose is 0.97
 
+  - reads corpus/sentences/*.json (public-domain annotated prose) as well and
+    measures the segmenter on every document there;
   - reads corpus/manifest.yaml plus the private manifest resolved through
     CORPUS_PRIVATE_DIR (environment variable, then the .env file at the root);
   - documents with "golden: none" are listed as "no golden" and not measured;
@@ -196,6 +211,8 @@ export interface EvalResult {
   code: number;
   documents: DocumentResult[];
   levels: LevelSummary[];
+  /** Annotated sentence corpus results (SEG-T05), empty when there is none. */
+  sentences: SentenceDocumentResult[];
   measured: number;
   errors: number;
   withGolden: number;
@@ -757,6 +774,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
       code: EXIT_ERROR,
       documents: [],
       levels: [],
+      sentences: [],
       measured: 0,
       errors: 1,
       withGolden: 0,
@@ -886,8 +904,27 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
     );
   }
 
+  let sentences: SentenceDocumentResult[] = [];
+  try {
+    const loaded = await loadSentenceCorpus(repoRoot);
+    const documentIds = new Set(entries.map((entry) => entry.id));
+    for (const entry of loaded) {
+      if (documentIds.has(entry.id)) {
+        throw new SentenceCorpusError(
+          `${SENTENCE_CORPUS_DIR}/${entry.id}.json: id already used by a corpus document`,
+        );
+      }
+    }
+    sentences = evaluateSentenceCorpus(loaded);
+  } catch (error) {
+    // A broken annotation fails the run: a metric on a shifted offset would
+    // be silent nonsense (ADR-036 style strictness).
+    errors++;
+    err(`eval: ${messageOf(error)}\n`);
+  }
+
   const levels = summarizeLevels(documents);
-  out(renderReport(corpus, documents, levels, { measured, errors, withGolden }));
+  out(renderReport(corpus, documents, levels, sentences, { measured, errors, withGolden }));
 
   if (options.writeReport !== false) {
     try {
@@ -906,6 +943,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
             withGolden,
             documents,
             levels,
+            sentences,
           },
           null,
           2,
@@ -918,7 +956,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
   }
 
   let code = errors > 0 ? EXIT_ERROR : EXIT_OK;
-  const metrics = metricsOf(documents);
+  const metrics = metricsOf(documents, sentences);
 
   if (options.updateBaseline) {
     code = await applyUpdateBaseline(repoRoot, metrics, { errors, out, err });
@@ -938,6 +976,7 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
     code,
     documents,
     levels,
+    sentences,
     measured,
     errors,
     withGolden,
@@ -946,7 +985,10 @@ export async function runEval(options: EvalOptions = {}): Promise<EvalResult> {
 }
 
 /** Measured documents as `id -> metric -> value`, the baseline shape. */
-function metricsOf(documents: DocumentResult[]): BaselineDocuments {
+function metricsOf(
+  documents: DocumentResult[],
+  sentences: readonly SentenceDocumentResult[] = [],
+): BaselineDocuments {
   const metrics: BaselineDocuments = {};
   for (const document of documents) {
     const boundaries = document.boundaries;
@@ -986,6 +1028,9 @@ function metricsOf(documents: DocumentResult[]): BaselineDocuments {
       style_f1: styles.f1,
       text_cer: document.cer,
     };
+  }
+  for (const sentence of sentences) {
+    metrics[sentence.id] = { sentence_f1: sentence.result.f1 };
   }
   return metrics;
 }
@@ -1156,10 +1201,59 @@ function summarizeLevels(documents: DocumentResult[]): LevelSummary[] {
     });
 }
 
+function renderSentenceSection(sentences: readonly SentenceDocumentResult[]): string {
+  if (sentences.length === 0) return "";
+  const rows = sentences.map((sentence) => [
+    sentence.id,
+    sentence.lang,
+    String(sentence.sentences),
+    sentence.result.f1.toFixed(4),
+    sentence.result.precision.toFixed(4),
+    sentence.result.recall.toFixed(4),
+    String(sentence.result.falsePositives),
+    String(sentence.result.falseNegatives),
+  ]);
+  const table = renderTable(
+    [
+      { name: "document", align: "left" },
+      { name: "lang", align: "left" },
+      { name: "sentences", align: "right" },
+      { name: "sentence_f1", align: "right" },
+      { name: "precision", align: "right" },
+      { name: "recall", align: "right" },
+      { name: "invented", align: "right" },
+      { name: "missed", align: "right" },
+    ],
+    rows,
+  );
+  const mean = meanSentenceF1(sentences);
+  const target = mean >= SENTENCE_F1_TARGET ? "reached" : "below target";
+  const errors = sentences.filter(
+    (sentence) => sentence.result.falsePositives > 0 || sentence.result.falseNegatives > 0,
+  );
+  const errorLines =
+    errors.length === 0
+      ? "  every break where the annotation has it"
+      : errors
+          .map(
+            (sentence) =>
+              `  ${sentence.id}: invented [${sentence.result.invented.join(", ")}], ` +
+              `missed [${sentence.result.missed.join(", ")}]`,
+          )
+          .join("\n");
+  return (
+    `\n\nSentence segmentation (${SENTENCE_CORPUS_DIR}, target >= ${SENTENCE_F1_TARGET.toFixed(2)})\n` +
+    `${table}\n` +
+    `mean sentence_f1 ${mean.toFixed(4)} over ${sentences.length} document(s): ${target}\n` +
+    `Break errors (character offsets):\n${errorLines}`
+  );
+}
+
 function renderReport(
   corpus: Awaited<ReturnType<typeof loadCorpus>>,
   documents: DocumentResult[],
   levels: LevelSummary[],
+  sentences: readonly SentenceDocumentResult[],
   totals: { measured: number; errors: number; withGolden: number },
 ): string {
   const header =
@@ -1409,7 +1503,7 @@ function renderReport(
                 .join("\n")
         }`;
 
-  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}${kindSection}${calibrationSection}\n`;
+  return `${header}\n${perDocument}\n\nBy level (mean of the measured documents)\n${perLevel}${errorSection}${boundarySection}${removalSection}${hyphenSection}${headingSection}${linkSection}${kindSection}${calibrationSection}${renderSentenceSection(sentences)}\n`;
 }
 
 /** `"none"` or the per-kind invented/missed counts, kept short for one report line. */

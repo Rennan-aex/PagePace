@@ -10,6 +10,7 @@ import {
   PARA_BOUNDARY_WINDOW,
   paraBoundaryF1,
   readingOrder,
+  sentenceF1,
   styleF1,
   textCer,
 } from "./metrics";
@@ -729,5 +730,81 @@ describe("confidenceCalibration (E7-T01)", () => {
     expect(confidenceCalibration(golden, extracted)).toEqual(
       confidenceCalibration(golden, extracted),
     );
+  });
+});
+
+describe("sentenceF1", () => {
+  it("scores 1 when every break matches exactly", () => {
+    const result = sentenceF1([10, 25, 40], [10, 25, 40]);
+    expect(result).toEqual({
+      f1: 1,
+      precision: 1,
+      recall: 1,
+      truePositives: 3,
+      falsePositives: 0,
+      falseNegatives: 0,
+      invented: [],
+      missed: [],
+    });
+  });
+
+  it("counts an invented break as a false positive", () => {
+    const result = sentenceF1([10, 40], [10, 25, 40]);
+    expect(result.truePositives).toBe(2);
+    expect(result.falsePositives).toBe(1);
+    expect(result.falseNegatives).toBe(0);
+    expect(result.invented).toEqual([25]);
+    expect(result.missed).toEqual([]);
+    expect(result.precision).toBeCloseTo(2 / 3, 10);
+    expect(result.recall).toBe(1);
+    expect(result.f1).toBeCloseTo(0.8, 10);
+  });
+
+  it("counts a skipped break as a false negative", () => {
+    const result = sentenceF1([10, 25, 40], [10, 40]);
+    expect(result.truePositives).toBe(2);
+    expect(result.falsePositives).toBe(0);
+    expect(result.falseNegatives).toBe(1);
+    expect(result.missed).toEqual([25]);
+    expect(result.invented).toEqual([]);
+    expect(result.precision).toBe(1);
+    expect(result.recall).toBeCloseTo(2 / 3, 10);
+    expect(result.f1).toBeCloseTo(0.8, 10);
+  });
+
+  it("scores 1 for two empty sides and 0 when only one side has breaks", () => {
+    expect(sentenceF1([], [])).toMatchObject({ f1: 1, precision: 1, recall: 1 });
+    expect(sentenceF1([], [5])).toMatchObject({
+      f1: 0,
+      precision: 0,
+      recall: 1,
+      invented: [5],
+    });
+    expect(sentenceF1([5], [])).toMatchObject({
+      f1: 0,
+      precision: 1,
+      recall: 0,
+      missed: [5],
+    });
+  });
+
+  it("matches offsets exactly: one character of by one is an error", () => {
+    const result = sentenceF1([10], [11]);
+    expect(result.truePositives).toBe(0);
+    expect(result.invented).toEqual([11]);
+    expect(result.missed).toEqual([10]);
+  });
+
+  it("reports every invented and missed offset in ascending order", () => {
+    const result = sentenceF1([10, 20, 30], [5, 20, 35]);
+    expect(result.invented).toEqual([5, 35]);
+    expect(result.missed).toEqual([10, 30]);
+    expect(result.falsePositives).toBe(2);
+    expect(result.falseNegatives).toBe(2);
+    expect(result.f1).toBeCloseTo(1 / 3, 10);
+  });
+
+  it("is deterministic: the same offsets always give the same result", () => {
+    expect(sentenceF1([10, 20], [10, 21])).toEqual(sentenceF1([10, 20], [10, 21]));
   });
 });

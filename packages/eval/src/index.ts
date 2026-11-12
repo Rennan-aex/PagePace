@@ -130,8 +130,23 @@ export {
   type ReadingOrderOptions,
   type ReadingOrderResult,
   readingOrder,
+  type SentenceF1Result,
+  sentenceF1,
   textCer,
 } from "./metrics";
+export {
+  evaluateSentenceCorpus,
+  evaluateSentenceDocument,
+  loadSentenceCorpus,
+  meanSentenceF1,
+  parseSentenceCorpus,
+  SENTENCE_CORPUS_DIR,
+  SENTENCE_CORPUS_FORMAT,
+  SENTENCE_F1_TARGET,
+  type SentenceCorpusEntry,
+  SentenceCorpusError,
+  type SentenceDocumentResult,
+} from "./sentences";
 export { SYNTHETIC_SPECS, syntheticSpecOf } from "./specs";
 export {
   buildSynthetic,

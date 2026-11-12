@@ -17,6 +17,7 @@ const ABBREVIATIONS: Readonly<Record<SegmentLang, ReadonlySet<string>>> = {
 const WHITESPACE = /\s/u;
 const LETTER_OR_DOT = /[\p{L}.]/u;
 const UPPERCASE = /\p{Lu}/u;
+const LOWERCASE = /\p{Ll}/u;
 
 /**
  * SEG-T04: default cap for every sentence span, in characters. Spans longer than
@@ -65,6 +66,15 @@ function nextNonSpace(text: string, from: number): string {
   let index = from;
   while (index < text.length && isWhitespace(text.charAt(index))) index += 1;
   return text.charAt(index);
+}
+
+/**
+ * Whether a terminator inside a closing quote continues the sentence: in
+ * `"...?" cried his wife.` the attribution after the closing quote belongs to
+ * the same sentence, so a lowercase word right after the closer keeps it going.
+ */
+function closerContinues(text: string, after: number): boolean {
+  return LOWERCASE.test(nextNonSpace(text, after));
 }
 
 /**
@@ -146,11 +156,16 @@ export function splitSentences(text: string, options: SplitSentencesOptions): Se
         after += 1;
         terminatorCount += 1;
       }
+      const terminatorsEnd = after;
       while (after < text.length && CLOSERS.has(text.charAt(after))) after += 1;
 
       if (after >= text.length || isWhitespace(text.charAt(after))) {
         const singlePeriod = terminatorCount === 1 && text.charAt(index) === ".";
         if (singlePeriod && keepsSentenceGoing(text, index, after, options.lang)) {
+          index = after;
+          continue;
+        }
+        if (after > terminatorsEnd && closerContinues(text, after)) {
           index = after;
           continue;
         }

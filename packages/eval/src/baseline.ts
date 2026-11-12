@@ -24,6 +24,7 @@ export const METRIC_DIRECTIONS: Readonly<Record<string, MetricDirection>> = Obje
   hyphen_join_acc: "higher",
   para_boundary_f1: "higher",
   reading_order: "higher",
+  sentence_f1: "higher",
   style_f1: "higher",
   text_cer: "lower",
 });

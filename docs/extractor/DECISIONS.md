@@ -110,6 +110,8 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-105 | Segmentador: abreviações por idioma e iniciais não terminam frase | accepted |
 | ADR-106 | Segmentador: travessão `—` separa palavras; hífen, apóstrofo, número e URL não | accepted |
 | ADR-107 | Segmentador: classes Unicode, span aparado no fim e `maxSpanLength` | accepted |
+| ADR-108 | Segmentador: `sentence_f1` sobre corpus anotado em `corpus/sentences/` | accepted |
+| ADR-109 | Segmentador: atribuição minúscula após fechamento continua a frase; `snr.`/`snra.` na lista pt | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -846,3 +848,15 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) manter `[A-Za-z]` e truncar em 1000 fixo (contras: continua errando `á/Κ` e não dá para desligar) · B) classes Unicode + trim final + `maxSpanLength` opcional (contras: `LETTER_OR_DOT` mais largo pode alongar candidato de abreviação, ex.: `ívol.`) · C) só o limite sem corrigir Unicode (contras: não cumpre o aceite).
 **Decisão:** **B** — `UPPERCASE = /\p{Lu}/u`, `LETTER_OR_DOT = /[\p{L}.]/u`, trim do fim do span antes de emitir, e `SplitOptions.maxSpanLength` (default `DEFAULT_MAX_SPAN_LENGTH = 1000`, `Infinity` desliga, inteiro ≥ 1 ou `RangeError`); corte: última quebra de espaço dentro do limite, senão corte seco no limite.
 **Consequências:** 20 casos novos de frase (grego/latim pt+en, `pág.`, `Á.`, só pontuação, espaço final, longos sem pontuação, 4 com `maxSpanLength`) + 8 de palavra + checagem de categorias SEG-T04 em ambos os idiomas + `properties.test.ts` (604 textos: cobertura sem sobreposição, offsets monotônicos, só espaço fora, cap ≤ limite, determinismo); `pnpm verify` verde, `pnpm eval --ci` exit 0 (segmentador ainda sem consumidor no extrator).
+
+### ADR-108 · Segmentador: `sentence_f1` sobre corpus anotado em `corpus/sentences/` · accepted · 2026-11-12
+**Contexto:** SEG-T05 pede um pequeno corpus anotado de frases (domínio público, pt/en) e a métrica `sentence_f1` com meta ≥ 0,97 em prosa comum, entrando no baseline; o extrator ainda não consome o segmentador, então não há fluxo de PDF onde medir frases.
+**Alternativas:** A) anotar frases no texto dos PDFs do corpus (contras: os goldens são de parágrafos e boa parte do corpus tem copyright) · B) corpus próprio versionado em `corpus/sentences/*.json`, medido pelo `pnpm eval` e gravado em `packages/eval/baseline.json` (prós: mesmo gate e mesmos flags de baseline do CI) · C) script separado com baseline próprio (contras: duas verdades e o gate do CI não cobre).
+**Decisão:** **B** — cada JSON traz `format`, `id`, `lang`, `source` e `sentences`; o texto é `sentences.join(" ")` e as fronteiras de referência são os fins aparados de todas menos a última, comparadas **exatamente** com os fins dos spans (o último span é descartado dos dois lados). Uma frase é o trecho máximo terminado em `. ! ? …` (mais fechamentos). O runner mede no `pnpm eval` (seção "Sentence segmentation"), grava `sentence_f1` por documento no baseline e o `--ci` cobre a métrica.
+**Consequências:** 4 documentos (Machado, Eça, Austen, Darwin; 71 frases, domínio público: 22/13 pt, 24/12 en) com `sentence_f1` 1,0000 e média 1,0000 (meta 0,97); estender é editar um JSON (validação estrita: chaves, formato, idioma, terminador, id = nome do arquivo); repositório sem corpus simplesmente não mede frases e um corpus quebrado derruba o run.
+
+### ADR-109 · Segmentador: atribuição minúscula após fechamento continua a frase; `snr.`/`snra.` na lista pt · accepted · 2026-11-12
+**Contexto:** o corpus de SEG-T05 expôs dois erros reais: `"Do not you want to know who has taken it?" cried his wife` era cortado depois de `?"` (a atribuição em minúscula pertence à mesma frase) e `o snr. Infante` era cortado depois de `snr.` (abreviação de tratamento fora da lista pt).
+**Alternativas:** A) anotar o corpus como o segmentador já faz (contras: normaliza o erro e o corpus deixa de ser verdade) · B) regra `terminador + fechamento + palavra minúscula → não quebra` mais `snr/snra/snrs/snras` na lista pt (prós: padrão comum de diálogo, mudança local) · C) só a abreviação (contras: metade dos erros de citação continua).
+**Decisão:** **B** — quando o terminador é seguido de ao menos um fechamento (`" ' ” ’ » ) ] }`) e o próximo caractere não-espaço é minúsculo (`\p{Ll}`), a frase continua; com maiúscula (ou outro caractere) a fronteira permanece. `snr.`, `snra.`, `snrs.` e `snras.` entram em `abbreviations/pt.ts`.
+**Consequências:** 9 casos novos tabelados (pt/en: continuação em minúscula, maiúscula ainda quebra, `snr.`/`snra.`) + checagem de categoria SEG-T05; o corpus vai a 1,0000 e passa a ser o teste de aceite — regressão futura aparece no `pnpm eval --ci`.

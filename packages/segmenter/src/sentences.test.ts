@@ -332,6 +332,42 @@ export const SENTENCE_CASES: SentenceCase[] = [
     sentences: ["alpha beta", "gamma"],
     maxSpanLength: 10,
   },
+  // SEG-T05: the eval corpus needed the address abbreviations `snr.`/`snra.` (pt).
+  {
+    lang: "pt",
+    text: "O snr. Silva chegou tarde.",
+    sentences: ["O snr. Silva chegou tarde."],
+  },
+  {
+    lang: "pt",
+    text: "A snra. Costa esperou na sala.",
+    sentences: ["A snra. Costa esperou na sala."],
+  },
+  // SEG-T05: a lowercase attribution after a closing quote continues the sentence.
+  {
+    lang: "pt",
+    text: 'Ele perguntou: "Vamos?" e eu concordei.',
+    sentences: ['Ele perguntou: "Vamos?" e eu concordei.'],
+  },
+  {
+    lang: "pt",
+    text: '"Já acabou." disse ela, sem olhar.',
+    sentences: ['"Já acabou." disse ela, sem olhar.'],
+  },
+  // SEG-T05: an uppercase word after the closer still starts a new sentence.
+  { lang: "pt", text: '"Fim." Ele saiu.', sentences: ['"Fim."', "Ele saiu."] },
+  {
+    lang: "en",
+    text: '"Are you sure?" she asked.',
+    sentences: ['"Are you sure?" she asked.'],
+  },
+  {
+    lang: "en",
+    text: 'He said, "Stop." and left the room.',
+    sentences: ['He said, "Stop." and left the room.'],
+  },
+  { lang: "en", text: '"Stop." He left.', sentences: ['"Stop."', "He left."] },
+  { lang: "en", text: '"Is it done?" "Yes."', sentences: ['"Is it done?"', '"Yes."'] },
 ];
 
 function expectValidSpans(text: string, spans: SentenceSpan[], expected: string[]): void {
@@ -384,6 +420,26 @@ describe("splitSentences", () => {
     for (const [name, matches] of Object.entries(categories)) {
       const langs = new Set(SENTENCE_CASES.filter(matches).map((testCase) => testCase.lang));
       expect({ name, langs: [...langs].sort() }).toEqual({ name, langs: ["en", "pt"] });
+    }
+  });
+
+  it("covers every SEG-T05 category where it applies", () => {
+    const categories: Record<
+      string,
+      { matches: (testCase: SentenceCase) => boolean; langs: string[] }
+    > = {
+      closerContinuation: {
+        matches: (testCase) => /[.!?…]["'”’)\]]\s+\p{Ll}/u.test(testCase.text),
+        langs: ["en", "pt"],
+      },
+      addressAbbreviation: {
+        matches: (testCase) => /\bsnra?\./u.test(testCase.text),
+        langs: ["pt"],
+      },
+    };
+    for (const [name, { matches, langs }] of Object.entries(categories)) {
+      const found = new Set(SENTENCE_CASES.filter(matches).map((testCase) => testCase.lang));
+      expect({ name, langs: [...found].sort() }).toEqual({ name, langs: [...langs].sort() });
     }
   });
 

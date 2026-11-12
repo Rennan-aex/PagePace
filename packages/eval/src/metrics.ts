@@ -876,3 +876,77 @@ export function confidenceCalibration(
 
   return { score, blocks, wrong, meanRight, meanWrong };
 }
+
+export interface SentenceF1Result {
+  /** `2 · precision · recall / (precision + recall)`, 1 when neither side breaks. */
+  f1: number;
+  /** Boundaries found ÷ boundaries the segmenter made. */
+  precision: number;
+  /** Boundaries found ÷ boundaries the annotation declares. */
+  recall: number;
+  /** Break offsets both sides agree on. */
+  truePositives: number;
+  /** Break offsets the segmenter made that the annotation does not have. */
+  falsePositives: number;
+  /** Break offsets the annotation has that the segmenter did not make. */
+  falseNegatives: number;
+  /** The false positives, ascending, for the report. */
+  invented: number[];
+  /** The false negatives, ascending, for the report. */
+  missed: number[];
+}
+
+/**
+ * F1 of the sentence breaks of a segmenter run against the annotated corpus
+ * (SEG-T05, `sentence_f1`): a break is a character offset where one sentence
+ * ends and the next one starts, and the two sides are compared exactly. A
+ * break the segmenter invented is a false positive (over-splitting), an
+ * annotated break it skipped is a false negative (under-splitting) — the two
+ * counts are the report of the acceptance.
+ *
+ * Both arrays must be sorted and must leave the break at the very end of the
+ * text out (it is implied by the text, not decided): the caller passes the
+ * trimmed ends of every span but the last. Empty sides score 1 (two empty
+ * sides agree), the convention of `paraBoundaryF1`.
+ */
+export function sentenceF1(
+  reference: readonly number[],
+  hypothesis: readonly number[],
+): SentenceF1Result {
+  const invented: number[] = [];
+  const missed: number[] = [];
+  let left = 0;
+  let right = 0;
+  let match = 0;
+  while (left < reference.length && right < hypothesis.length) {
+    const referenceOffset = reference[left] as number;
+    const hypothesisOffset = hypothesis[right] as number;
+    if (referenceOffset === hypothesisOffset) {
+      match++;
+      left++;
+      right++;
+    } else if (referenceOffset < hypothesisOffset) {
+      missed.push(referenceOffset);
+      left++;
+    } else {
+      invented.push(hypothesisOffset);
+      right++;
+    }
+  }
+  while (left < reference.length) missed.push(reference[left++] as number);
+  while (right < hypothesis.length) invented.push(hypothesis[right++] as number);
+
+  const precision = hypothesis.length === 0 ? 1 : match / hypothesis.length;
+  const recall = reference.length === 0 ? 1 : match / reference.length;
+  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  return {
+    f1,
+    precision,
+    recall,
+    truePositives: match,
+    falsePositives: invented.length,
+    falseNegatives: missed.length,
+    invented,
+    missed,
+  };
+}

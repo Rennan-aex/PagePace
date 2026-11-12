@@ -6,6 +6,7 @@ Conjunto de PDFs de teste do extrator. **Nenhum PDF é versionado**, com uma ún
 corpus/
   manifest.yaml     lista de PDFs públicos (id, nível, idioma, licença, sha256...)   [git]
   golden/           gabaritos dos PDFs públicos                                      [git]
+  sentences/        corpus anotado de frases pt/en (SEG-T05, texto público)          [git]
   vendored/         2 PDFs do SciELO versionados (única exceção da regra)            [git]
   public/           PDFs públicos baixados por `pnpm corpus:fetch`                    [ignorado]
     synthetic/      PDFs sintéticos gerados a partir das especificações               [ignorado]
@@ -74,6 +75,14 @@ setx CORPUS_PRIVATE_DIR "C:\Users\<voce>\pagepace-corpus-private"
 ```
 
 A variável de ambiente **vence** sobre o `.env`. O runner de avaliação mescla os dois corpora automaticamente. Nada do corpus privado deve aparecer em commits, issues ou PRs.
+
+## Corpus anotado de frases (`sentences/`)
+Texto de **domínio público** para medir o segmentador de frases (`sentence_f1`, SEG-T05). Um JSON por documento, com `format: 1`, `id` (= nome do arquivo), `lang` (`pt`/`en`), `source` (citação + domínio público) e `sentences` (as frases anotadas, em ordem).
+
+- O texto entregue ao segmentador é `sentences.join(" ")`, e cada fronteira é o fim aparado de uma frase (a última não conta: é o fim do texto).
+- Convenção de frase: o trecho máximo terminado em `. ! ? …`, mais fechamentos (`" ' ” ’ » ) ] }`). Uma fala pode virar duas frases quando tem pontuação final no meio.
+- Medido pelo `pnpm eval` (seção "Sentence segmentation"), gravado em `packages/eval/baseline.json` como `sentence_f1`; `--ci` falha se piorar. Meta de aceite: **≥ 0,97**.
+- Regra de ouro da leitura: só entra obra de domínio público, com a fonte no campo `source`; nada de texto de livro com copyright.
 
 ## Níveis
 N1 livro simples · N2 artigo em duas colunas · N3 filosofia com notas · N4 técnico (equações/tabelas) · N5 escaneado.

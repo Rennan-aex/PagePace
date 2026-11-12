@@ -27,6 +27,7 @@ Cada nível deve ter **pt e en** sempre que possível. Distribuição mínima de
 | Pessoais (com copyright) | pasta **fora** do repo, `CORPUS_PRIVATE_DIR` | Nunca |
 | Gabaritos de públicos | `corpus/golden/` | Sim |
 | Gabaritos de pessoais | `$CORPUS_PRIVATE_DIR/golden/` | Nunca |
+| Corpus anotado de frases (SEG-T05, texto de domínio público) | `corpus/sentences/` | Sim — JSON por documento, `sentence_f1` no baseline (ADR-108) |
 
 Fontes sugeridas para públicos: arXiv e outros de acesso aberto (nível 2 e 4), Wikisource/Domínio Público/Project Gutenberg/Standard Ebooks (níveis 1 e 3, quando houver PDF), Internet Archive (nível 5). Verificar a **licença de cada item antes** de entrar no manifest.
 

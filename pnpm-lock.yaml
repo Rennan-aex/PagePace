@@ -62,6 +62,9 @@ importers:
       '@pagepace/schema':
         specifier: workspace:*
         version: link:../schema
+      '@pagepace/segmenter':
+        specifier: workspace:*
+        version: link:../segmenter
     devDependencies:
       '@napi-rs/canvas':
         specifier: ^1.0.10
