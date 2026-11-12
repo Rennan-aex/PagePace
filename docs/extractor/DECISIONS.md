@@ -108,6 +108,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-103 | PDFs do SciELO versionados em `corpus/vendored/` (entrega `corpus-public-v1` removida) | accepted |
 | ADR-104 | Segmentador: offsets de frase aparados e palavra = trecho sem espaço | accepted |
 | ADR-105 | Segmentador: abreviações por idioma e iniciais não terminam frase | accepted |
+| ADR-106 | Segmentador: travessão `—` separa palavras; hífen, apóstrofo, número e URL não | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -832,3 +833,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) lista única pt+en — simples, mas uma abreviação de um idioma vaza para o outro · B) um arquivo de dados por idioma · C) heurística sem lista (só letra minúscula depois do ponto) — perde `Mr. Smith` e `3.14`.
 **Decisão:** **B** — `src/abbreviations/{pt,en}.ts` exportam listas lowercase sem o ponto final (multi-ponto mantém o interno: `e.g`), comparadas sem diferenciar maiúsculas. Ponto isolado + abreviação conhecida → nunca quebra (mesmo antes de maiúscula); ponto isolado + letra maiúscula sozinha (inicial) → não quebra se a próxima palavra começa com maiúscula. `! ? …` e runs de pontos seguem a regra anterior. A API não muda.
 **Consequências:** `Item A. Depois` (letra solteira seguida de maiúscula) e `..., etc. Depois` (abreviação no fim de frase) ficam juntos por escolha; revisar se o corpus de SEG-T05 mostrar perda. Estender a lista é editar o arquivo do idioma; o teste confere formato (minúsculas, sem ponto final, sem duplicata).
+
+### ADR-106 · Segmentador: travessão `—` separa palavras; hífen, apóstrofo, número e URL não · accepted · 2026-11-11
+**Contexto:** SEG-T03 define a forma do token de palavra; com quebra só por espaço, `ele—disse` sai como um token só e o comportamento de compostos/URLs fica sem teste que o fixe.
+**Alternativas:** A) travessão cola na palavra anterior (prós: menos tokens; contras: `ele—` não é palavra e o token deixa de ser "trecho com pontuação anexada" de forma uniforme) · B) travessão vira token próprio mesmo sem espaço (prós: mesmo resultado de `a — b`, texto coberto só por espaço fora dos tokens) · C) separar só com espaço (prós: zero mudança; contras: não cumpre o aceite da tarefa).
+**Decisão:** **B** — `splitWords` quebra em `—` (U+2014) e emite cada travessão como token próprio. Hífen composto (`guarda-chuva`), apóstrofo (`don't`, `d'água`, `’`), separadores numéricos (`1.000,50`, `1,000.50`) e URLs/e-mails nunca quebram; a pontuação final segue anexada (ADR-104), então `exemplo.com.` é um token. `–` (en dash) e `--` ficam de fora por não serem travessão.
+**Consequências:** 56 casos tabelados (26 novos) + checagem de cobertura (≥ 2 por categoria) e mínimo de 50 casos; API inalterada, nenhum consumidor do extrator usa `splitWords` ainda (eval intacto); revisar se SEG-T05 mostrar que o en dash também precisa separar.

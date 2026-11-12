@@ -40,6 +40,44 @@ export const WORD_CASES: WordCase[] = [
   { text: "A", words: ["A"] },
   { text: "tab\tand\nnewline", words: ["tab", "and", "newline"] },
   { text: "Chapter 1. The start.", words: ["Chapter", "1.", "The", "start."] },
+  // SEG-T03: compound hyphens stay one word (pt)
+  { text: "guarda-chuva", words: ["guarda-chuva"] },
+  { text: "O guarda-chuva abriu.", words: ["O", "guarda-chuva", "abriu."] },
+  { text: "segunda-feira à tarde", words: ["segunda-feira", "à", "tarde"] },
+  // SEG-T03: compound hyphens stay one word (en)
+  { text: "well-known", words: ["well-known"] },
+  { text: "A state-of-the-art design.", words: ["A", "state-of-the-art", "design."] },
+  // SEG-T03: apostrophes stay one word
+  { text: "d'água corrente", words: ["d'água", "corrente"] },
+  { text: "d’água potável", words: ["d’água", "potável"] },
+  { text: "don't", words: ["don't"] },
+  { text: "She doesn't know.", words: ["She", "doesn't", "know."] },
+  { text: "don’t", words: ["don’t"] },
+  // SEG-T03: numbers with separators stay one word
+  { text: "10.000.000 de reais", words: ["10.000.000", "de", "reais"] },
+  { text: "1,000.50", words: ["1,000.50"] },
+  { text: "12,345.67 in cash", words: ["12,345.67", "in", "cash"] },
+  // SEG-T03: the em dash separates even without spaces
+  { text: "ele—disse—ela", words: ["ele", "—", "disse", "—", "ela"] },
+  { text: "2020—2024", words: ["2020", "—", "2024"] },
+  { text: "year—month—day", words: ["year", "—", "month", "—", "day"] },
+  { text: "fim—", words: ["fim", "—"] },
+  { text: "—início", words: ["—", "início"] },
+  { text: "a — b", words: ["a", "—", "b"] },
+  { text: "—", words: ["—"] },
+  // SEG-T03: URLs and e-mails are one token
+  { text: "Veja https://exemplo.com/path?q=1.", words: ["Veja", "https://exemplo.com/path?q=1."] },
+  {
+    text: "escreva para contato@exemplo.com.br.",
+    words: ["escreva", "para", "contato@exemplo.com.br."],
+  },
+  { text: "https://meu-site.org.br/a-b", words: ["https://meu-site.org.br/a-b"] },
+  {
+    text: "Visit https://example.com/docs#intro",
+    words: ["Visit", "https://example.com/docs#intro"],
+  },
+  { text: "Mail john.doe@example.com now.", words: ["Mail", "john.doe@example.com", "now."] },
+  { text: "<https://example.com/a-b>", words: ["<https://example.com/a-b>"] },
 ];
 
 function expectValidTokens(text: string, tokens: WordToken[], expected: string[]): void {
@@ -61,8 +99,22 @@ function expectValidTokens(text: string, tokens: WordToken[], expected: string[]
 }
 
 describe("splitWords", () => {
-  it("has at least 30 word table cases", () => {
-    expect(WORD_CASES.length).toBeGreaterThanOrEqual(30);
+  it("has at least 50 word table cases", () => {
+    expect(WORD_CASES.length).toBeGreaterThanOrEqual(50);
+  });
+
+  it("covers every SEG-T03 category", () => {
+    const categories: Record<string, RegExp> = {
+      compoundHyphens: /\p{L}-\p{L}/u,
+      apostrophes: /['’]/u,
+      numberSeparators: /\d[.,]\d/u,
+      emDashSeparator: /\S—\S/u,
+      urlsEmails: /(?:https?:\/\/|[\w.+-]+@[\w-]+\.\w)/u,
+    };
+    for (const [name, pattern] of Object.entries(categories)) {
+      const count = WORD_CASES.filter((testCase) => pattern.test(testCase.text)).length;
+      expect(count, `category ${name}`).toBeGreaterThanOrEqual(2);
+    }
   });
 
   for (const testCase of WORD_CASES) {
