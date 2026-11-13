@@ -10,10 +10,10 @@
 - **Última atualização:** 2026-11-12 (SEG-T05).
 
 ## Tarefa atual
-Nenhuma aberta no extrator (fase SEG encerrada em 2026-11-12). Próximo marco: **M2 do app**, que depende do M0 planejado (`docs/app/STATE.md`).
+**PUB-01 "arquivos legais e da comunidade"** (branch `chore-pub-legal-community`, tarefa do PO fora das fases): LICENSE, THIRD_PARTY.md, package.json, .editorconfig, CONTRIBUTING, SECURITY, ISSUE_TEMPLATE, dependabot — para deixar o repositório público. Nenhuma tarefa aberta no extrator (fase SEG encerrada em 2026-11-12).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão encerrada: SEG-T05 concluída e mesclada (PR #111, squash); branch `seg-t05-eval` removida.** Feito: `corpus/sentences/*.json` (Machado, Eça, Austen, Darwin), `packages/eval/src/sentences.ts` (loader estrito + runner + meta 0,97), `sentence_f1` em `metrics.ts`/baseline/`pnpm eval` (seção "Sentence segmentation"), 2 correções no segmentador (ADR-109), ADR-108/109, fase SEG fechada, `pnpm verify` verde, `pnpm eval --ci` exit 0. Próximo: se o PO liberar, começar o M0/M2 do app (`docs/app/STATE.md`); nenhuma tarefa aberta no extrator.
+- **Sessão iniciada: PUB-01 "arquivos legais e da comunidade" (branch `chore-pub-legal-community`).** Plano: (0) conferência pré-publicação (git/CI/higiene) — faltava só `.env.example`, criado com exceção no `.gitignore`; greps de `C:\Users`/`pagepace-corpus` acham só placeholders genéricos, sem dado pessoal; (1) LICENSE MIT; (2) THIRD_PARTY.md; (3) package.json raiz + 5 pacotes; (4) .editorconfig; (5) CONTRIBUTING.md; (6) SECURITY.md; (7) ISSUE_TEMPLATE + PR template; (8) dependabot.yml; (9) verify + eval --ci, STATE/BACKLOG, PR. Commit WIP + push a cada item.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
