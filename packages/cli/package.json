@@ -2,6 +2,18 @@
   "name": "@pagepace/cli",
   "version": "0.0.0",
   "private": true,
+  "description": "PagePace command-line interface: extract, inspect and explain PDF pages from the terminal.",
+  "license": "MIT",
+  "author": "Rennan-aex (https://github.com/Rennan-aex)",
+  "homepage": "https://github.com/Rennan-aex/PagePace",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rennan-aex/PagePace.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Rennan-aex/PagePace/issues"
+  },
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",

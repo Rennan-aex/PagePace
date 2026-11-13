@@ -1,15 +1,16 @@
-## Tarefa
-<!-- ID da tarefa no roadmap, ex.: E2-T03 -->
+## Task
+<!-- Task ID from the roadmap, e.g. E2-T03 -->
 
-## O que foi feito
-<!-- 2-5 linhas -->
+## What was done
+<!-- 2-5 lines -->
 
-## Critérios de aceite
-- [ ] Todos os critérios da tarefa (docs/extractor/phases/...) foram atendidos
-- [ ] `pnpm verify` passa
-- [ ] Avaliação do corpus rodada: nenhuma métrica piorou (ou a piora foi justificada em DECISIONS.md)
-- [ ] `docs/extractor/STATE.md` atualizado
-- [ ] `DECISIONS.md` atualizado (se houve decisão)
-- [ ] Nenhum PDF ou texto com copyright commitado
+## Acceptance criteria
+- [ ] All task criteria (`docs/extractor/phases/...`) are met
+- [ ] `pnpm verify` passes
+- [ ] `pnpm eval --ci` passes with no regression (a regression must be justified in an ADR)
+- [ ] An ADR was added when a metric changed or a decision was made
+- [ ] No PDF, e-mail address or local machine path is included in this PR
+- [ ] `docs/extractor/STATE.md` updated (phase tasks only)
+- [ ] `docs/extractor/DECISIONS.md` updated (if a decision was made)
 
-## Notas para a próxima sessão
+## Notes for the next session

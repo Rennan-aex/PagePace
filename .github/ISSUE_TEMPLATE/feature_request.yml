@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. **Never attach PDFs — or any text — with
+        copyright**; describe the document type and the page instead. See
+        `CONTRIBUTING.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the use case or limitation you ran into.
+      placeholder: Scanned receipts are rejected with ScannedPdfError, so I cannot use PagePace on them.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like PagePace to do?
+      placeholder: Fall back to OCR automatically when no text layer is found.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why they fall short.
+    validations:
+      required: false
