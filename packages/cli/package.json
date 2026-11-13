@@ -18,7 +18,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.10",
+    "@napi-rs/canvas": "^1.1.0",
     "@pagepace/eval": "workspace:*",
     "@pagepace/extractor": "workspace:*",
     "@pagepace/schema": "workspace:*",
