@@ -37,8 +37,8 @@
     "bench": "tsx packages/eval/src/bench.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
-    "@napi-rs/canvas": "^1.0.10",
+    "@biomejs/biome": "^2.6.6",
+    "@napi-rs/canvas": "^1.1.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/por": "^1.0.0",
     "@types/node": "^22.0.0",
