@@ -4,17 +4,18 @@
 
 ## Situação
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
-- **Próxima tarefa:** **PUB-02 em andamento** (READMEs e documentação de entrada); depois o **M0/M2 do app** (`docs/app/STATE.md`) espera o PO liberar o M0.
+- **Próxima tarefa:** **M0/M2 do app** — espera o PO liberar o M0 (`docs/app/STATE.md`). Nenhuma tarefa aberta no extrator.
 - **Ação pendente do PO:** liberar o M0 do app.
-- **Status:** **PUB-01 concluída e mesclada em 2026-11-13 (PR #1, squash)** — repositório pronto para ficar público: conferência pré-publicação (git/CI/config do GitHub ok; `.env.example` era a única falta), LICENSE (MIT), THIRD_PARTY.md, package.json (raiz + 5, lockfile intacto), .editorconfig, CONTRIBUTING.md, SECURITY.md, ISSUE_TEMPLATE x3 + PR template em inglês, dependabot.yml. `pnpm verify` verde; `pnpm eval --ci` exit 0. Última fase fechada: SEG-T05 (2026-11-12, PR #111).
-- **Última atualização:** 2026-11-13 (PUB-01, PR #1).
+- **Status:** **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDA e mesclada em 2026-11-13 (PR #9, squash `f063107`)**: README raiz EN/PT-BR, READMEs dos 5 pacotes, tests/, corpus/, docs/README, scripts/, apps/, .opencode/; 109 links relativos conferidos (0 quebrados), todos os comandos executados, números do `pnpm eval` conferidos, `pnpm verify` verde. **PUB-01 concluída e mesclada em 2026-11-13 (PR #1, squash)**: LICENSE (MIT), THIRD_PARTY.md, package.json raiz+5, CONTRIBUTING, SECURITY, ISSUE/PR templates, dependabot.
+- **Última atualização:** 2026-11-13 (PUB-02 mesclada, PR #9).
 
 ## Tarefa atual
-**PUB-02 — READMEs e documentação de entrada** (branch `docs-pub-readmes`): README raiz EN/PT-BR, READMEs dos 5 pacotes, tests/, corpus/, docs/README, scripts/, apps/, .opencode/; nada inventado, PR ao fim.
+Nenhuma. Última concluída: **PUB-02 — READMEs e documentação de entrada** (PR #9).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão iniciada: PUB-02 (READMEs e documentação de entrada), branch `docs-pub-readmes`.** Plano: (1) README raiz EN do zero + README.pt-BR; (2) READMEs dos 5 pacotes com exemplos executados; (3) tests/ e corpus/ README; (4) docs/README, scripts/, apps/, .opencode/; (5) verificação (links, comandos, números do eval) + PR. Regra: nada inventado — todo comando executado, métricas só do `pnpm eval` real.
-- `pnpm verify` verde no início (1406 testes). CLI real: `pnpm --silent pagepace inspect corpus/vendored/n3-pt-scielo-wittgenstein.pdf --pages 2-2` (sem e-mail na saída escolhida).
+- **PUB-02 encerrada e mesclada (PR #9, squash `f063107`).** README raiz EN + README.pt-BR; READMEs dos 5 pacotes com exemplos `tsx` executados; tests/, corpus/ (EN), docs/README (índice pt), scripts/, apps/, .opencode/.
+- **Verificação desta sessão:** 109 links relativos = 0 quebrados; exemplos `tsx` dos 4 pacotes e o `pagepace inspect` reproduzidos linha a linha; contagens de teste conferidas (`vitest run` por pacote: 71/181/748/360/46 = 1406 em 93 arquivos); números do README = saída real do `pnpm eval`; `pnpm verify` verde (42,3 s); tempos do quick start remedidos (install 0,9 s, fetch 2,0 s, verify 42,3 s). Correção feita: OCR não é "aguardando" — é adaptador opcional (`--ocr`).
+- **Próximo passo:** o PO libera o M0 do app; depois abrir a fase M0 em `docs/app/` e seguir para o M2. Nada pendente no extrator.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
@@ -41,8 +42,8 @@
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
+- 2026-11-13 · **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDO (PR #9, squash `f063107`)** · README raiz EN + README.pt-BR (badges, status honesto, diagrama mermaid, quick start com tempos reais, CLI real do vendored com atribuição CC BY, tabela do `pnpm eval`, mapa, docs, "how it is built", acks); READMEs dos 5 pacotes (exemplos tsx executados); tests/ e corpus/ README; docs/README (índice pt), scripts/, apps/, .opencode/; 109 links relativos = 0 quebrados; números do `pnpm eval` conferidos; `pnpm verify` verde (1406 testes, 42,3 s); CI `verify` verde antes do merge.
 - 2026-11-13 · **PUB-01 (arquivos legais e da comunidade) — CONCLUÍDO (PR #1, squash)** · conferência pré-publicação (git/CI/config do GitHub ok; `.env.example` era a única falta; greps só com placeholders); LICENSE MIT, THIRD_PARTY.md, package.json raiz+5 (private intacto, lockfile intacto), .editorconfig, CONTRIBUTING.md, SECURITY.md, ISSUE_TEMPLATE x3 + PR template em inglês, dependabot.yml; `pnpm verify` verde, `pnpm eval --ci` exit 0. Próxima: M0/M2 do app (PO).
-- 2026-11-12 · **SEG-T05 (avaliação) — CONCLUÍDO (PR #111)** · corpus anotado pt/en em `corpus/sentences/` (4 docs, 71 frases, domínio público) + `sentence_f1` no baseline (1,0000 nos 4; meta 0,97); 2 correções no segmentador achadas pelo corpus (ADR-109); ADR-108; `pnpm verify` verde, `eval --ci` exit 0. Próxima: M0/M2 do app (PO).
-- Sessões anteriores: SEG-T04 (2026-11-11, PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md` (SEG-T03 palavras), `archive/STATE-log-2026-11-11-segt02.md` (SEG-T02 frases), `archive/STATE-log-2026-11-11-corpus-vendored.md` (manutenção corpus vendored), `archive/STATE-log-2026-11-11-e10t04.md` (E10-T04 recortes), `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
+- Sessões anteriores: 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
 
 Histórico completo: docs/extractor/archive/
