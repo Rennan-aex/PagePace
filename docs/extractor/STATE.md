@@ -6,17 +6,17 @@
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
 - **Próxima tarefa:** **M0/M2 do app** — espera o PO liberar o M0 (`docs/app/STATE.md`). Nenhuma tarefa aberta no extrator.
 - **Ação pendente do PO:** liberar o M0 do app.
-- **Status:** **PUB-04 (README principal mais visual) — CONCLUÍDA em 2026-11-13** (branch `docs-pub-readme-visual`): README EN e pt-BR com a mesma estrutura (selos, tabela de problema, mermaid de 7 camadas, quick start, CLI com saídas reais, qualidade com `pnpm eval` só do corpus público, árvore, roadmap M0–M6, callouts e `<details>`); 114 links relativos = 0 quebrados; 16 URLs externas = 200; mermaid `flowchart-v2` válido nos 2 arquivos. Antes: **PUB-03 (PR #11, `2176bf8`)**, **PUB-02 (PR #9)** e **PUB-01 (PR #1)**.
-- **Última atualização:** 2026-11-13 (PUB-04).
+- **Status:** **PUB-05 (triagem dos PRs do Dependabot) — CONCLUÍDA em 2026-11-13** (branch `chore/align-types-node-24`): dos 7 PRs abertos, #6 (biome/canvas/zod), #2 (upload-artifact 7.0.2), #4 (checkout 7.0.1) e #7 (TypeScript 7.0.2) mesclados; #13 fechado como superado pelo #6; #14 (vitest 4) e #8 (`@types/node` 26) fechados com `@dependabot ignore this major version`; `@types/node` alinhado a `^24` e regra de ignore de major no `dependabot.yml`; ADR-111. Antes: **PUB-04 (READMEs)**, **PUB-03 (PR #11)** e **PUB-02 (PR #9)**.
+- **Última atualização:** 2026-11-13 (PUB-05).
 
 ## Tarefa atual
-Nenhuma. Última concluída: **PUB-04 — README principal mais visual** (branch `docs-pub-readme-visual`).
+Nenhuma. Última concluída: **PUB-05 — triagem dos PRs do Dependabot** (branch `chore/align-types-node-24`).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **PUB-04 (READMEs):** README.md e README.pt-BR.md com 305 linhas cada e a mesma estrutura; o pt-BR é tradução fiel. Saídas reais: `inspect` (12 linhas) e trecho de 15 linhas do JSON do `Book` do PDF SciELO; qualidade com `pnpm eval` **sem** `CORPUS_PRIVATE_DIR` **e sem o `.env` local** (16 documentos, 16 públicos, 12 com gabarito) — as 3 linhas da tabela de nível conferem com a saída.
-- **Verificação dos READMEs:** 114 links (94 relativos + 20 âncoras internas) = 0 quebrados; âncoras conferidas com `github-slugger`; 16 URLs externas (selos, DOI, CC BY, pdf.js, tesseract.js, zod, Source Serif) = HTTP 200; mermaid validado com `mermaid@11` + `jsdom` (`flowchart-v2`, os 2 arquivos).
-- **GitHub agora:** repositório **público** (o PO publicou); ruleset `protect-main` ativo (só squash, check `verify` obrigatório); `branches/main/protection` responde 404 porque a proteção é por ruleset.
-- **Pendências registradas:** o aviso de 18 vulnerabilidades do Dependabot foi para o BACKLOG; `EVALUATION.md` e `WORKFLOW.md` desatualizados já estavam lá.
+- **PUB-05 (Dependabot):** #6 `8797251` (biome 2.6.6, `@napi-rs/canvas` 1.1.0, zod 4.6.7), #2 `be698c5` (upload-artifact 7.0.2) e #4 `1758fe8` (checkout 7.0.1) mesclados com o `verify` verde; as duas Actions seguem **por SHA com o comentário da versão** no `ci.yml`.
+- **#7 TypeScript 7.0.2 `a805340` mesclado** depois de `pnpm verify`, `pnpm eval --ci` e `pnpm bench --ci --runs 3` verdes na branch; o typecheck foi conferido reprovando um erro plantado (não é no-op).
+- **Causa do #14 (vitest 4):** peer `vite ^6 || ^7 || ^8` contra `vite@5.4.21` no lockfile (o workspace não declara `vite`) → `ERR_PACKAGE_PATH_NOT_EXPORTED` no `pnpm test`; reproduzido localmente e registrado no BACKLOG como "avaliar quando maduro".
+- **#8 (`@types/node` 26):** fechado porque o runtime é Node 24; os tipos foram para `^24.0.0` (24.19.2) e o `dependabot.yml` ignora majors dele, com comentário. ADR-111 cobre os três majors.
 - **Próximo passo:** o PO libera o M0 do app (único bloqueio aberto).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
@@ -44,8 +44,8 @@ Nenhuma. Última concluída: **PUB-04 — README principal mais visual** (branch
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-13 · **PUB-03 (CI endurecido, regras do agente e conferência final) — CONCLUÍDO (PR #11, squash `2176bf8`)** · actions por SHA com a tag ao lado, `concurrency` só para PR, `timeout-minutes: 20`; `pnpm check:emails` (noreply obrigatório, `base..head`, `fetch-depth: 0`) provado em repo temporário; AGENTS.md com as regras 11/12 e o merge `--auto`, ADR-110; conferência final: gitleaks 0 achados, 0 links quebrados, clone limpo do README verde, repo ainda privado (prot. da main 403); `pnpm verify` e `pnpm eval --ci` verdes.
+- 2026-11-13 · **PUB-05 (triagem dos PRs do Dependabot) — CONCLUÍDO** · 7 PRs: #6/#2/#4/#7 mesclados, #13 superado, #14 e #8 fechados com `@dependabot ignore this major version`; TS 7 passou verify/eval/bench; `@types/node` em `^24` + ignore de major no `dependabot.yml`; ADR-111; `pnpm verify` e `pnpm eval --ci` verdes.
 - 2026-11-13 · **PUB-04 (README principal mais visual) — CONCLUÍDO** · README EN + pt-BR reescritos com selos, tabela de problema, mermaid de 7 camadas, callouts, CLI com saídas reais, qualidade só com o corpus público, árvore, roadmap e `<details>`; 114 links = 0 quebrados, 16 URLs externas 200, mermaid válido; `pnpm verify` verde (1406 testes).
-- Sessões anteriores: PUB-02 em `archive/STATE-log-2026-11-13-pub02.md`; 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
+- Sessões anteriores: PUB-03 em `archive/STATE-log-2026-11-13-pub03.md`; PUB-02 em `archive/STATE-log-2026-11-13-pub02.md`; 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
 
 Histórico completo: docs/extractor/archive/

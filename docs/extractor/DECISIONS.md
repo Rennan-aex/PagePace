@@ -113,6 +113,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-108 | Segmentador: `sentence_f1` sobre corpus anotado em `corpus/sentences/` | accepted |
 | ADR-109 | Segmentador: atribuição minúscula após fechamento continua a frase; `snr.`/`snra.` na lista pt | accepted |
 | ADR-110 | Política de publicação do repositório | accepted |
+| ADR-111 | Dependabot: TypeScript 7 adotado; vitest 4 e `@types/node` 26 rejeitados | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -867,3 +868,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) publicar o histórico antigo com filtro de e-mail (contras: reescrever o remoto, quebrar clones e ainda expor metadados) · B) repositório novo, histórico reiniciado, commits só com noreply e PRs antigos **não** migrados (prós: nada de dado pessoal, histórico das fases vive nos .md e no novo git) · C) manter privado (contras: o objetivo do projeto é público).
 **Decisão:** **B** — código sob **MIT**; todo commit usa `*@users.noreply.github.com` ou `noreply@github.com`, verificado por `pnpm check:emails` no CI (`base..head` em pull_request, `fetch-depth: 0`); o corpus versionado só aceita CC BY, CC0 ou domínio público (fonte duvidosa: parar e perguntar ao PO); nada de e-mail, caminho local ou dado pessoal em arquivos, commits ou PRs; `git config` de usuário nunca é alterado.
 **Consequências:** os PRs #1–#112 do repositório antigo não existem aqui — o registro é STATE.md, DECISIONS.md e o histórico novo; commits com e-mail comum passam a reprovar no CI; fonte nova sem licença verificável bloqueia a tarefa até o PO responder.
+
+### ADR-111 · Dependabot: TypeScript 7 adotado; vitest 4 e `@types/node` 26 rejeitados · accepted · 2026-11-13
+**Contexto:** a triagem PUB-05 avaliou os majors abertos pelo Dependabot: TypeScript 5.9.3→7.0.2 (#7), vitest 2.1.9→4.1.11 (#14) e `@types/node` 22→26 (#8). O runtime declarado é Node 24 (`.nvmrc` 24.18.0, `engines.node >= 24`).
+**Alternativas:** A) aceitar os três (contras: vitest 4 quebra o `pnpm test`, e tipos de Node 26 descrevem um runtime que o projeto não usa) · B) aceitar só o TypeScript 7 e rejeitar os outros dois com a causa registrada · C) congelar os três (contras: perde o typecheck nativo do TS 7, que passou em todos os gates).
+**Decisão:** **B** — TS 7.0.2 mesclado depois de `pnpm verify`, `pnpm eval --ci` e `pnpm bench --ci --runs 3` verdes (o typecheck foi conferido reprovando um erro plantado, para não ser um no-op); vitest 4 e `@types/node` 26 fechados com `@dependabot ignore this major version`. `@types/node` vai para `^24` e o `dependabot.yml` ignora majors dele, com comentário no arquivo.
+**Consequências:** o typecheck roda no compilador nativo do TS 7; vitest 4 exige subir `vite` para ≥ 6 junto e fica no BACKLOG ("avaliar quando maduro"); tipos de Node só sobem de major numa tarefa que suba o runtime antes.

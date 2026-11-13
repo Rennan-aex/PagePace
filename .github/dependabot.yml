@@ -15,6 +15,12 @@ updates:
       # pdfjs-dist is pinned to an exact version (ADR-027); bumping it is a
       # deliberate task, never an automated PR.
       - dependency-name: "pdfjs-dist"
+      # @types/node must describe the runtime Node version (.nvmrc / engines),
+      # so a major bump of the types is always a deliberate task: bumping the
+      # runtime and its types together, never in an automated PR.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
