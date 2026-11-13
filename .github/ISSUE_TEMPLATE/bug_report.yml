@@ -1,0 +1,62 @@
+name: Bug report
+description: Report something that does not work as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never attach PDFs — or any text — with copyright.** Describe the
+        type of document (journal article, book, scanned report...) and the
+        page number instead; a maintainer will reproduce the case from a
+        licensed source. See `CONTRIBUTING.md`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you observe? Include the exact error message, if any.
+      placeholder: The extractor returned empty paragraphs on page 3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: Describe the behavior you expected instead.
+      placeholder: The paragraphs of page 3 should contain the body text.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands and actions, in order, from a clean checkout.
+      placeholder: |
+        1. `pnpm install`
+        2. `pnpm pagepace extract <document> --pages 3`
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: explain-page
+    attributes:
+      label: Output of `pagepace explain-page` (extraction problems only)
+      description: For extraction problems, paste the output of `pnpm pagepace explain-page <file.pdf> <page>`. Leave empty otherwise.
+      placeholder: (paste the terminal output here)
+    validations:
+      required: false
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node -v` (the version in `.nvmrc` is expected).
+      placeholder: v24.18.0
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: OS, pnpm version, screenshots of the rendered page, or anything else that helps.
+    validations:
+      required: false
