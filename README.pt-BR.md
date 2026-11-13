@@ -32,7 +32,7 @@ Somente o que o código faz hoje — conferido em [docs/extractor/ARCHITECTURE.m
 - **Layout**: linhas de texto, até três colunas com ordem de leitura, regiões repetidas (cabeçalhos, rodapés, números de página) removidas do fluxo, regiões laterais e junções entre páginas de parágrafos e palavras hifenizadas.
 - **Estilos inline**: negrito, itálico, sobrescrito, subescrito e versalete recuperados de nomes e flags da fonte; trechos gregos/latinos marcados com `lang`.
 - **Nível do documento**: sumário a partir dos bookmarks do PDF, metadados de título/autores/idioma e, por bloco, `confidence` mais `flags` com todos os motivos de dúvida.
-- **Limites honestos**: os blocos `figure`, `table` e `equation` são detectados e carregados como *placeholders* (sem runs) — o conteúdo deles ainda não é reconstruído. Um PDF escaneado sem camada de texto é recusado (`ScannedPdfError`, aguardando OCR); texto vindo de camada de OCR embutida é extraído com confiança reduzida e aviso.
+- **Limites honestos**: os blocos `figure`, `table` e `equation` são detectados e carregados como *placeholders* (sem runs) — o conteúdo deles ainda não é reconstruído. Um PDF sem camada de texto falha no caminho padrão (`ScannedPdfError`); o OCR é um adaptador de ingestão opcional (`ingestOcrFlow`, `pagepace extract --ocr`). Texto vindo de camada de OCR embutida é extraído com confiança reduzida e aviso.
 
 ## Arquitetura
 
@@ -58,12 +58,12 @@ flowchart LR
 Requisitos: **Node >= 24** (a versão exata está em [`.nvmrc`](.nvmrc)) e **pnpm 9** (fixado no campo `packageManager` do [`package.json`](package.json)).
 
 ```bash
-pnpm install --frozen-lockfile   # 0,8 s (execução com tudo já instalado)
-pnpm corpus:fetch                # 1,9 s (16 arquivos em cache, sem download)
-pnpm verify                      # 41,6 s: typecheck, lint, formatação, 1406 testes, checagem de PDFs, orçamento de docs
+pnpm install --frozen-lockfile   # 0,9 s (execução com tudo já instalado)
+pnpm corpus:fetch                # 2,0 s (16 arquivos em cache, sem download)
+pnpm verify                      # 42,3 s: typecheck, lint, formatação, 1406 testes, checagem de PDFs, orçamento de docs
 ```
 
-Tempos medidos nesta máquina com tudo já instalado (`pnpm install` imprime "Done in 684ms"; `corpus:fetch` reporta `16 public (… 16 reused)`). O **primeiro** `pnpm corpus:fetch` baixa o corpus público de testes pela rede e demora mais; as execuções seguintes só conferem o SHA-256 de cada arquivo. O `pnpm verify` precisa estar verde antes de qualquer pull request — ver [CONTRIBUTING.md](CONTRIBUTING.md).
+Tempos medidos nesta máquina com tudo já instalado (`pnpm install` imprime "Done in 659ms"; `corpus:fetch` reporta `16 public (… 16 reused)`). O **primeiro** `pnpm corpus:fetch` baixa o corpus público de testes pela rede e demora mais; as execuções seguintes só conferem o SHA-256 de cada arquivo. O `pnpm verify` precisa estar verde antes de qualquer pull request — ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Exemplo: a CLI num PDF do corpus
 
