@@ -49,8 +49,9 @@ Atalho: skill `end-session`.
 - Commits WIP frequentes e `git push` na branch da tarefa assim que houver mudanca salva: o GitHub e o backup do trabalho.
 - So abrir o PR quando a tarefa estiver pronta (aceite cumprido, verify verde). Usar `gh pr create --base main --title "<Conventional Commits, ingles>" --body-file <arquivo temporario fora do repo>` (nunca --body com texto de varias linhas, por causa de aspas no PowerShell).
 - O merge e sempre squash (configurado no repositorio): os commits WIP da branch se tornam 1 commit na main. Por isso nunca reaproveitar uma branch ja mesclada.
+- Repositório público com a `main` protegida e o check `verify` obrigatório: pode usar `gh pr merge --auto --squash --delete-branch` (o auto-merge espera o check sozinho). Se o comando recusar porque o auto-merge está desligado, use o fluxo manual.
 - O agente PODE fazer o merge sozinho, mas só quando `gh pr checks` mostrar todos os checks obrigatorios (o `verify`) como passando. Se algum check falhar ou estiver pendente, NAO mesclar: corrigir (se o erro for da tarefa) ou esperar (se for so o CI ainda rodando) e tentar de novo numa proxima checagem, nunca insistindo em loop apertado.
-- Comando de merge: `gh pr merge --squash --delete-branch`. A branch remota some sozinha nesse comando; a branch LOCAL so se remove depois, com `git branch -D <nome>` (o `-d` minusculo falha depois de squash, e isso e esperado).
+- Comando de merge manual: `gh pr merge --squash --delete-branch`. A branch remota some sozinha nesse comando; a branch LOCAL so se remove depois, com `git branch -D <nome>` (o `-d` minusculo falha depois de squash, e isso e esperado).
 - Se o `gh` falhar por qualquer motivo (rede, auth, etc.), nao insistir: registrar em STATE.md e entregar ao PO o titulo/descricao do PR pela skill report-to-po, como era feito antes.
 
 ## Regras invioláveis
@@ -64,6 +65,8 @@ Atalho: skill `end-session`.
 8. **Conventional Commits** nas mensagens de commit e no título do PR (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 9. **Sem decisões silenciosas.** Se escolheu entre alternativas, escreveu em `DECISIONS.md`.
 10. **Sem atribuição de IA.** Commits e PRs terminam na própria mensagem: nada de `Generated with...` nem `Co-Authored-By` de IA.
+11. **Repositório público: nada de dado pessoal.** E-mail, caminho local (`C:\Users\...`), token ou dado pessoal não entram em arquivos, mensagens de commit, título ou corpo de PR — tudo é público. Commits só com `*@users.noreply.github.com` ou `noreply@github.com` (`pnpm check:emails` no CI). **Nunca altere `git config` de usuário** (`user.name`/`user.email`); quando precisar de outro valor, use `git -c ...` só naquele comando.
+12. **Licença do corpus.** No corpus versionado, só PDF e texto com licença **CC BY, CC0 ou domínio público** (com a atribuição que a licença exigir). Nada com direitos autorais. Se uma fonte nova tiver licença duvidosa, **pare e pergunte ao PO** (registre em OPEN-QUESTIONS).
 
 ## Definição de pronto (uma tarefa)
 Critérios de aceite da tarefa cumpridos, testes automatizados escritos (ou justificativa), `pnpm verify` verde, avaliação sem regressão, docs de estado atualizados, PR aberto.
