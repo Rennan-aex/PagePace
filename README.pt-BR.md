@@ -1,77 +1,125 @@
-# PagePace
+<div align="center">
 
-[Read in English](README.md)
+# 📖 PagePace
 
-PagePace reconstrói um PDF como documento estruturado e reflowable e lê o texto de volta — parágrafos, títulos, notas e estilos — em vez de mostrar a página do PDF.
+### PDF entra, texto fluido sai
 
-[![CI](https://github.com/Rennan-aex/PagePace/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Rennan-aex/PagePace/actions/workflows/ci.yml)
-[![Licença: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node >= 24](https://img.shields.io/badge/Node-%3E%3D24-339933.svg)](.nvmrc)
+*O PagePace reconstrói um PDF como um documento estruturado e fluido — parágrafos, títulos, notas e estilos — e o lê como texto, em vez de mostrar a página do PDF.*
 
-## Status
+[**Read in English**](README.md)
 
-| Componente | Estado |
+<!-- hero image goes here -->
+
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-%3E%3D24-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-9.15.0-F69220?style=for-the-badge&logo=pnpm&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Biome](https://img.shields.io/badge/Biome-60A5FA?style=for-the-badge&logo=biome&logoColor=white)
+![pdf.js](https://img.shields.io/badge/pdf.js-6.4.299-FF6B6B?style=for-the-badge)
+
+![CI](https://github.com/Rennan-aex/PagePace/actions/workflows/ci.yml/badge.svg?branch=main)
+![Licença: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+![extrator: completo](https://img.shields.io/badge/extractor-complete-brightgreen?style=flat-square)
+![app: planejado](https://img.shields.io/badge/app-planned-lightgrey?style=flat-square)
+
+</div>
+
+---
+
+## 📑 Índice
+
+| | |
 |---|---|
-| `packages/extractor` (PDF → modelo) | **Completo e testado** — fases E0–E10 encerradas, ver [docs/extractor/ROADMAP.md](docs/extractor/ROADMAP.md) |
-| `packages/segmenter` (frases e palavras, pt/en) | **Completo e testado** — trilha SEG encerrada |
-| `apps/reader` (o app leitor) | **Ainda não iniciado** — só planejado, ver [docs/app/ROADMAP.md](docs/app/ROADMAP.md) |
+| [🎯 O problema](#-o-problema) | [📈 Qualidade](#-qualidade) |
+| [🏗️ Arquitetura](#️-arquitetura) | [📁 Estrutura do repositório](#-estrutura-do-repositório) |
+| [⚡ Começo rápido](#-começo-rápido) | [🗺️ Roadmap](#️-roadmap) |
+| [🖥️ A linha de comando](#️-a-linha-de-comando) | [🛠️ Como é feito](#️-como-é-feito) |
+| [📚 Documentação](#-documentação) | [🙏 Agradecimentos](#-agradecimentos) |
 
-Os números desta página vêm de execuções reais dos comandos mostrados (`pnpm eval`, `pnpm verify`) numa máquina de desenvolvimento; nada aqui foi escrito à mão.
+---
 
-## Por quê
+## 🎯 O problema
 
-PDFs foram feitos para impressão, não para leitura profunda: páginas fixas, duas colunas, notas de rodapé embaixo, linhas quebradas por hífen, cabeçalhos repetidos em toda página. No celular fica pior — zoom, perda do lugar.
+PDFs são feitos para impressão, não para leitura profunda. No celular é pior: zoom, arrastar, perder o lugar. A tabela abaixo mostra o que dá errado numa página de PDF e o que o extrator faz a respeito hoje.
 
-O PagePace extrai o PDF **uma vez** para um modelo intermediário (`Book`: blocos tipados com estilos inline, IDs estáveis, confiança) e todos os modos de leitura consomem esse modelo. A página do PDF nunca é renderizada ao leitor; o texto pode se adaptar a qualquer tela, e as correções do leitor (juntar, separar, mudar o tipo) ficam em um overlay separado que sobrevive à reextração.
+| 🔴 O PDF como foi impresso | ✅ O que o PagePace faz |
+|---|---|
+| **Páginas fixas** — cada página é uma tela de tamanho fixo; no celular o texto fica minúsculo ou cortado | O texto vira blocos tipados em ordem de leitura; a geometria da página sobrevive só como metadado `origin`, então o texto pode fluir para qualquer tela (o app de leitura ainda é planejado) |
+| **Colunas** — duas ou três colunas são lidas linha a linha, atravessando a calha, na ordem errada | Até três colunas são detectadas por página e lidas na ordem de leitura correta |
+| **Notas no rodapé** — as notas ficam no pé da página, longe da chamada que aponta para elas | Blocos `footnote` são ligados à sua chamada (`anchor` e `noteRef`) |
+| **Hifenização** — palavras são quebradas por hífen na quebra de linha, e parágrafos são cortados na virada de página | Junções entre páginas remontam palavras hifenizadas e parágrafos; hifens genuínos de palavras compostas são preservados |
+| **Cabeçalhos repetidos** — títulos correntes, rodapés e números de página se repetem dentro do fluxo do texto | Regiões repetidas são removidas do fluxo, e regiões laterais ficam fora do corpo |
 
-## O que o extrator reconhece
+> [!NOTE]
+> **Status:** o extrator (`packages/extractor`, fases E0–E10) e o segmentador (`packages/segmenter`, fase SEG) estão completos e testados. O app de leitura (`apps/reader`) **não começou** — está planejado em marcos M0–M6. Hoje o PagePace é uma biblioteca e uma linha de comando.
 
-Somente o que o código faz hoje — conferido em [docs/extractor/ARCHITECTURE.md](docs/extractor/ARCHITECTURE.md) e [docs/extractor/SCHEMA.md](docs/extractor/SCHEMA.md):
+> [!IMPORTANT]
+> **Nenhum PDF com direitos autorais neste repositório.** Os PDFs públicos de teste são baixados por um script, nunca versionados; os únicos PDFs versionados são os dois artigos do SciELO em CC BY 4.0, em `corpus/vendored/`. Livros com direitos autorais ficam **fora** do repositório, na pasta indicada por `CORPUS_PRIVATE_DIR`. Nunca anexe um PDF com direitos autorais nem o texto dele a um commit, issue ou pull request.
 
-- **Tipos de bloco** (`BlockKind`): `heading` (níveis 1–6), `paragraph`, `blockquote`, `epigraph`, `list_item`, `footnote` (ligado à sua chamada), `reference`, `caption`, `figure`, `table`, `equation`, `code`, `margin_ref` (numeração editorial como Bekker/Stephanus, mantida fora do fluxo de leitura).
-- **Layout**: linhas de texto, até três colunas com ordem de leitura, regiões repetidas (cabeçalhos, rodapés, números de página) removidas do fluxo, regiões laterais e junções entre páginas de parágrafos e palavras hifenizadas.
-- **Estilos inline**: negrito, itálico, sobrescrito, subescrito e versalete recuperados de nomes e flags da fonte; trechos gregos/latinos marcados com `lang`.
-- **Nível do documento**: sumário a partir dos bookmarks do PDF, metadados de título/autores/idioma e, por bloco, `confidence` mais `flags` com todos os motivos de dúvida.
-- **Limites honestos**: os blocos `figure`, `table` e `equation` são detectados e carregados como *placeholders* (sem runs) — o conteúdo deles ainda não é reconstruído. Um PDF sem camada de texto falha no caminho padrão (`ScannedPdfError`); o OCR é um adaptador de ingestão opcional (`ingestOcrFlow`, `pagepace extract --ocr`). Texto vindo de camada de OCR embutida é extraído com confiança reduzida e aviso.
+---
 
-## Arquitetura
+## 🏗️ Arquitetura
 
-As sete camadas de [docs/extractor/ARCHITECTURE.md](docs/extractor/ARCHITECTURE.md) — cada uma uma função pura com tipos explícitos:
+As sete camadas do extrator — cada uma uma função pura com tipos explícitos, testável sozinha com fixtures pequenas:
 
 ```mermaid
 flowchart LR
-    PDF[PDF bytes] --> I[1 Ingestão<br/>adaptador pdf.js]
-    OCR[adaptador OCR] --> I
-    I --> R[RawDocument]
-    R --> N[2 Normalização<br/>Unicode, ligaduras, espaços]
-    N --> L[3 Layout<br/>linhas, colunas, ordem de leitura]
-    L --> S[4 Semântica<br/>blocos tipados]
-    S --> Y[5 Estilos inline<br/>runs]
-    Y --> J[6 Junção entre páginas<br/>parágrafos, hifens, notas]
-    J --> O[7 Saída]
-    O --> B[Book]
-    B --> C[app / CLI / eval]
+    subgraph ENTRADA["📥 Entrada"]
+        PDF["📄 Bytes do PDF"]
+        OCR["🔍 Adaptador OCR<br/><i>opcional</i>"]
+        ING["1️⃣ Ingestão<br/>pdf.js"]
+    end
+
+    subgraph PIPELINE["⚙️ Pipeline"]
+        NRM["2️⃣ Normalização<br/>Unicode, ligaduras, espaços"]
+        LAY["3️⃣ Layout<br/>linhas, colunas, ordem"]
+        SEM["4️⃣ Semântica<br/>blocos tipados"]
+        STY["5️⃣ Estilos inline<br/>runs"]
+    end
+
+    subgraph SAIDA["📤 Saída"]
+        JOIN["6️⃣ Junção entre páginas<br/>parágrafos, hífens, notas"]
+        OUT["7️⃣ Saída<br/>modelo Book"]
+        READ["📖 app · CLI · eval"]
+    end
+
+    PDF --> ING
+    OCR -.-> ING
+    ING --> NRM --> LAY --> SEM --> STY --> JOIN --> OUT --> READ
+
+    classDef entrada fill:#1f6feb,color:#fff,stroke:#164a9c
+    classDef pipeline fill:#8250df,color:#fff,stroke:#5a2ca0
+    classDef saida fill:#2da44e,color:#fff,stroke:#1a7f37
+    class PDF,OCR,ING entrada
+    class NRM,LAY,SEM,STY pipeline
+    class JOIN,OUT,READ saida
 ```
 
-## Primeiros passos
+O `Book` é o contrato entre o extrator e todo o resto: blocos tipados com IDs estáveis, estilos inline, origem na página, confiança e flags. Detalhes: [docs/extractor/ARCHITECTURE.md](docs/extractor/ARCHITECTURE.md) e [docs/extractor/SCHEMA.md](docs/extractor/SCHEMA.md).
 
-Requisitos: **Node >= 24** (a versão exata está em [`.nvmrc`](.nvmrc)) e **pnpm 9** (fixado no campo `packageManager` do [`package.json`](package.json)).
+---
+
+## ⚡ Começo rápido
+
+Requisitos: **Node >= 24** (a versão exata está em [`.nvmrc`](.nvmrc)) e **pnpm 9.15.0** (fixado no campo `packageManager` do [`package.json`](package.json)).
 
 ```bash
-pnpm install --frozen-lockfile   # 0,9 s (execução com tudo já instalado)
-pnpm corpus:fetch                # 2,0 s (16 arquivos em cache, sem download)
-pnpm verify                      # 42,3 s: typecheck, lint, formatação, 1406 testes, checagem de PDFs, orçamento de docs
+pnpm install --frozen-lockfile
+pnpm corpus:fetch   # a primeira execução baixa os PDFs públicos de teste
+pnpm verify         # typecheck, lint, formato, testes, checagem de PDF e orçamento de docs
 ```
 
-Tempos medidos nesta máquina com tudo já instalado (`pnpm install` imprime "Done in 659ms"; `corpus:fetch` reporta `16 public (… 16 reused)`). O **primeiro** `pnpm corpus:fetch` baixa o corpus público de testes pela rede e demora mais; as execuções seguintes só conferem o SHA-256 de cada arquivo. O `pnpm verify` precisa estar verde antes de qualquer pull request — ver [CONTRIBUTING.md](CONTRIBUTING.md).
+O corpus público está descrito em [corpus/README.md](corpus/README.md); a pasta privada é opcional.
 
-## Exemplo: a CLI num PDF do corpus
+---
+
+## 🖥️ A linha de comando
 
 ```bash
 pnpm --silent pagepace inspect corpus/vendored/n3-pt-scielo-wittgenstein.pdf --pages 2-2
 ```
 
-Primeiras 12 linhas de uma execução real (`--silent` esconde o banner do pnpm, para só o relatório chegar ao terminal):
+O relatório abaixo são as 12 primeiras linhas de uma execução real:
 
 ```text
 Arquivo: corpus/vendored/n3-pt-scielo-wittgenstein.pdf
@@ -88,47 +136,118 @@ Largura de coluna: 482.19 pt
 Descartes, instado por objetores, esclarecia a função metódica da dúvida através de uma analogia bastante eloquente: "Se vós tivésseis um cesto de maçãs dentre as quais várias estivessem podres, contaminando assim as restantes, o que fazer senão esvaziá-lo todo e, tomando cada maçã, uma a uma, recolocar as boas no cesto e jogar fora as más?" (Respostas às sétimas objeções, p. 324). Ou seja, a ideia é que o ceticismo epistemológico cumpre uma espécie de função profilática, funcionando como um filtro que é útil para separar o que é verdadeiro e certo do que é falso e duvidoso.
 ```
 
-"Wittgenstein e o ceticismo" de Daniel Temp, *Filosofia Unisinos* 27(1) (2026), e27103, DOI [10.4013/fsu.2026.271.03](https://doi.org/10.4013/fsu.2026.271.03) — © os autores, licenciado sob [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). O arquivo é uma cópia byte a byte em `corpus/vendored/`; detalhes em [THIRD_PARTY.md](THIRD_PARTY.md).
+O `extract` imprime o `Book` inteiro em JSON. O trecho abaixo é de uma execução real, cortado em 15 linhas, mostrando o fim de um bloco e o começo do seguinte:
 
-## Qualidade
+```bash
+pnpm --silent pagepace extract corpus/vendored/n3-pt-scielo-wittgenstein.pdf > book.json
+```
 
-O `pnpm eval` mede o extrator contra documentos golden (saída esperada gravada ao lado do corpus). Saída de uma execução real nesta máquina:
+```json
+        "originalPageLabel": "1"
+      },
+      "confidence": 0.9,
+      "flags": []
+    },
+    {
+      "id": "p0-b0-645288ef",
+      "kind": "heading",
+      "level": 1,
+      "runs": [
+        {
+          "text": "Artigo",
+          "bold": true,
+          "sup": true
+        }
+```
+
+A saída da linha de comando é em **português**. "Wittgenstein e o ceticismo", de Daniel Temp, *Filosofia Unisinos* 27(1) (2026), e27103, DOI [10.4013/fsu.2026.271.03](https://doi.org/10.4013/fsu.2026.271.03) — © dos autores, licenciado em [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). O arquivo é uma cópia byte a byte em `corpus/vendored/`; detalhes em [THIRD_PARTY.md](THIRD_PARTY.md).
+
+> [!TIP]
+> Use `pnpm --silent` para esconder o aviso do pnpm, para que só o relatório ou o JSON chegue ao terminal.
+
+> [!WARNING]
+> Um PDF sem camada de texto é recusado pelo caminho padrão (`ScannedPdfError`). O OCR é opcional: `pnpm pagepace extract arquivo.pdf --ocr` usa o adaptador Tesseract. Texto vindo de uma camada de OCR embutida é extraído com confiança reduzida e um aviso, porque os caracteres podem estar errados.
+
+---
+
+## 📈 Qualidade
+
+O `pnpm eval` mede o extrator contra documentos gabarito. Esta é a saída de uma execução real só com o corpus público (sem pasta privada configurada) — exatamente o que um clone novo reproduz:
 
 ```text
-PagePace evaluation - 31 documents (16 public, 15 private), 12 with golden, 12 measured
+PagePace evaluation - 16 documents (16 public, 0 private), 12 with golden, 12 measured
 
 By level (mean of the measured documents)
 level  documents  measured  text_cer (mean)  style_f1 (mean)
 -----  ---------  --------  ---------------  ---------------
-N1            10         4           0.0000           1.0000
-N2             8         5           0.0000           1.0000
-N3             8         3           0.0000           0.9983
-N4             3         0                -                -
-N5             2         0                -                -
+N1             5         4           0.0000           1.0000
+N2             6         5           0.0000           1.0000
+N3             5         3           0.0000           0.9983
 ```
 
-- **Testes golden** são arquivos JSON de saída esperada (`corpus/golden/*.golden.json`) para documentos cuja especificação *é* a verdade — hoje os 12 PDFs sintéticos `syn-*`, gerados por `pnpm corpus:synthetic`. Toda métrica compara a extração com eles; os PDFs reais são exercitados pelos testes de aceite em `packages/*/test/`.
-- As demais métricas são `1.0000` nos 12 documentos medidos, exceto `style_f1` em `syn-n3-en-quotes` (`0.9950`), que derruba a média de N3 para `0.9983`. A segmentação de frases é medida à parte em quatro textos de domínio público: `sentence_f1 1.0000` (meta ≥ 0,97).
-- **Baseline e a regra sem regressão:** [packages/eval/baseline.json](packages/eval/baseline.json) guarda o valor aceito de cada métrica por documento. O `pnpm eval --ci` (rodo pelo CI em todo pull request) **falha se alguma métrica piorar mais de 0,002**. Piora de propósito exige um ADR em [docs/extractor/DECISIONS.md](docs/extractor/DECISIONS.md) e atualização explícita da baseline. Detalhes: [docs/extractor/EVALUATION.md](docs/extractor/EVALUATION.md).
+- **Testes golden** são arquivos JSON de saída esperada (`corpus/golden/*.golden.json`) para documentos cuja especificação *é* a verdade — os 12 PDFs sintéticos `syn-*`, gerados por `pnpm corpus:synthetic`. Toda métrica compara a extração com eles.
+- **Baseline e a regra de não regressão:** [packages/eval/baseline.json](packages/eval/baseline.json) registra o valor aceito de cada métrica por documento. O `pnpm eval --ci` (rodado pelo CI em todo pull request) **falha se qualquer métrica piorar mais que 0,002**.
+- Uma piora deliberada exige uma ADR em [docs/extractor/DECISIONS.md](docs/extractor/DECISIONS.md) e uma atualização explícita do baseline. Todas as outras métricas são `1,0000` nos 12 documentos medidos, exceto `style_f1` em `syn-n3-en-quotes` (`0,9950`), que define a média do N3 em `0,9983`.
 
-## Mapa do repositório
+---
 
-| Caminho | O que é |
-|---|---|
-| `packages/` | `schema` (o contrato), `extractor`, `segmenter`, `eval`, `cli` |
-| `apps/` | o app leitor — planejado, não iniciado ([docs/app/ROADMAP.md](docs/app/ROADMAP.md)) |
-| `corpus/` | documentos de teste: manifest, goldens, PDFs vendored (os públicos são baixados, nunca commitados) |
-| `docs/` | documentação de planejamento e processo, em português |
-| `scripts/` | utilitários pequenos do repositório (orçamento de docs, índice de decisões, assets do pdf.js) |
-| `tests/manual/` | checklists visuais executados por um humano ao fim de cada marco |
-| `.opencode/` | skills (receitas reutilizáveis) para as agentes de IA que trabalham aqui |
-| `.github/` | workflow de CI, templates de issue e de pull request |
+## 📁 Estrutura do repositório
 
-## Documentação
+```text
+PagePace/
+├── 📦 packages/            pacotes do workspace
+│   ├── schema/             o contrato de dados: RawDocument, Book, Anchor, Overlay
+│   ├── extractor/          o pipeline de sete camadas, de PDF a Book
+│   ├── segmenter/          frases e palavras determinísticas, pt e en
+│   ├── eval/               runner do corpus, métricas e o portão do baseline
+│   └── cli/                pagepace extract · inspect · explain-page · eval
+├── 📱 apps/                o app de leitura — planejado, não iniciado
+├── 📚 corpus/              manifest, gabaritos, frases, PDFs CC BY versionados
+├── 📖 docs/                planejamento, fases, ADRs e o processo de trabalho
+├── 🧪 tests/manual/        checklists visuais que um humano roda ao fechar cada marco
+├── 🤖 .opencode/           skills (receitas reutilizáveis) para os agentes de IA
+├── ⚙️ scripts/             pequenos utilitários do repositório
+└── 🔧 .github/             workflow do CI, modelos de issue e de pull request
+```
 
-Tudo em `docs/` está escrito em português; comece por [docs/README.md](docs/README.md).
+---
 
-| Quero… | Leia |
+## 🗺️ Roadmap
+
+- [x] **Extrator** — fases E0–E10 fechadas: sete camadas, blocos tipados, estilos inline, junções entre páginas, notas, confiança e flags
+- [x] **Segmentador** — fase SEG fechada: frases e palavras determinísticas para português e inglês
+- [ ] **M0 · Spikes e arquitetura** — decidir alvo no PC (site ou local), armazenamento e TTS; escrever os planos das fases M1–M6
+- [ ] **M1 · Casca do app** — projeto TypeScript + Capacitor, biblioteca, adicionar PDF → extrair (em streaming) → salvar o `Book`; temas
+- [ ] **M2 · Leitura dinâmica (celular)** — tela de preparação, palavra por palavra com ORP e ritmo proporcional, trechos de frase/parágrafo/página, controles, pausa, salvar posição
+- [ ] **M3 · Leitura normal + anotações** — paginador, subpáginas, marca-texto/sublinhado/anotação, salvamento automático, régua de foco, tela de correção
+- [ ] **M4 · PC** — layout de duas páginas, contexto inferior durante a leitura, atalhos, anotações ao passar o mouse
+- [ ] **M5 · TTS** — adaptador TTS, destaque da palavra, velocidade; avaliar voz local
+- [ ] **M6 · Extras** — OCR, pacer-fade, Bionic opcional, exportação Markdown das anotações, sincronização
+
+Os marcos do app estão definidos em [docs/app/ROADMAP.md](docs/app/ROADMAP.md); cada um será quebrado em fases e tarefas atômicas durante o M0.
+
+---
+
+## 🛠️ Como é feito
+
+| Pilar | Na prática | Onde |
+|---|---|---|
+| **ADRs** | Toda escolha entre alternativas, dependência ou troca aceita é registrada, então quem continua lê o *porquê*, não um palpite | [docs/extractor/DECISIONS.md](docs/extractor/DECISIONS.md) |
+| **Portões de CI** | Lint, formato, typecheck, a suíte de testes inteira, a checagem de PDF, o orçamento de docs, `pnpm eval --ci` (portão de regressão das métricas) e `pnpm bench --ci` (alarme de velocidade e memória) | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
+| **Métricas** | Mudanças na extração só são aceitas se a avaliação do corpus não regredir além da tolerância de 0,002 | [docs/extractor/EVALUATION.md](docs/extractor/EVALUATION.md) |
+
+O processo está em [docs/WORKFLOW.md](docs/WORKFLOW.md): tarefas pequenas e atômicas, teste primeiro quando possível, `pnpm verify` verde, pull request, squash merge. Regras para contribuir: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## 📚 Documentação
+
+Tudo em `docs/` é escrito em português. A tabela abaixo aponta cada mapa.
+
+<details>
+<summary><b>📖 Mapa da documentação</b></summary>
+
+| Eu quero… | Leia |
 |---|---|
 | Entender o projeto | [docs/extractor/PROJECT.md](docs/extractor/PROJECT.md) |
 | Entender o extrator | [docs/extractor/ARCHITECTURE.md](docs/extractor/ARCHITECTURE.md), [docs/extractor/SCHEMA.md](docs/extractor/SCHEMA.md) |
@@ -139,30 +258,48 @@ Tudo em `docs/` está escrito em português; comece por [docs/README.md](docs/RE
 | Entender o plano do app | [docs/app/PROJECT.md](docs/app/PROJECT.md), [docs/app/ROADMAP.md](docs/app/ROADMAP.md) |
 | Contribuir | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-## Como é construído
+Comece em [docs/README.md](docs/README.md).
 
-O PagePace é desenvolvido com **agentes de IA** (um por vez, com passagem de bastão registrada em `STATE.md`) sob o processo de [docs/WORKFLOW.md](docs/WORKFLOW.md): tarefas atômicas pequenas, teste primeiro quando possível, `pnpm verify` verde, pull request, squash merge.
+</details>
 
-Três coisas mantêm o trabalho honesto:
+<details>
+<summary><b>⚠️ Limitações conhecidas</b></summary>
 
-- **ADRs** — toda escolha entre alternativas, dependência ou trade-off aceito é escrito em [docs/extractor/DECISIONS.md](docs/extractor/DECISIONS.md) (mais de 100 entradas), para que o próximo contribuidor leia o *porquê*, não um chute.
-- **Gates de CI** — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda lint, formatação, typecheck, a suíte de testes inteira, a checagem de PDFs, o orçamento de docs, `pnpm eval --ci` (gate de regressão de métricas) e `pnpm bench --ci` (alarme de velocidade/memória).
-- **Métricas** — mudanças na extração só são aceitas se a avaliação do corpus não regredir (ver *Qualidade* acima).
+- Blocos `figure`, `table` e `equation` são detectados e guardados como **placeholders** (sem runs) — o conteúdo deles ainda não é reconstruído.
+- Um PDF **sem camada de texto** falha no caminho padrão (`ScannedPdfError`); o OCR é um adaptador de ingestão opcional (`ingestOcrFlow`, `pagepace extract --ocr`).
+- Texto vindo de uma **camada de OCR embutida** é extraído com confiança reduzida e um aviso.
+- O **app de leitura** não começou: ainda não existe tela para ler um `Book`.
 
-## Contribuindo
+</details>
 
-Leia [CONTRIBUTING.md](CONTRIBUTING.md). Em resumo: Node do `.nvmrc`, `pnpm install`, `pnpm corpus:fetch`, `pnpm verify` verde, pull requests pequenos, Conventional Commits em inglês, sem regressão de métricas e **nunca** anexar PDFs ou texto com copyright em commits, issues ou pull requests.
+<details>
+<summary><b>🗂️ Mapa do repositório</b></summary>
 
-## Licença
+| Caminho | O que é |
+|---|---|
+| `packages/` | `schema` (o contrato), `extractor`, `segmenter`, `eval`, `cli` |
+| `apps/` | o app de leitura — planejado, não iniciado ([docs/app/ROADMAP.md](docs/app/ROADMAP.md)) |
+| `corpus/` | documentos de teste: manifest, gabaritos, PDFs CC BY versionados (PDFs públicos são baixados, nunca versionados) |
+| `docs/` | documentação de planejamento e processo, em português |
+| `scripts/` | pequenos utilitários do repositório (orçamento de docs, política de e-mail, assets do pdf.js) |
+| `tests/manual/` | checklists visuais que um humano roda ao fim de cada marco |
+| `.opencode/` | skills (receitas reutilizáveis) para os agentes de IA que trabalham aqui |
+| `.github/` | workflow do CI, modelos de issue e de pull request |
 
-[MIT](LICENSE).
+</details>
 
-## Agradecimentos
+---
 
-- [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) — ingestão de PDF, roda no navegador e no Node.
-- [tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0) — motor de OCR (adaptador).
-- [zod](https://zod.dev/) (MIT) — validação em runtime do contrato de dados.
+## 🙏 Agradecimentos
+
+- [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) — ingestão do PDF, roda no navegador e no Node.
+- [tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0) — adaptador do motor de OCR.
+- [zod](https://zod.dev/) (MIT) — validação em tempo de execução do contrato de dados.
 - [Source Serif 4](https://adobe-fonts.github.io/source-serif/) (SIL OFL 1.1) — fontes de teste usadas pela suíte de testes.
-- Daniel Temp e Milene Consenso Tonetto, autores dos dois artigos SciELO com licença CC BY 4.0 usados como fixtures de teste.
+- Daniel Temp e Milene Consenso Tonetto, autores dos dois artigos do SciELO em CC BY 4.0 usados como fixtures de teste.
 
 Licenças e atribuições de tudo que vive ou é distribuído com este repositório: [THIRD_PARTY.md](THIRD_PARTY.md).
+
+---
+
+**PagePace** · [Licença MIT](LICENSE) · 2026
