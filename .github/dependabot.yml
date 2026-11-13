@@ -1,0 +1,27 @@
+# Dependabot: monthly, low-noise updates (see ADR-006 for the license policy).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # pdfjs-dist is pinned to an exact version (ADR-027); bumping it is a
+      # deliberate task, never an automated PR.
+      - dependency-name: "pdfjs-dist"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
