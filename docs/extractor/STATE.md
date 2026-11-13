@@ -6,24 +6,21 @@
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
 - **Próxima tarefa:** **M0/M2 do app** — espera o PO liberar o M0 (`docs/app/STATE.md`). Nenhuma tarefa aberta no extrator.
 - **Ação pendente do PO:** liberar o M0 do app.
-- **Status:** **PUB-03 (CI endurecido, regras do agente e conferência final) — CONCLUÍDA e mesclada em 2026-11-13 (PR #11, squash `2176bf8`)**: actions fixadas por SHA, `concurrency` que só cancela PR, job com `timeout-minutes: 20`; `pnpm check:emails` (noreply obrigatório) no CI em pull_request; AGENTS.md com as regras de publicação e ADR-110; conferência final (gitleaks 0, 0 links quebrados, clone limpo do README verde, repo ainda privado). Antes: **PUB-02 (PR #9, squash `f063107`)** e **PUB-01 (PR #1)**.
-- **Última atualização:** 2026-11-13 (PUB-03).
+- **Status:** **PUB-04 (README principal mais visual) — CONCLUÍDA em 2026-11-13** (branch `docs-pub-readme-visual`): README EN e pt-BR com a mesma estrutura (selos, tabela de problema, mermaid de 7 camadas, quick start, CLI com saídas reais, qualidade com `pnpm eval` só do corpus público, árvore, roadmap M0–M6, callouts e `<details>`); 114 links relativos = 0 quebrados; 16 URLs externas = 200; mermaid `flowchart-v2` válido nos 2 arquivos. Antes: **PUB-03 (PR #11, `2176bf8`)**, **PUB-02 (PR #9)** e **PUB-01 (PR #1)**.
+- **Última atualização:** 2026-11-13 (PUB-04).
 
 ## Tarefa atual
-Nenhuma. Última concluída: **PUB-03 — CI endurecido, regras do agente e conferência final** (branch `chore-pub-ci-final`).
+Nenhuma. Última concluída: **PUB-04 — README principal mais visual** (branch `docs-pub-readme-visual`).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **PUB-03 (CI + regras + conferência):** `ci.yml` com todas as actions por SHA completo + comentário `# v4.x.y` (confira com `gh api repos/<repo>/commits/<tag>`), `concurrency` cancelando só pull_request, `timeout-minutes: 20`, `permissions: contents: read` e todos os passos antigos.
-- **E-mail:** `scripts/check-commit-emails.mjs` + `pnpm check:emails <base> <head>` reprova autor/committer fora de `*@users.noreply.github.com` e `noreply@github.com`; provado em repo temporário (reprova `teste@exemplo.com`, aprova as duas formas); CI só em pull_request, checkout `fetch-depth: 0`.
-- **Regras (AGENTS.md 9.377 B, limite 10 KB):** 11 = repositório público (dado pessoal, nunca `git config` de usuário) e 12 = corpus só CC BY/CC0/domínio público (licença duvidosa: parar e perguntar); merge `--auto --squash --delete-branch` quando público com main protegida; `end-session` ajustada.
-- **Conferência:** gitleaks 8.30.1 no histórico inteiro (134 commits) = **0 achados**; 114 links relativos em 97 `.md` = 0 quebrados (1 falso positivo de regex em código inline); 0 PDFs fora de `corpus/vendored/`; `C:\Users`/`ghp_`/`github_pat_`/`BEGIN PRIVATE KEY` = 0 em arquivos e no histórico.
-- **Clone limpo (fora do repo, sem `CORPUS_PRIVATE_DIR`):** clone 4,5 s; install 1 s; `corpus:fetch` 6 s (2 baixados + 12 gerados); `verify` 29 s exit 0; `inspect` idêntico ao README; pasta apagada.
-- **GitHub:** ainda **privado**; `allow_squash_merge` true, `allow_merge_commit` false, `delete_branch_on_merge` true, `has_projects` true, `has_wiki` false; `branches/main/protection` = **403** (exige repo público ou GitHub Pro).
-- **Próximo passo:** o PO libera o M0 do app; a publicação (público + proteção da main + auto-merge) espera a resposta dele.
+- **PUB-04 (READMEs):** README.md e README.pt-BR.md com 305 linhas cada e a mesma estrutura; o pt-BR é tradução fiel. Saídas reais: `inspect` (12 linhas) e trecho de 15 linhas do JSON do `Book` do PDF SciELO; qualidade com `pnpm eval` **sem** `CORPUS_PRIVATE_DIR` **e sem o `.env` local** (16 documentos, 16 públicos, 12 com gabarito) — as 3 linhas da tabela de nível conferem com a saída.
+- **Verificação dos READMEs:** 114 links (94 relativos + 20 âncoras internas) = 0 quebrados; âncoras conferidas com `github-slugger`; 16 URLs externas (selos, DOI, CC BY, pdf.js, tesseract.js, zod, Source Serif) = HTTP 200; mermaid validado com `mermaid@11` + `jsdom` (`flowchart-v2`, os 2 arquivos).
+- **GitHub agora:** repositório **público** (o PO publicou); ruleset `protect-main` ativo (só squash, check `verify` obrigatório); `branches/main/protection` responde 404 porque a proteção é por ruleset.
+- **Pendências registradas:** o aviso de 18 vulnerabilidades do Dependabot foi para o BACKLOG; `EVALUATION.md` e `WORKFLOW.md` desatualizados já estavam lá.
+- **Próximo passo:** o PO libera o M0 do app (único bloqueio aberto).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
-- Autorizar a publicação do repositório (tornar público, proteger a main com o check `verify`, ligar o auto-merge) — passo a passo na mensagem final.
 
 ## Progresso por marco
 | Marco | Status |
@@ -48,7 +45,7 @@ Nenhuma. Última concluída: **PUB-03 — CI endurecido, regras do agente e conf
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
 - 2026-11-13 · **PUB-03 (CI endurecido, regras do agente e conferência final) — CONCLUÍDO (PR #11, squash `2176bf8`)** · actions por SHA com a tag ao lado, `concurrency` só para PR, `timeout-minutes: 20`; `pnpm check:emails` (noreply obrigatório, `base..head`, `fetch-depth: 0`) provado em repo temporário; AGENTS.md com as regras 11/12 e o merge `--auto`, ADR-110; conferência final: gitleaks 0 achados, 0 links quebrados, clone limpo do README verde, repo ainda privado (prot. da main 403); `pnpm verify` e `pnpm eval --ci` verdes.
-- 2026-11-13 · **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDO (PR #9, squash `f063107`)** · README raiz EN + README.pt-BR; READMEs dos 5 pacotes; tests/, corpus/, docs/README, scripts/, apps/, .opencode/; 109 links = 0 quebrados; números do `pnpm eval` conferidos; `pnpm verify` verde (1406 testes).
-- Sessões anteriores: 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
+- 2026-11-13 · **PUB-04 (README principal mais visual) — CONCLUÍDO** · README EN + pt-BR reescritos com selos, tabela de problema, mermaid de 7 camadas, callouts, CLI com saídas reais, qualidade só com o corpus público, árvore, roadmap e `<details>`; 114 links = 0 quebrados, 16 URLs externas 200, mermaid válido; `pnpm verify` verde (1406 testes).
+- Sessões anteriores: PUB-02 em `archive/STATE-log-2026-11-13-pub02.md`; 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
 
 Histórico completo: docs/extractor/archive/
