@@ -13,9 +13,9 @@ description: Use ao terminar uma tarefa ou quando a sessão estiver perto do fim
    - **Handoff:** no máximo **15 linhas**.
 3. Se tomou decisão: skill `record-decision` (ADR de no máximo 12 linhas).
 4. Commit (Conventional Commits em inglês) e `git push` da branch.
-5. Abra o PR: `gh pr create --base main --title "<Conventional Commits, em inglês>" --body-file <arquivo temporário fora do repositório>` (nunca `--body` com texto de várias linhas — aspas quebram no PowerShell; o `.github/pull_request_template.md` é o guia do conteúdo).
+5. Abra o PR: `gh pr create --base main --title "<Conventional Commits, em inglês>" --body-file <arquivo temporário fora do repositório>` (nunca `--body` com texto de várias linhas — aspas quebram no PowerShell; o `.github/pull_request_template.md` é o guia do conteúdo). O repositório é público: nada de e-mail comum, caminho local (`C:\Users\...`) ou dado pessoal no título, no corpo, nos commits ou nos arquivos.
 6. Rode `gh pr checks`:
-   - Todos os checks obrigatórios (o `verify`) passando: **mescle na mesma sessão** com `gh pr merge --squash --delete-branch` e depois `git branch -D <nome>` (a branch local; o `-d` minusculo falha depois de squash, e isso é esperado).
+   - Todos os checks obrigatórios (o `verify`) passando: **mescle na mesma sessão** com `gh pr merge --auto --squash --delete-branch` (repositório público com a `main` protegida: o auto-merge espera o check sozinho; se o comando recusar porque o auto-merge está desligado, use `gh pr merge --squash --delete-branch`) e depois `git branch -D <nome>` (a branch local; o `-d` minusculo falha depois de squash, e isso é esperado).
    - Algum check falhado ou pendente: **não mescle**; deixe para o `start-session` da próxima sessão conferir e mesclar (corrigir agora só se o erro for desta tarefa).
 7. Se o `gh` falhar por qualquer motivo (rede, auth etc.), não insista: registre em STATE.md (Bloqueios) e entregue ao PO o título e a descrição do PR pela skill `report-to-po`, como era feito antes do `gh`.
 8. Reporte ao PO pela skill `report-to-po` o que aconteceu: PR aberto / mesclado / aguardando CI.

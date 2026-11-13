@@ -112,6 +112,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-107 | Segmentador: classes Unicode, span aparado no fim e `maxSpanLength` | accepted |
 | ADR-108 | Segmentador: `sentence_f1` sobre corpus anotado em `corpus/sentences/` | accepted |
 | ADR-109 | Segmentador: atribuição minúscula após fechamento continua a frase; `snr.`/`snra.` na lista pt | accepted |
+| ADR-110 | Política de publicação do repositório | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -860,3 +861,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) anotar o corpus como o segmentador já faz (contras: normaliza o erro e o corpus deixa de ser verdade) · B) regra `terminador + fechamento + palavra minúscula → não quebra` mais `snr/snra/snrs/snras` na lista pt (prós: padrão comum de diálogo, mudança local) · C) só a abreviação (contras: metade dos erros de citação continua).
 **Decisão:** **B** — quando o terminador é seguido de ao menos um fechamento (`" ' ” ’ » ) ] }`) e o próximo caractere não-espaço é minúsculo (`\p{Ll}`), a frase continua; com maiúscula (ou outro caractere) a fronteira permanece. `snr.`, `snra.`, `snrs.` e `snras.` entram em `abbreviations/pt.ts`.
 **Consequências:** 9 casos novos tabelados (pt/en: continuação em minúscula, maiúscula ainda quebra, `snr.`/`snra.`) + checagem de categoria SEG-T05; o corpus vai a 1,0000 e passa a ser o teste de aceite — regressão futura aparece no `pnpm eval --ci`.
+
+### ADR-110 · Política de publicação do repositório · accepted · 2026-11-13
+**Contexto:** PUB-03 endurece o CI e o AGENTS.md para um repositório **público**: o histórico antigo, com endereços reais de e-mail e nome pessoal, não pode ser publicado, e o corpus versionado precisa de licença clara.
+**Alternativas:** A) publicar o histórico antigo com filtro de e-mail (contras: reescrever o remoto, quebrar clones e ainda expor metadados) · B) repositório novo, histórico reiniciado, commits só com noreply e PRs antigos **não** migrados (prós: nada de dado pessoal, histórico das fases vive nos .md e no novo git) · C) manter privado (contras: o objetivo do projeto é público).
+**Decisão:** **B** — código sob **MIT**; todo commit usa `*@users.noreply.github.com` ou `noreply@github.com`, verificado por `pnpm check:emails` no CI (`base..head` em pull_request, `fetch-depth: 0`); o corpus versionado só aceita CC BY, CC0 ou domínio público (fonte duvidosa: parar e perguntar ao PO); nada de e-mail, caminho local ou dado pessoal em arquivos, commits ou PRs; `git config` de usuário nunca é alterado.
+**Consequências:** os PRs #1–#112 do repositório antigo não existem aqui — o registro é STATE.md, DECISIONS.md e o histórico novo; commits com e-mail comum passam a reprovar no CI; fonte nova sem licença verificável bloqueia a tarefa até o PO responder.
