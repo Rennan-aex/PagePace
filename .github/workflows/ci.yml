@@ -20,7 +20,7 @@ jobs:
       # before the tests, so a failing test never throws the download away.
       # The key changes by itself whenever corpus/manifest.yaml changes.
       - name: Corpus cache (restore)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: corpus/public
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
@@ -47,7 +47,7 @@ jobs:
           # github.com hosts by the script.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Corpus cache (save)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: corpus/public
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
