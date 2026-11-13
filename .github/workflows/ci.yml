@@ -11,27 +11,46 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the older run. Pushes to main
+# are never cancelled: every commit on main must finish its verification.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      # Full history is needed only by the commit e-mail policy below, which
+      # diffs base.sha..head.sha (a shallow clone cannot see the base commit).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       # ADR-032 rule 4: restore first, save right after the fetch (below) and
       # before the tests, so a failing test never throws the download away.
       # The key changes by itself whenever corpus/manifest.yaml changes.
       - name: Corpus cache (restore)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: corpus/public
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Single source of truth for the Node version (E1-T00, ADR-022):
           # .nvmrc = package.json engines >= 24 = reports (spikes ran on Node 24).
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The repository is public (ADR-110): every commit in the pull request
+      # must use a GitHub noreply address, never a real e-mail.
+      - name: Commit e-mail policy
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm check:emails "$BASE_SHA" "$HEAD_SHA"
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
@@ -47,7 +66,7 @@ jobs:
           # github.com hosts by the script.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Corpus cache (save)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: corpus/public
           key: corpus-public-${{ hashFiles('corpus/manifest.yaml') }}
@@ -81,7 +100,7 @@ jobs:
         run: pnpm bench --ci --runs 3
       - name: Bench report (artifact)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bench-report
           path: packages/eval/out/bench.json
