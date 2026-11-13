@@ -1,50 +1,58 @@
 # @pagepace/cli
 
-Comando único do PagePace: `pnpm pagepace <comando>` (na raiz do monorepo).
+The PagePace command line: `pnpm pagepace <command>` from the monorepo root
+(run through `tsx`, no build step).
 
-## Comandos
+## Commands
 
-| Comando | O que faz |
+| Command | What it does |
 | --- | --- |
-| `dump-raw <pdf> [--pages a-b]` | Lê o PDF e escreve o `RawDocument` (JSON) no console |
-| `extract <pdf>` | Gera o `Book` (JSON) e escreve no console |
-| `inspect <pdf> [--pages a-b] [--format text\|md\|html] [--out <arquivo>]` | Relatório da extração: resumo do documento e, por página, os blocos com tipo, nível, confiança e flags de dúvida; em `md`/`html` a página original fica ao lado dos blocos |
-| `explain-page <pdf> <n>` | Explica a página `n` (1-based): a decisão de cada camada (colunas, margin-ref, heading, footnote/endnote, quote, lista, caption, referência, sidebar, hífen, fonte quebrada, ligação de nota) parágrafo a parágrafo |
-| `eval [--diff\|--ci\|--update-baseline]` | Roda a avaliação do corpus contra os gabaritos — mesmas opções e códigos de saída do `pnpm eval` |
-| `--help` | Ajuda completa, com códigos de saída |
+| `dump-raw <pdf> [--pages a-b]` | Reads the PDF and prints the `RawDocument` (JSON) |
+| `extract <pdf>` | Builds the `Book` (JSON) and prints it; page progress goes to stderr; `--cache-dir`, `--memory-limit-mb`, `--ocr`, `--tessdata` available |
+| `inspect <pdf> [--pages a-b] [--format text\|md\|html] [--out <file>]` | Extraction report: document summary plus every block with type, level, confidence and doubt flags; `md`/`html` show the original page beside the blocks |
+| `explain-page <pdf> <n>` | Explains page `n` (1-based): the decision of each layer (columns, margin-ref, heading, footnote/endnote, quote, list, caption, reference, sidebar, hyphen, broken font, note link), paragraph by paragraph |
+| `eval [--diff\|--ci\|--update-baseline]` | Runs the corpus evaluation — same options and exit codes as `pnpm eval` |
+| `--help` | Full help with exit codes |
 
-## Formatos do `inspect`
+## The `--silent` warning
 
-- **`text`** (padrão): no console, ou em `--out relatorio.txt`.
-- **`md`**: exige `--out relatorio.md`; grava as imagens das páginas em `relatorio-inspect/pagina-N.png` e monta uma tabela lado a lado (original × extraído).
-- **`html`**: exige `--out relatorio.html`; arquivo único com as imagens embutidas (base64), grade de duas colunas por página e as flags destacadas em vermelho.
+pnpm prints its own header before the script output. Add `-s`/`--silent` (or
+redirect stderr) when you want **clean JSON** on stdout:
 
-Blocos com flags de dúvida (`uncertain-hyphen`, `note-without-call`, ...) aparecem realçados no HTML — são os candidatos a correção manual.
+```bash
+pnpm --silent pagepace extract corpus/vendored/n3-pt-scielo-wittgenstein.pdf > book.json
+```
 
-## Exemplos (PowerShell)
+## Formats of `inspect`
 
-```powershell
-# Relatório de texto das páginas 10 a 12
-pnpm -s pagepace inspect <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf --pages 10-12
+- **`text`** (default): to the console, or to `--out report.txt`.
+- **`md`**: requires `--out report.md`; writes page images to `report-inspect/page-N.png` and a side-by-side table (original × extracted).
+- **`html`**: requires `--out report.html`; a single file with embedded images (base64), a two-column grid per page and doubt flags highlighted in red.
 
-# Relatório HTML lado a lado para conferência visual
-pnpm pagepace inspect <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf --pages 10-12 --format html --out $env:TEMP\sofia.html
+Blocks with doubt flags (`uncertain-hyphen`, `note-without-call`, …) are the
+candidates for manual correction.
 
-# Por que a página 12 saiu assim (decisão de cada camada)
-pnpm -s pagepace explain-page <CORPUS_PRIVATE_DIR>\n1-pt-sofia.pdf 12
+## Examples
 
-# Avaliação do corpus (o mesmo que pnpm eval)
+```bash
+# Text report of pages 1–2 of a committed corpus PDF
+pnpm --silent pagepace inspect corpus/vendored/n3-pt-scielo-wittgenstein.pdf --pages 1-2
+
+# Why page 2 came out that way (each layer's decision)
+pnpm --silent pagepace explain-page corpus/vendored/n3-pt-scielo-wittgenstein.pdf 2
+
+# Corpus evaluation (the same as pnpm eval)
 pnpm pagepace eval --diff
 ```
 
-## Códigos de saída
+## Exit codes
 
-`0` sucesso · `1` erro de leitura · `2` uso incorreto · `3` PDF escaneado (ADR-018).
+`0` success · `1` read error · `2` wrong usage · `3` scanned PDF without a text
+layer (ADR-018) — use `--ocr` to recognise the text instead.
 
-## Camadas que o `explain-page` mostra
+## Docs
 
-Cada parágrafo da página traz, em ordem do pipeline: `margin-ref`, `reference`,
-`footnote` (inclui endnotes), `heading`, `caption`, `list`, `quote`, `sidebar`,
-`cross-page`, `hyphen` (cada sitio `hife-|palavra → junção (join|keep|uncertain)`),
-`broken-font` e `note-link`. O `kind`, `level`, `flags` e `confidence` impressos são
-os do `Book` real (ADR-077) — o relatório nunca diverge da extração.
+[docs/extractor/ARCHITECTURE.md](../../docs/extractor/ARCHITECTURE.md) ·
+[docs/extractor/EVALUATION.md](../../docs/extractor/EVALUATION.md) ·
+[corpus/README.md](../../corpus/README.md) ·
+[tests/README.md](../../tests/README.md).
