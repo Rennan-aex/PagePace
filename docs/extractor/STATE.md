@@ -4,16 +4,17 @@
 
 ## Situação
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
-- **Próxima tarefa:** nenhuma no extrator; o **M2 do app** (`docs/app/STATE.md`) espera o PO liberar o M0 (planejar fases e tarefas).
+- **Próxima tarefa:** **PUB-02 em andamento** (READMEs e documentação de entrada); depois o **M0/M2 do app** (`docs/app/STATE.md`) espera o PO liberar o M0.
 - **Ação pendente do PO:** liberar o M0 do app.
 - **Status:** **PUB-01 concluída e mesclada em 2026-11-13 (PR #1, squash)** — repositório pronto para ficar público: conferência pré-publicação (git/CI/config do GitHub ok; `.env.example` era a única falta), LICENSE (MIT), THIRD_PARTY.md, package.json (raiz + 5, lockfile intacto), .editorconfig, CONTRIBUTING.md, SECURITY.md, ISSUE_TEMPLATE x3 + PR template em inglês, dependabot.yml. `pnpm verify` verde; `pnpm eval --ci` exit 0. Última fase fechada: SEG-T05 (2026-11-12, PR #111).
 - **Última atualização:** 2026-11-13 (PUB-01, PR #1).
 
 ## Tarefa atual
-Nenhuma aberta no extrator (fase SEG encerrada em 2026-11-12; PUB-01 encerrada em 2026-11-13). Próximo marco: **M2 do app**, que depende do M0 planejado (`docs/app/STATE.md`).
+**PUB-02 — READMEs e documentação de entrada** (branch `docs-pub-readmes`): README raiz EN/PT-BR, READMEs dos 5 pacotes, tests/, corpus/, docs/README, scripts/, apps/, .opencode/; nada inventado, PR ao fim.
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **Sessão encerrada: PUB-01 concluída e mesclada (PR #1, squash; branch `chore-pub-legal-community` removida).** Feito: `.env.example` (+ `.gitignore`), LICENSE, THIRD_PARTY.md, package.json raiz+5 (private/versões/deps/scripts intactos, `--frozen-lockfile` sem mudar o lock), .editorconfig, CONTRIBUTING.md, SECURITY.md, ISSUE_TEMPLATE (bug/feature/config) + PR template em inglês, dependabot.yml (npm+actions, mensal, agrupa minor/patch, 3 PRs, ignora `pdfjs-dist`), STATE/BACKLOG. Verificações: `pnpm verify` verde, `pnpm eval --ci` exit 0, greps sem dado pessoal. Próximo: M0/M2 do app quando o PO liberar; nenhuma tarefa aberta.
+- **Sessão iniciada: PUB-02 (READMEs e documentação de entrada), branch `docs-pub-readmes`.** Plano: (1) README raiz EN do zero + README.pt-BR; (2) READMEs dos 5 pacotes com exemplos executados; (3) tests/ e corpus/ README; (4) docs/README, scripts/, apps/, .opencode/; (5) verificação (links, comandos, números do eval) + PR. Regra: nada inventado — todo comando executado, métricas só do `pnpm eval` real.
+- `pnpm verify` verde no início (1406 testes). CLI real: `pnpm --silent pagepace inspect corpus/vendored/n3-pt-scielo-wittgenstein.pdf --pages 2-2` (sem e-mail na saída escolhida).
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
