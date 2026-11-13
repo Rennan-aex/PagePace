@@ -3,6 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "description": "PagePace monorepo: PDF-to-reflow extractor, segmenter, eval harness and the reader app.",
+  "license": "MIT",
+  "author": "Rennan-aex (https://github.com/Rennan-aex)",
+  "homepage": "https://github.com/Rennan-aex/PagePace",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rennan-aex/PagePace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rennan-aex/PagePace/issues"
+  },
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "engines": {
