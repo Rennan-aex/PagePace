@@ -23,11 +23,10 @@ const isAllowed = (email) => email === NOREPLY || email.endsWith(NOREPLY_SUFFIX)
 
 let log;
 try {
-  log = execFileSync(
-    "git",
-    ["log", `--format=%H%x09%ae%x09%ce%x09%an%x09%cn`, range, "--"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
+  log = execFileSync("git", ["log", `--format=%H%x09%ae%x09%ce%x09%an%x09%cn`, range, "--"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 } catch {
   console.error(`check:emails: cannot read commits in ${range}.`);
   console.error("check:emails: fetch the full history (actions/checkout with fetch-depth: 0).");

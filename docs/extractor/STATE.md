@@ -6,19 +6,24 @@
 - **Fase atual:** **SEG concluída (2026-11-12)** — T01–T05 done; E10/E9/E8/E7/E6/E5/E4/E3/E2/E1/E0 fechadas. Nenhuma tarefa aberta no extrator.
 - **Próxima tarefa:** **M0/M2 do app** — espera o PO liberar o M0 (`docs/app/STATE.md`). Nenhuma tarefa aberta no extrator.
 - **Ação pendente do PO:** liberar o M0 do app.
-- **Status:** **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDA e mesclada em 2026-11-13 (PR #9, squash `f063107`)**: README raiz EN/PT-BR, READMEs dos 5 pacotes, tests/, corpus/, docs/README, scripts/, apps/, .opencode/; 109 links relativos conferidos (0 quebrados), todos os comandos executados, números do `pnpm eval` conferidos, `pnpm verify` verde. **PUB-01 concluída e mesclada em 2026-11-13 (PR #1, squash)**: LICENSE (MIT), THIRD_PARTY.md, package.json raiz+5, CONTRIBUTING, SECURITY, ISSUE/PR templates, dependabot.
-- **Última atualização:** 2026-11-13 (PUB-02 mesclada, PR #9).
+- **Status:** **PUB-03 (CI endurecido, regras do agente e conferência final) — CONCLUÍDA nesta sessão**: actions fixadas por SHA, `concurrency` que só cancela PR, job com `timeout-minutes: 20`; `pnpm check:emails` (noreply obrigatório) no CI em pull_request; AGENTS.md com as regras de publicação e ADR-110; conferência final (gitleaks 0, 0 links quebrados, clone limpo do README verde, repo ainda privado). Antes: **PUB-02 (PR #9, squash `f063107`)** e **PUB-01 (PR #1)**.
+- **Última atualização:** 2026-11-13 (PUB-03).
 
 ## Tarefa atual
-Nenhuma. Última concluída: **PUB-02 — READMEs e documentação de entrada** (PR #9).
+Nenhuma. Última concluída: **PUB-03 — CI endurecido, regras do agente e conferência final** (branch `chore-pub-ci-final`).
 
 ## Handoff (atualizar a cada checkpoint; ≤ 15 linhas)
-- **PUB-02 encerrada e mesclada (PR #9, squash `f063107`).** README raiz EN + README.pt-BR; READMEs dos 5 pacotes com exemplos `tsx` executados; tests/, corpus/ (EN), docs/README (índice pt), scripts/, apps/, .opencode/.
-- **Verificação desta sessão:** 109 links relativos = 0 quebrados; exemplos `tsx` dos 4 pacotes e o `pagepace inspect` reproduzidos linha a linha; contagens de teste conferidas (`vitest run` por pacote: 71/181/748/360/46 = 1406 em 93 arquivos); números do README = saída real do `pnpm eval`; `pnpm verify` verde (42,3 s); tempos do quick start remedidos (install 0,9 s, fetch 2,0 s, verify 42,3 s). Correção feita: OCR não é "aguardando" — é adaptador opcional (`--ocr`).
-- **Próximo passo:** o PO libera o M0 do app; depois abrir a fase M0 em `docs/app/` e seguir para o M2. Nada pendente no extrator.
+- **PUB-03 (CI + regras + conferência):** `ci.yml` com todas as actions por SHA completo + comentário `# v4.x.y` (confira com `gh api repos/<repo>/commits/<tag>`), `concurrency` cancelando só pull_request, `timeout-minutes: 20`, `permissions: contents: read` e todos os passos antigos.
+- **E-mail:** `scripts/check-commit-emails.mjs` + `pnpm check:emails <base> <head>` reprova autor/committer fora de `*@users.noreply.github.com` e `noreply@github.com`; provado em repo temporário (reprova `teste@exemplo.com`, aprova as duas formas); CI só em pull_request, checkout `fetch-depth: 0`.
+- **Regras (AGENTS.md 9.377 B, limite 10 KB):** 11 = repositório público (dado pessoal, nunca `git config` de usuário) e 12 = corpus só CC BY/CC0/domínio público (licença duvidosa: parar e perguntar); merge `--auto --squash --delete-branch` quando público com main protegida; `end-session` ajustada.
+- **Conferência:** gitleaks 8.30.1 no histórico inteiro (134 commits) = **0 achados**; 114 links relativos em 97 `.md` = 0 quebrados (1 falso positivo de regex em código inline); 0 PDFs fora de `corpus/vendored/`; `C:\Users`/`ghp_`/`github_pat_`/`BEGIN PRIVATE KEY` = 0 em arquivos e no histórico.
+- **Clone limpo (fora do repo, sem `CORPUS_PRIVATE_DIR`):** clone 4,5 s; install 1 s; `corpus:fetch` 6 s (2 baixados + 12 gerados); `verify` 29 s exit 0; `inspect` idêntico ao README; pasta apagada.
+- **GitHub:** ainda **privado**; `allow_squash_merge` true, `allow_merge_commit` false, `delete_branch_on_merge` true, `has_projects` true, `has_wiki` false; `branches/main/protection` = **403** (exige repo público ou GitHub Pro).
+- **Próximo passo:** o PO libera o M0 do app; a publicação (público + proteção da main + auto-merge) espera a resposta dele.
 
 ## Bloqueios / ações do humano (PO) (só abertos; passo a passo na mensagem do report-to-po)
 - Liberar o M0 do app (fases e tarefas) para o M2 começar.
+- Autorizar a publicação do repositório (tornar público, proteger a main com o check `verify`, ligar o auto-merge) — passo a passo na mensagem final.
 
 ## Progresso por marco
 | Marco | Status |
@@ -42,8 +47,8 @@ Nenhuma. Última concluída: **PUB-02 — READMEs e documentação de entrada** 
 - Gate: `pnpm eval --ci` falha (exit 1) se piorar mais que 0,002 por documento; `--update-baseline` regrava; `--diff` compara.
 
 ## Log de sessões (mais recente em cima; só as 2 últimas; anteriores: archive/)
-- 2026-11-13 · **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDO (PR #9, squash `f063107`)** · README raiz EN + README.pt-BR (badges, status honesto, diagrama mermaid, quick start com tempos reais, CLI real do vendored com atribuição CC BY, tabela do `pnpm eval`, mapa, docs, "how it is built", acks); READMEs dos 5 pacotes (exemplos tsx executados); tests/ e corpus/ README; docs/README (índice pt), scripts/, apps/, .opencode/; 109 links relativos = 0 quebrados; números do `pnpm eval` conferidos; `pnpm verify` verde (1406 testes, 42,3 s); CI `verify` verde antes do merge.
-- 2026-11-13 · **PUB-01 (arquivos legais e da comunidade) — CONCLUÍDO (PR #1, squash)** · conferência pré-publicação (git/CI/config do GitHub ok; `.env.example` era a única falta; greps só com placeholders); LICENSE MIT, THIRD_PARTY.md, package.json raiz+5 (private intacto, lockfile intacto), .editorconfig, CONTRIBUTING.md, SECURITY.md, ISSUE_TEMPLATE x3 + PR template em inglês, dependabot.yml; `pnpm verify` verde, `pnpm eval --ci` exit 0. Próxima: M0/M2 do app (PO).
+- 2026-11-13 · **PUB-03 (CI endurecido, regras do agente e conferência final) — CONCLUÍDO (PR #NN)** · actions por SHA com a tag ao lado, `concurrency` só para PR, `timeout-minutes: 20`; `pnpm check:emails` (noreply obrigatório, `base..head`, `fetch-depth: 0`) provado em repo temporário; AGENTS.md com as regras 11/12 e o merge `--auto`, ADR-110; conferência final: gitleaks 0 achados, 0 links quebrados, clone limpo do README verde, repo ainda privado (prot. da main 403); `pnpm verify` e `pnpm eval --ci` verdes.
+- 2026-11-13 · **PUB-02 (READMEs e documentação de entrada) — CONCLUÍDO (PR #9, squash `f063107`)** · README raiz EN + README.pt-BR; READMEs dos 5 pacotes; tests/, corpus/, docs/README, scripts/, apps/, .opencode/; 109 links = 0 quebrados; números do `pnpm eval` conferidos; `pnpm verify` verde (1406 testes).
 - Sessões anteriores: 2026-11-12 SEG-T05 (`archive/STATE-log-2026-11-12-segt05.md`), 2026-11-11 SEG-T04 (PR #110, ADR-107), `archive/STATE-log-2026-11-11-segt03.md`, `archive/STATE-log-2026-11-11-segt02.md`, `archive/STATE-log-2026-11-11-corpus-vendored.md`, `archive/STATE-log-2026-11-11-e10t04.md`, `archive/STATE-full-2026-10-10.md`, `archive/STATE-log-2026-10-12.md`, `archive/STATE-log-2026-10-14.md`, `archive/STATE-log-2026-10-17.md`, `archive/STATE-log-2026-10-19.md`, `archive/STATE-log-2026-10-20.md`, `archive/STATE-handoff-2026-10-22.md`, `archive/STATE-log-2026-10-27-e8t03.md`, `archive/STATE-log-2026-10-28-e8t02.md`, `archive/STATE-log-2026-10-28-e8t03-fatia3.md`, `archive/STATE-log-2026-11-02-e9t04.md`.
 
 Histórico completo: docs/extractor/archive/
