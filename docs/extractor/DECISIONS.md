@@ -114,6 +114,7 @@ Formato: `ADR-NNN · título · status (accepted/provisional/superseded) · data
 | ADR-109 | Segmentador: atribuição minúscula após fechamento continua a frase; `snr.`/`snra.` na lista pt | accepted |
 | ADR-110 | Política de publicação do repositório | accepted |
 | ADR-111 | Dependabot: TypeScript 7 adotado; vitest 4 e `@types/node` 26 rejeitados | accepted |
+| ADR-112 | Actions do CI nas majors atuais (cache 6, setup-node 7, pnpm/action-setup 6) | accepted |
 <!-- INDEX:END -->
 
 ---
@@ -874,3 +875,9 @@ Critério de detecção: se a **maior parte dos caracteres** das páginas estive
 **Alternativas:** A) aceitar os três (contras: vitest 4 quebra o `pnpm test`, e tipos de Node 26 descrevem um runtime que o projeto não usa) · B) aceitar só o TypeScript 7 e rejeitar os outros dois com a causa registrada · C) congelar os três (contras: perde o typecheck nativo do TS 7, que passou em todos os gates).
 **Decisão:** **B** — TS 7.0.2 mesclado depois de `pnpm verify`, `pnpm eval --ci` e `pnpm bench --ci --runs 3` verdes (o typecheck foi conferido reprovando um erro plantado, para não ser um no-op); vitest 4 e `@types/node` 26 fechados com `@dependabot ignore this major version`. `@types/node` vai para `^24` e o `dependabot.yml` ignora majors dele, com comentário no arquivo.
 **Consequências:** o typecheck roda no compilador nativo do TS 7; vitest 4 exige subir `vite` para ≥ 6 junto e fica no BACKLOG ("avaliar quando maduro"); tipos de Node só sobem de major numa tarefa que suba o runtime antes.
+
+### ADR-112 · Actions do CI nas majors atuais (cache 6, setup-node 7, pnpm/action-setup 6) · accepted · 2026-11-13
+**Contexto:** depois dos merges anteriores, o Dependabot abriu #17 (`actions/cache/save` 4.3.0→6.1.0), #18 (`actions/setup-node` 4.4.0→7.1.0) e #19 (`pnpm/action-setup` 5.0.0→6.1.1) — três majors que rodam no `verify` e mudam o runtime exigido pelas actions.
+**Alternativas:** A) aceitar as três como vieram (contra: `cache/restore` ficaria em v4 lendo um cache escrito pelo `cache/save` v6) · B) aceitar as três e alinhar o restore na mesma major (escolhida) · C) recusar as majors (contra: as actions v4 usam runtime Node 20, já sem suporte, e o Dependabot reabriria os PRs).
+**Decisão:** **B** — #17/#18/#19 mesclados com `verify` verde e pin por SHA com o comentário da versão; o `cache/restore` foi para v6.1.0 no PR #20, com o mesmo SHA do save.
+**Consequências:** o cache do corpus é escrito e lido pela mesma major; as actions rodam no runtime Node 24 atual; subir qualquer uma delas de novo é tarefa própria, com `verify` verde antes do merge.
